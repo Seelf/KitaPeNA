@@ -56,7 +56,7 @@ def calculate_reachability_graph(places, transitions, arcs, max_states=100):
     # Edges: [source_id, target_id] (We lose label in MIS edge format usually, but we can try to encode it or just keep structure)
     # Actually MIS Edges are [id1, id2]. Directed? MIS is undirected usually.
     # But Reachability Graph IS directed. 
-    # The existing MIS Editor supports directed edges visually (arrows), but underlying logic is usually undirected for MIS algo.
+    # The existing Kitapena supports directed edges visually (arrows), but underlying logic is usually undirected for MIS algo.
     # However, for visualization, we just need nodes and edges.
     
     nodes_out = []
