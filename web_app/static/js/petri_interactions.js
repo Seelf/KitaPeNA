@@ -652,9 +652,14 @@ async function updateReachabilityGraph() {
 
         logToScreen(`Sending Payload: ${places.length}P ${transitions.length}T ${arcs.length}A`);
 
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
         const response = await fetch('/api/petri/reachability', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
             body: JSON.stringify(payload)
         });
 

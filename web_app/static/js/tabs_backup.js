@@ -31,7 +31,7 @@ export function initTabs(switchContextCallback) {
     }
 }
 
-export function createNewTab(type = 'PETRI', name = null, content = null) {
+export function createNewTab(type = 'MIS', name = null, content = null) {
     const id = `tab_${nextTabId++}`;
     const title = name || `Untitled-${nextTabId - 1}`;
 
@@ -105,7 +105,7 @@ export function closeTab(id, event) {
         } else {
             // No tabs left? Create default
             activeTabId = null; // reset so createNewTab doesn't try to save
-            createNewTab('PETRI');
+            createNewTab('MIS');
         }
     } else {
         renderTabBar();
@@ -172,33 +172,8 @@ function restoreStateFromTab(tab) {
 
         petriState.nextPlaceId = tab.data.nextPlaceId || 1;
         petriState.nextTransitionId = tab.data.nextTransitionId || 1;
-
-        // Clear previous Reachability Graph state BEFORE restoring
-        nodes.length = 0;
-        edges.length = 0;
-
-        if (tab.data.nodes) {
-            const seenIds = new Set();
-            tab.data.nodes.forEach(n => {
-                if (!seenIds.has(n.id)) {
-                    nodes.push(n);
-                    seenIds.add(n.id);
-                }
-            });
-        }
-        if (tab.data.edges) {
-            const seenEdges = new Set();
-            tab.data.edges.forEach(e => {
-                let key;
-                if (Array.isArray(e)) key = `${e[0]}-${e[1]}`;
-                else key = `${e.source}-${e.target}`; // Check object structure
-
-                if (!seenEdges.has(key)) {
-                    edges.push(e);
-                    seenEdges.add(key);
-                }
-            });
-        }
+        if (tab.data.nodes) tab.data.nodes.forEach(n => nodes.push(n));
+        if (tab.data.edges) tab.data.edges.forEach(e => edges.push(e));
 
         state.misSteps = tab.data.misSteps || [];
         state.isGenerated = tab.data.isGenerated || false;

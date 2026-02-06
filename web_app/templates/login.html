@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitapena - Login</title>
+    <!-- Dark Mode CSS (Inline for simplicity) -->
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #ccc;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .login-box {
+            background: #252526;
+            padding: 40px;
+            border: 1px solid #3c3c3c;
+            border-radius: 5px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            width: 300px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #fff;
+            margin-bottom: 20px;
+            font-weight: normal;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 3px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #1177bb;
+        }
+
+        .alert {
+            background: #440000;
+            color: #ff9999;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #880000;
+            font-size: 13px;
+        }
+
+        .cf-turnstile {
+            margin: 15px 0;
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+    <!-- Cloudflare Turnstile -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+
+<body>
+    <div class="login-box">
+        <h2>Kitapena Login</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="username" placeholder="Username" required autofocus>
+            <input type="password" name="password" placeholder="Password" required>
+
+            <div class="cf-turnstile" data-sitekey="{{ site_key }}" data-theme="dark"></div>
+
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</body>
+
+</html>

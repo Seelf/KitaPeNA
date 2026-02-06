@@ -57,7 +57,13 @@ export function updateResultsList() {
                 const misArray = Array.isArray(step) ? step : (step.mis || []);
                 el.textContent = `${index + 1}. { ${misArray.join(', ')} }`;
                 el.onclick = () => {
-                    // Jump to step logic (omitted for brevity in debug)
+                    import('./simulation.js').then(module => {
+                        state.currentStepIndex = index;
+                        module.stopAutoPlay();
+                        module.highlightResultItem(index);
+                        import('./render.js').then(r => r.draw());
+                        updateButtonStates();
+                    });
                 };
                 elements.resultsList.appendChild(el);
             });
@@ -94,8 +100,8 @@ export function updateReadOnlyUI() {
     const btnDelete = document.getElementById('btnDelete');
     const btnClear = document.getElementById('btnClear');
 
-    // Disable/Gray out tools
-    [btnModeNode, btnModeEdge, btnDelete, btnClear].forEach(btn => {
+    // Disable Creation Tools ONLY
+    [btnModeNode, btnModeEdge].forEach(btn => {
         if (btn) {
             btn.disabled = isReadOnly;
             btn.style.opacity = isReadOnly ? '0.3' : '1';
@@ -103,8 +109,17 @@ export function updateReadOnlyUI() {
         }
     });
 
-    // Force View Mode if Read Only
-    if (isReadOnly && state.mode !== 'view') {
+    // Delete and Clear should remained ENABLED
+    [btnDelete, btnClear].forEach(btn => {
+        if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        }
+    });
+
+    // If currently in creation mode, switch to view
+    if (isReadOnly && (state.mode === 'nodes' || state.mode === 'edges')) {
         setMode('view');
     }
 }

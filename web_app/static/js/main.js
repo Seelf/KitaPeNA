@@ -3,6 +3,7 @@ console.log("Main.js module loading...");
 import { initElements, state, nodes, edges, camera } from './state.js';
 import { draw, resizeCanvas } from './render.js';
 import { initInteractions, deleteSelectedNode } from './interactions.js';
+import { initAdminConsole } from './admin.js';
 import { updateStats, setMode, updateResultsList, updateButtonStates } from './ui.js';
 import { loadFromLocalStorage, loadSavedGraphs, saveGraph, loadGraphFromDb, loadSavedPetriNets, loadPetriNetFromDb, savePetriNetDb, importPetriBatch } from './storage.js';
 import { fetchSolution, advanceStep, startAutoPlay, stopAutoPlay, resetSimulation, highlightResultItem, updateSimulationSpeed } from './simulation.js';
@@ -18,6 +19,7 @@ initElements();
 // 2. Init Interactions
 initInteractions();
 initPetriInteractions();
+initAdminConsole();
 
 // --- CONTEXT SWITCHING ---
 const tabContextGraph = document.getElementById('tabContextGraph');
@@ -307,14 +309,26 @@ if (tabEditor && tabDb && viewResults && viewDb) {
                                 setTimeout(() => {
                                     const allZero = [...places, ...transitions].every(n => (n.x === 0 && n.y === 0));
                                     if (allZero && (places.length > 0 || transitions.length > 0)) {
-                                        runAutoLayout();
+                                        // runAutoLayout(); // Make sure this function exists and works!
+                                        // Only run if actually available, otherwise just draw
+                                        if (typeof runAutoLayout === 'function') runAutoLayout();
+                                        else {
+                                            console.warn("runAutoLayout not found");
+                                            drawPetri();
+                                        }
                                     } else {
+                                        // Reset camera if possibly far away?
+                                        if (state.petriCamera) { state.petriCamera.x = 0; state.petriCamera.y = 0; state.petriCamera.zoom = 1; }
                                         drawPetri();
                                     }
                                     updateStats();
                                     tabEditor.click();
                                     switchContext('PETRI');
-                                }, 50);
+
+                                    // AUTO-GENERATE REACHABILITY GRAPH (User Request)
+                                    generateReachabilityGraph();
+
+                                }, 100); // Increased timeout slightly to ensure DOM/Canvas ready
                             });
                         }
                     });
@@ -477,6 +491,14 @@ window.addEventListener('resize', () => {
     }
 });
 
+// --- REACHABILITY BUTTON ---
+const btnPetriReachability = document.getElementById('btnPetriReachability');
+if (btnPetriReachability) {
+    btnPetriReachability.addEventListener('click', async () => {
+        await generateReachabilityGraph();
+    });
+}
+
 // --- PETRI SAVE TOOLBAR BUTTON ---
 const btnPetriSave = document.getElementById('btnPetriSave');
 if (btnPetriSave) {
@@ -600,23 +622,34 @@ function runMisLayout() {
     draw();
 }
 
+// --- REACHABILITY ---
 async function generateReachabilityGraph() {
     console.log("Generating Reachability Graph...");
 
-    // Get current Petri state loaded in variables (places, transitions, arcs)
-    // They are imported from petri_state.js
-
+    // Use globals imported from petri_state.js
     if (places.length === 0 && transitions.length === 0) {
         alert("Petri Net is empty.");
         return;
     }
 
     try {
+        console.log("Sending payload:", { places, transitions, arcs });
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
         const response = await fetch('/api/petri/reachability', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
             body: JSON.stringify({ places, transitions, arcs })
         });
+
+        if (!response.ok) {
+            const txt = await response.text();
+            throw new Error(`Server status: ${response.status} - ${txt}`);
+        }
 
         const data = await response.json();
 
@@ -625,14 +658,8 @@ async function generateReachabilityGraph() {
             nodes.length = 0;
             edges.length = 0;
 
-            // Map data.nodes / data.edges to our format
-            // data.nodes might be just IDs or objects?
-            // Python: nodes, edges = calculate_reachability_graph(...)
-            // Looking at python code (checking later if needed, assuming standard format)
-
             if (data.nodes && Array.isArray(data.nodes)) {
                 data.nodes.forEach(n => {
-                    // Randomize layout to avoid overlap at 0,0
                     n.x = Math.random() * 800 + 50;
                     n.y = Math.random() * 600 + 50;
                     n.vx = 0; n.vy = 0;
@@ -648,27 +675,25 @@ async function generateReachabilityGraph() {
             // Switch Context
             switchContext('MIS');
 
-            // Auto Layout for the new graph
-            // runAutoLayout(); // this is for Petri... we need MIS layout
-            // We can re-use the force layout in draw() or similar?
-            // resetSimulation() calls draw() which might not layout?
-            // runMISLayout? 
+            // Layout if needed
+            runMisLayout();
 
-            // For now, let's trigger a layout if nodes have 0,0 coords (which they might from backend)
-            // The simulation loop (lines 500+) in updateLayout() handles this? 
-            // Wait, main.js DOES NOT HAVE an updateLayout loop exported?
-            // Ah, I see "initInteractions" might import it?
+            // MARK AS GENERATED (Read Only)
+            import('./state.js').then(s => {
+                s.state.isGenerated = true;
+                import('./ui.js').then(ui => ui.updateReadOnlyUI());
+            });
 
-            // Let's just call draw() and updateStats()
             draw();
             updateStats();
 
         } else {
+            console.error("API returned error:", data.message);
             alert('Error generating graph: ' + data.message);
         }
     } catch (e) {
         console.error("Reachability generation failed:", e);
-        alert("Failed to reach server.");
+        alert("Failed to reach server: " + e.message);
     }
 }
 

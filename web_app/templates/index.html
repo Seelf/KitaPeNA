@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIS Editor - Web Version</title>
+    <title>Kitapena - Web Version</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- Google Fonts for that VS Code look -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,7 +46,7 @@
 
         <!-- Header / Title Bar -->
         <header class="title-bar">
-            <div class="title">MIS Graph Editor <span class="badge">Web</span></div>
+            <div class="title">Kitapena <span class="badge">Web</span></div>
             <div class="spacer"></div>
             <div class="window-controls">
                 <button id="btnToggleSettings" class="btn small"
@@ -64,8 +65,76 @@
                 </div>
                 <button id="btnToggleDebug" class="btn small"
                     style="font-size: 11px; padding: 2px 8px; background: #333; color: lime; border: 1px solid green; margin-right: 10px;">Debug</button>
+
+                {% if user.role == 'admin' %}
+                <button id="btnAdminConsole" class="btn small"
+                    style="font-size: 11px; padding: 2px 8px; background: #440000; color: #ffcccc; border: 1px solid #ff0000; margin-right: 10px;">🛡️
+                    Admin</button>
+                {% endif %}
+
+                <a href="{{ url_for('logout') }}" class="btn small"
+                    style="font-size: 11px; padding: 2px 8px; background: #333; color: #ccc; border: 1px solid #555; text-decoration: none;">Logout</a>
             </div>
         </header>
+
+        <!-- ADMIN MODAL -->
+        <div id="adminModal"
+            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 20000; justify-content: center; align-items: center;">
+            <div
+                style="background: #252526; width: 600px; max-height: 80vh; display: flex; flex-direction: column; border: 1px solid #444; box-shadow: 0 0 20px rgba(0,0,0,0.7);">
+                <div
+                    style="padding: 10px; background: #333; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; color: #ddd;">🛡️ User Management Console</span>
+                    <button id="btnCloseAdmin"
+                        style="background: none; border: none; color: #ccc; cursor: pointer;">✕</button>
+                </div>
+
+                <div style="padding: 20px; overflow-y: auto;">
+                    <!-- Change My Password -->
+                    <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #333;">
+                        <h4 style="color: #aaa; margin-bottom: 10px;">My Credentials</h4>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="password" id="inputNewAdminPass" placeholder="New Password"
+                                style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                            <button id="btnChangeAdminPass" class="btn primary">Update Password</button>
+                        </div>
+                    </div>
+
+                    <!-- User List -->
+                    <h4 style="color: #aaa; margin-bottom: 10px;">Users</h4>
+                    <table
+                        style="width: 100%; text-align: left; font-size: 12px; color: #ccc; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #444;">
+                                <th style="padding: 5px;">ID</th>
+                                <th style="padding: 5px;">Username</th>
+                                <th style="padding: 5px;">Role</th>
+                                <th style="padding: 5px;">Status</th>
+                                <th style="padding: 5px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+
+                    <!-- Add User -->
+                    <h4 style="color: #aaa; margin-top: 20px; margin-bottom: 10px;">Add New User</h4>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="inputNewUser" placeholder="Username"
+                            style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                        <input type="password" id="inputNewPass" placeholder="Password"
+                            style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                        <select id="selectNewRole"
+                            style="background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <button id="btnAddUser" class="btn primary">Create</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Main Content Area -->
         <div class="main-split">
@@ -81,9 +150,9 @@
                     </svg>
                 </div>
                 <div class="icon" id="tabDb" title="Saved Graphs">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 3h18v18H3z"></path>
-                        <path d="M21 9H3M21 15H3M12 3v18"></path>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                     </svg>
                 </div>
             </div>
@@ -170,6 +239,8 @@
                         <div class="tool-separator"></div>
                         <button class="tool-btn" id="btnPetriSave" title="Save Petri Net">💾</button>
                         <button class="tool-btn" id="btnPetriImport" title="Import .pnh">📂</button>
+                        <button class="tool-btn highlight" id="btnPetriReachability"
+                            title="Generate Reachability Graph">🕸️</button>
                         <button class="tool-btn" id="btnPetriLayout" title="Auto Layout">✨</button>
                         <button class="tool-btn danger" id="btnPetriClear" title="Clear All">❌</button>
 
@@ -201,7 +272,7 @@
                     <!-- Database Module Tabs -->
                     <div class="db-tabs">
                         <button id="btnDbPetri" class="db-tab active">Petri Nets</button>
-                        <button id="btnDbGraphs" class="db-tab">MIS Graphs</button>
+                        <button id="btnDbGraphs" class="db-tab">Rea Graphs</button>
                     </div>
 
                     <!-- MIS GRAPHS CONTENT (Hidden) -->
