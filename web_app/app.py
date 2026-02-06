@@ -41,6 +41,10 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return render_template('429.html', description=e.description), 429
+
 # --- User Model ---
 class User(UserMixin):
     def __init__(self, id, username, role, is_blocked):
