@@ -2,7 +2,7 @@
 
 Aplikacja webowa do edycji, analizy i symulacji Sieci Petriego (Petri Nets) oraz wyznaczania Maksymalnych Zbiorów Niezależnych (MIS) na Grafach Osiągalności.
 
-## 🚀 Instrukcja Uruchomienia / How to Run
+## Instrukcja Uruchomienia / How to Run
 
 ### Wymagania
 - Python 3.8+
@@ -36,7 +36,7 @@ Aplikacja powninna wystartować pod adresem: [http://127.0.0.1:5002](http://127.
 
 ---
 
-## 📖 Opis Projektu
+## Opis Projektu
 
 Celem projektu jest badanie i wizualizacja problemu wyznaczania **Maksymalnych Zbiorów Niezależnych (Maximum Independent Sets - MIS)** w kontekście systemów współbieżnych modelowanych za pomocą Sieci Petriego.
 
@@ -47,7 +47,7 @@ Proces badawczy w aplikacji wygląda następująco:
 
 ---
 
-## 📂 Struktura Plików i Folderów
+## Struktura Plików i Folderów
 
 Projekt podzielony jest na backend w Pythonie (Flask) oraz rozbudowany frontend w JavaScript (Vanilla ES6 Modules).
 
@@ -89,7 +89,7 @@ Aplikacja kliencka napisana jest w nowoczesnym JavaScript z podziałem na moduł
 
 ---
 
-## 🛠 Kluczowe Funkcje i Metody
+## Kluczowe Funkcje i Metody
 
 ### Backend (`app.py` & `petri_reachability.py`)
 -   **`/api/petri/reachability` (POST)**: Przyjmuje definicję sieci Petriego (JSON), buduje graf osiągalności metodą BFS i zwraca węzły/krawędzie.
@@ -107,7 +107,7 @@ Aplikacja kliencka napisana jest w nowoczesnym JavaScript z podziałem na moduł
 
 ---
 
-## 🖥️ Interfejs Użytkownika
+## Interfejs Użytkownika
 
 1.  **Toolbar (Lewa/Góra)**: Narzędzia edycji (Dodaj Miejsce, Tranzycję, Łuk, Token). Przełącznik trybów (Model / Analysis).
 2.  **Canvas (Środek)**: Obszar roboczy z obsługą nieskończonego przesuwania i przybliżania.
