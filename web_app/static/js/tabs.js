@@ -170,8 +170,12 @@ function restoreStateFromTab(tab) {
         if (tab.data.transitions) tab.data.transitions.forEach(t => transitions.push(t));
         if (tab.data.arcs) tab.data.arcs.forEach(a => arcs.push(a));
 
-        petriState.nextPlaceId = tab.data.nextPlaceId || 1;
-        petriState.nextTransitionId = tab.data.nextTransitionId || 1;
+        // Dynamically calculate next IDs if not present explicitly (safe for imported files)
+        const maxPlaceId = places.reduce((max, p) => Math.max(max, p.id), -1);
+        const maxTransId = transitions.reduce((max, t) => Math.max(max, t.id), -1);
+
+        petriState.nextPlaceId = (tab.data.nextPlaceId !== undefined) ? tab.data.nextPlaceId : (maxPlaceId + 1);
+        petriState.nextTransitionId = (tab.data.nextTransitionId !== undefined) ? tab.data.nextTransitionId : (maxTransId + 1);
 
         // Clear previous Reachability Graph state BEFORE restoring
         nodes.length = 0;
@@ -190,8 +194,15 @@ function restoreStateFromTab(tab) {
             const seenEdges = new Set();
             tab.data.edges.forEach(e => {
                 let key;
-                if (Array.isArray(e)) key = `${e[0]}-${e[1]}`;
-                else key = `${e.source}-${e.target}`; // Check object structure
+                if (Array.isArray(e)) {
+                    // ID format: [source, target, label]
+                    // Label can be a string or object {label: "t1"}
+                    const rawLabel = e[2];
+                    const labelStr = (rawLabel && typeof rawLabel === 'object' && rawLabel.label) ? rawLabel.label : String(rawLabel || '');
+                    key = `${e[0]}-${e[1]}-${labelStr}`;
+                } else {
+                    key = `${e.source}-${e.target}-${e.label || ''}`;
+                }
 
                 if (!seenEdges.has(key)) {
                     edges.push(e);

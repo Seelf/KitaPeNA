@@ -364,6 +364,7 @@ def get_graph(graph_id):
     return jsonify(dict(graph))
 
 @app.route('/api/graphs', methods=['POST'])
+@csrf.exempt
 def save_graph():
     """Saves a new graph to the database."""
     data = request.json
@@ -426,8 +427,8 @@ def parse_pnh(content):
     # Spec implies last row is marking.
     num_transitions = num_rows - 1
     
-    places = [{'id': i+1, 'tokens': 0, 'label': f'p{i+1}'} for i in range(num_places)]
-    transitions = [{'id': i+1, 'label': f't{i+1}'} for i in range(num_transitions)]
+    places = [{'id': i, 'tokens': 0, 'label': f'p{i}'} for i in range(num_places)]
+    transitions = [{'id': i, 'label': f't{i}'} for i in range(num_transitions)]
     arcs = []
     
     # Parse Matrix
@@ -455,16 +456,16 @@ def parse_pnh(content):
                 if val == -1:
                         # Place -> Transition
                         arcs.append({
-                            'sourceId': p_idx + 1,
-                            'targetId': t_idx + 1,
+                            'sourceId': p_idx,
+                            'targetId': t_idx,
                             'type': 'place_to_transition',
                             'weight': 1
                         })
                 elif val == 1:
                         # Transition -> Place
                         arcs.append({
-                            'sourceId': t_idx + 1,
-                            'targetId': p_idx + 1,
+                            'sourceId': t_idx,
+                            'targetId': p_idx,
                             'type': 'transition_to_place',
                             'weight': 1
                         })
@@ -497,6 +498,7 @@ def parse_pnh(content):
     return {'places': places, 'transitions': transitions, 'arcs': arcs}
 
 @app.route('/api/petri/import', methods=['POST'])
+@csrf.exempt
 def import_petri():
     if 'file' not in request.files:
         return jsonify({'status': 'error', 'message': 'No file part'}), 400
@@ -535,6 +537,7 @@ def get_saved_petri_net(net_id):
     return jsonify(dict(net))
 
 @app.route('/api/petri/saved', methods=['POST'])
+@csrf.exempt
 def save_petri_net():
     """Saves a new Petri net to the database."""
     data = request.json
@@ -561,6 +564,7 @@ def delete_petri_net(net_id):
     return jsonify({'status': 'deleted'})
 
 @app.route('/api/petri/import_batch', methods=['POST'])
+@csrf.exempt
 def import_petri_batch():
     if 'files' not in request.files:
         return jsonify({'status': 'error', 'message': 'No files part'}), 400
@@ -594,6 +598,7 @@ def import_petri_batch():
     return jsonify({'status': 'success', 'imported_count': imported_count, 'errors': errors})
 
 @app.route('/api/petri/reachability', methods=['POST'])
+@csrf.exempt
 def calculate_reachability():
     """Calculates the Reachability Graph and returns nodes/edges directly."""
     try:

@@ -16,8 +16,8 @@ export const arcs = [
 export const petriState = {
     selectedElement: null, // place, transition, or arc
     mode: 'view', // 'view', 'place', 'transition', 'arc'
-    nextPlaceId: 1,
-    nextTransitionId: 1,
+    nextPlaceId: 0,
+    nextTransitionId: 0,
     mouseX: 0,
     mouseY: 0,
 
@@ -29,7 +29,7 @@ export function clearPetri() {
     places.length = 0;
     transitions.length = 0;
     arcs.length = 0;
-    petriState.nextPlaceId = 1;
-    petriState.nextTransitionId = 1;
+    petriState.nextPlaceId = 0;
+    petriState.nextTransitionId = 0;
     petriState.selectedElement = null;
 }
