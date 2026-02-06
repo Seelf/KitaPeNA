@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIS Editor - Web Version</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Google Fonts for that VS Code look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+</head>
+<style>
+    /* Critical render path styles */
+    body {
+        background-color: #222;
+        color: #f00;
+        font-family: sans-serif;
+    }
+</style>
+
+<body>
+
+    <div class="app-container">
+        <!-- DEBUG OVERLAY (Window Mode) -->
+        <div id="debugOverlay"
+            style="position: fixed; top: 50px; right: 20px; width: 400px; height: 300px; background: rgba(0,0,0,0.9); color: lime; font-family: monospace; font-size: 11px; z-index: 9999; border: 1px solid #00ff00; display: none; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+
+            <!-- Title Bar -->
+            <div
+                style="background: #003300; padding: 5px 10px; cursor: move; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid green;">
+                <span>Debug Console</span>
+                <button id="btnCloseDebug"
+                    style="background: none; border: none; color: lime; cursor: pointer; font-weight: bold;">[X]</button>
+            </div>
+
+            <!-- Content -->
+            <div id="debugLogContainer" style="flex: 1; overflow-y: auto; padding: 5px;">
+                <div>> Ready.</div>
+            </div>
+        </div>
+
+        <!-- Header / Title Bar -->
+        <header class="title-bar">
+            <div class="title">MIS Graph Editor <span class="badge">Web</span></div>
+            <div class="spacer"></div>
+            <div class="window-controls">
+                <button id="btnToggleSettings" class="btn small"
+                    style="font-size: 11px; padding: 2px 8px; background: #333; color: #aaa; border: 1px solid #555; margin-right: 10px;">⚙️
+                    View</button>
+                <div id="settingsPanel"
+                    style="display: none; position: absolute; top: 40px; right: 10px; background: #222; border: 1px solid #555; padding: 10px; z-index: 10001; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                    <div style="font-size: 11px; color: #fff; margin-bottom: 5px; font-weight: bold;">VIEW SETTINGS
+                    </div>
+                    <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                        <input type="checkbox" id="chkShowSidebar" checked> Show Sidebar
+                    </label>
+                    <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                        <input type="checkbox" id="chkShowToolbar" checked> Show Toolbar
+                    </label>
+                </div>
+                <button id="btnToggleDebug" class="btn small"
+                    style="font-size: 11px; padding: 2px 8px; background: #333; color: lime; border: 1px solid green; margin-right: 10px;">Debug</button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="main-split">
+            <!-- Left: Sidebar (Tools) -->
+            <div class="activity-bar">
+                <div class="icon active" id="tabEditor" title="Edit Graph">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="18" cy="5" r="3"></circle>
+                        <circle cx="6" cy="12" r="3"></circle>
+                        <circle cx="18" cy="19" r="3"></circle>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
+                </div>
+                <div class="icon" id="tabDb" title="Saved Graphs">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3h18v18H3z"></path>
+                        <path d="M21 9H3M21 15H3M12 3v18"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Center: Canvas Editor -->
+            <div class="editor-area">
+                <!-- Custom Tab Bar Wrapper (Active Files) -->
+                <div class="tabs-wrapper">
+                    <button id="btnTabScrollLeft" class="tab-scroll-btn" title="Scroll Left">‹</button>
+                    <div class="editor-tabs-bar" id="editorTabBar">
+                        <!-- Tabs injected by tabs.js -->
+                    </div>
+                    <button id="btnTabScrollRight" class="tab-scroll-btn" title="Scroll Right">›</button>
+                </div>
+
+                <!-- Context Wrapper (Model/Analysis) -->
+                <div class="editor-header">
+                    <span class="tab active" id="tabContextPetri">Petri Net (Model)</span>
+                    <span class="tab" id="tabContextGraph">Reachability Graph (Analysis)</span>
+                </div>
+                <div class="canvas-container" id="canvasContainer">
+                    <div id="graphStats" class="graph-stats">Nodes: 0 | Edges: 0</div>
+
+                    <!-- Graph MIS Toolbar -->
+                    <div class="floating-toolbar" id="toolbarGraph">
+                        <button class="tool-btn" id="btnModeView" title="Move / Pan">✋</button>
+                        <button class="tool-btn" id="btnModeNode" title="Add Node">
+                            <svg width="20" height="20" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" />
+                                <text x="12" y="16" text-anchor="middle" fill="currentColor" font-size="12"
+                                    font-family="monospace" id="iconNodeNum">1</text>
+                            </svg>
+                        </button>
+                        <button class="tool-btn" id="btnModeEdge" title="Add Edge">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="5" cy="19" r="3"></circle>
+                                <circle cx="19" cy="5" r="3"></circle>
+                                <line x1="7.5" y1="16.5" x2="16.5" y2="7.5"></line>
+                            </svg>
+                        </button>
+                        <div class="tool-separator"></div>
+                        <button class="tool-btn" id="btnSaveGraph" title="Save Graph">💾</button>
+                        <button class="tool-btn" id="btnGraphLayout" title="Auto Layout">✨</button>
+                        <button class="tool-btn" id="btnDelete" title="Delete Selected">🗑️</button>
+                        <button class="tool-btn danger" id="btnClear" title="Clear All">❌</button>
+                    </div>
+
+                    <!-- Petri Net Toolbar (Hidden by default) -->
+                    <div class="floating-toolbar" id="toolbarPetri" style="display: none;">
+                        <button class="tool-btn" id="btnPetriPan" title="Move / Pan">✋</button>
+                        <button class="tool-btn" id="btnPetriPlace" title="Add Place (O)">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="8"></circle>
+                            </svg>
+                        </button>
+                        <button class="tool-btn" id="btnPetriTransition" title="Add Transition ([ ])">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="8" y="4" width="8" height="16"></rect>
+                            </svg>
+                        </button>
+                        <button class="tool-btn" id="btnPetriArc" title="Add Arc (->)">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M5 12h14m-4-4l4 4-4 4"></path>
+                            </svg>
+                        </button>
+                        <button class="tool-btn" id="btnPetriToken" title="Add/Remove Token">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                <circle cx="12" cy="12" r="5"></circle>
+                            </svg>
+                        </button>
+                        <button class="tool-btn" id="btnPetriDelete" title="Delete Element (Eraser)">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M3 6h18"></path>
+                                <path
+                                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                </path>
+                            </svg>
+                        </button>
+                        <div class="tool-separator"></div>
+                        <button class="tool-btn" id="btnPetriSave" title="Save Petri Net">💾</button>
+                        <button class="tool-btn" id="btnPetriImport" title="Import .pnh">📂</button>
+                        <button class="tool-btn" id="btnPetriLayout" title="Auto Layout">✨</button>
+                        <button class="tool-btn danger" id="btnPetriClear" title="Clear All">❌</button>
+
+                        <!-- Hidden File Input -->
+                        <input type="file" id="fileInputPnh" accept=".pnh" style="display: none;">
+                    </div>
+
+                    <canvas id="graphCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Resizer Handle -->
+            <div id="resizer" class="resizer"></div>
+
+            <!-- Right: Results Panel -->
+            <div class="sidebar-panel">
+                <!-- RESULTS VIEW -->
+                <div id="viewResults" style="display: flex; flex-direction: column; height: 100%;">
+                    <div class="panel-header">EXPLORER: RESULTS</div>
+                    <div class="results-list" id="resultsList">
+                        <div class="empty-state">No MIS found yet. Draw graph and click Start.</div>
+                    </div>
+                </div>
+
+                <!-- DATABASE VIEW -->
+                <div id="viewDb" style="display: none; flex-direction: column; height: 100%;">
+                    <div class="panel-header">DATABASE</div>
+
+                    <!-- Database Module Tabs -->
+                    <div class="db-tabs">
+                        <button id="btnDbPetri" class="db-tab active">Petri Nets</button>
+                        <button id="btnDbGraphs" class="db-tab">MIS Graphs</button>
+                    </div>
+
+                    <!-- MIS GRAPHS CONTENT (Hidden) -->
+                    <div id="dbContentGraphs" class="db-content" style="display: none;">
+                        <div class="sidebar-actions">
+                            <button id="btnSaveGraph" class="action-btn">Save Current Graph</button>
+                            <input type="text" id="inputSearchGraph" placeholder="Search graphs..."
+                                style="width: 100%; margin-top: 5px; padding: 5px; background: #333; color: #fff; border: 1px solid #555; border-radius: 3px;">
+                        </div>
+                        <div id="savedGraphsList" class="saved-list">
+                            <!-- Items populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- PETRI NETS CONTENT (Active) -->
+                    <div id="dbContentPetri" class="db-content">
+                        <div class="sidebar-actions">
+                            <button id="btnSavePetri" class="action-btn">Save Model</button>
+                            <button id="btnImportBatch" class="action-btn secondary">Import Folder</button>
+                            <input type="file" id="fileInputBatch" webkitdirectory directory multiple
+                                style="display: none;">
+                            <input type="text" id="inputSearchPetri" placeholder="Search models..."
+                                style="width: 100%; margin-top: 5px; padding: 5px; background: #333; color: #fff; border: 1px solid #555; border-radius: 3px;">
+                        </div>
+                        <div id="savedPetriList" class="saved-list">
+                            <!-- Items populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer / Status Bar with Controls -->
+        <footer class="status-bar">
+            <!-- Simulation Controls Only -->
+            <div class="controls-group" style="width: 100%; justify-content: center;">
+                <button id="btnStart" class="btn primary">Start / Solve</button>
+                <div class="separator"></div>
+
+                <button id="btnPrev" class="btn" disabled>Prev</button>
+                <button id="btnNext" class="btn" disabled>Next</button>
+                <button id="btnAuto" class="btn" disabled>Auto</button>
+
+                <div class="separator"></div>
+
+                <div class="slider-container" title="Simulation Speed">
+                    <span style="font-size: 10px; opacity: 0.7;">Speed</span>
+                    <input type="range" id="speedSlider" min="1" max="100" value="50">
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Main App Logic (ES Modules) -->
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v=fixed18"></script>
+</body>
+
+</html>
