@@ -3,7 +3,8 @@ import os
 import sqlite3
 import json
 import requests
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, Response, stream_with_context
+# Author: Dawid Konarczak
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, send_from_directory, Response, stream_with_context
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter

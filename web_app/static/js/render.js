@@ -1,5 +1,6 @@
 
 import { nodes, edges, camera, state, elements } from './state.js';
+import { places } from './petri_state.js';
 
 // --- COORDINATE SYSTEM ---
 export function toWorld(screenX, screenY) {
@@ -263,9 +264,9 @@ export function draw() {
         : new Set();
 
     // Draw Nodes
-    nodes.forEach(node => {
-        // Halo for selected node (Edit Mode)
-        if (state.selectedNode === node) {
+    nodes.forEach((node, index) => {
+        // Halo for selected state (from list or graph click) - use same style as edit mode
+        if (index === state.selectedReachabilityIndex || state.selectedNode === node) {
             ctx.beginPath();
             ctx.arc(node.x, node.y, 28, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
@@ -296,18 +297,54 @@ export function draw() {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // ID Label inside
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 14px Inter, sans-serif';
+        // Draw ID inside (1-based)
+        ctx.fillStyle = '#eee';
+        ctx.font = 'bold 14px Inter';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(node.id, node.x, node.y);
 
-        // State Label (Marking) below
-        if (node.label) {
-            ctx.fillStyle = '#ccc';
-            ctx.font = '12px Inter, sans-serif';
-            ctx.fillText(node.label, node.x, node.y + 35); // Offset below radius (20) + padding
+        // Ensure ID is treated as number and incremented
+        const displayId = (parseInt(node.id) + 1).toString();
+        ctx.fillText(displayId, node.x, node.y);
+
+        // Draw Active Places Label BELOW
+        if (node.marking) {
+            let labelText = '';
+            try {
+                // Ensure places is available
+                if (typeof places !== 'undefined' && places && places.length > 0) {
+                    const parts = [];
+                    const items = [];
+
+                    Object.keys(node.marking).forEach(k => {
+                        const pid = parseInt(k);
+                        const count = node.marking[pid];
+                        if (count > 0) {
+                            const place = places.find(p => p.id === pid);
+                            const name = place ? (place.label || `p${pid}`) : `p${pid}`;
+                            items.push({ name, count });
+                        }
+                    });
+
+                    items.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+                    items.forEach(item => {
+                        parts.push(item.count > 1 ? `${item.count}${item.name}` : item.name);
+                    });
+
+                    if (parts.length > 0) labelText = parts.join(', ');
+                    else labelText = 'ø';
+                }
+            } catch (err) {
+                console.error("Error generating label for node", node.id, err);
+            }
+
+            if (labelText) {
+                ctx.fillStyle = '#aaaaaa'; // Citrine/Light Gray
+                ctx.font = '11px Inter';
+                // Offset below radius (20) + padding (15)
+                ctx.fillText(labelText, node.x, node.y + 35);
+            }
         }
     });
 

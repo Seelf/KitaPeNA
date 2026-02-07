@@ -1,9 +1,10 @@
+// Author: Dawid Konarczak
 import { triggerAutoSave } from './tabs.js';
 import { petriState, places, transitions, arcs } from './petri_state.js';
 import { drawPetri } from './petri_render.js';
 import { toWorld, toScreen } from './render.js';
 import { state, camera, elements } from './state.js';
-import { updateStats } from './ui.js';
+import { updateStats, updateResultsList } from './ui.js';
 
 // Global listeners already set up in main for interactions.js but we need specific ones for Petri
 // We will attach listeners to canvas in initPetriInteractions
@@ -196,6 +197,8 @@ export function initPetriInteractions() {
         return;
     }
     isPetriInitialized = true;
+    const btnPetriRename = document.getElementById('btnPetriRename');
+    const graphCanvas = document.getElementById('graphCanvas');
     console.log("Initializing Petri Interactions...");
 
     const canvas = document.getElementById('graphCanvas');
@@ -208,13 +211,38 @@ export function initPetriInteractions() {
         }
     });
 
+    // Tool Handlers
+    function setActiveTool(btn, mode) {
+        document.querySelectorAll('#toolbarPetri .tool-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        petriState.mode = mode;
+        petriState.selectedElement = null; // Deselect
+        drawPetri();
+
+        // Update cursor based on mode
+        if (graphCanvas) {
+            if (mode === 'view') graphCanvas.style.cursor = 'grab';
+            else if (mode === 'delete') graphCanvas.style.cursor = 'not-allowed';
+            else if (mode === 'rename') graphCanvas.style.cursor = 'text';
+            else graphCanvas.style.cursor = 'crosshair';
+        }
+    }
+
     // Toolbar Listeners
-    document.getElementById('btnPetriPan')?.addEventListener('click', () => setPetriMode('view'));
-    document.getElementById('btnPetriPlace')?.addEventListener('click', () => setPetriMode('place'));
-    document.getElementById('btnPetriTransition')?.addEventListener('click', () => setPetriMode('transition'));
-    document.getElementById('btnPetriArc')?.addEventListener('click', () => setPetriMode('arc'));
-    document.getElementById('btnPetriToken')?.addEventListener('click', () => setPetriMode('token'));
-    document.getElementById('btnPetriDelete')?.addEventListener('click', () => setPetriMode('delete'));
+    const btnPetriPan = document.getElementById('btnPetriPan');
+    const btnPetriPlace = document.getElementById('btnPetriPlace');
+    const btnPetriTransition = document.getElementById('btnPetriTransition');
+    const btnPetriArc = document.getElementById('btnPetriArc');
+    const btnPetriToken = document.getElementById('btnPetriToken');
+    const btnPetriDelete = document.getElementById('btnPetriDelete');
+
+    if (btnPetriPan) btnPetriPan.addEventListener('click', () => setActiveTool(btnPetriPan, 'view'));
+    if (btnPetriPlace) btnPetriPlace.addEventListener('click', () => setActiveTool(btnPetriPlace, 'place'));
+    if (btnPetriTransition) btnPetriTransition.addEventListener('click', () => setActiveTool(btnPetriTransition, 'transition'));
+    if (btnPetriArc) btnPetriArc.addEventListener('click', () => setActiveTool(btnPetriArc, 'arc'));
+    if (btnPetriToken) btnPetriToken.addEventListener('click', () => setActiveTool(btnPetriToken, 'token'));
+    if (btnPetriDelete) btnPetriDelete.addEventListener('click', () => setActiveTool(btnPetriDelete, 'delete'));
+    if (btnPetriRename) btnPetriRename.addEventListener('click', () => setActiveTool(btnPetriRename, 'rename'));
 
     document.getElementById('btnPetriClear')?.addEventListener('click', () => {
         if (confirm("Clear Petri Net?")) {
@@ -335,6 +363,22 @@ export function initPetriInteractions() {
                 checkIntegrity();
                 drawPetri();
                 updateAndSave();
+            }
+        } else if (petriState.mode === 'rename') {
+            if (clicked) {
+                const el = clicked.element;
+                const type = clicked.type;
+
+                // Prompt user
+                const currentName = el.label || (type === 'place' ? `p${el.id}` : `t${el.id}`);
+                const newName = prompt(`Rename ${type} (ID: ${el.id}):`, currentName);
+
+                if (newName !== null && newName.trim() !== "") {
+                    el.label = newName.trim();
+                    drawPetri();
+                    updateAndSave();
+                    updateResultsList(); // Immediate UI update for names
+                }
             }
         } else if (petriState.mode === 'token') {
             if (clicked && clicked.type === 'place') {

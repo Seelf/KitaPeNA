@@ -1,3 +1,4 @@
+// Author: Dawid Konarczak
 
 console.log("Main.js module loading...");
 import { initElements, state, nodes, edges, camera } from './state.js';
@@ -681,11 +682,24 @@ export async function generateReachabilityGraph(background = false) {
         return;
     }
 
+    // 1. Prepare Payload
+    const payload = {
+        places: places.map(p => ({ ...p, tokens: parseInt(p.tokens) || 0 })),
+        transitions: transitions,
+        arcs: arcs,
+        max_states: state.maxReachabilityStates || 1000
+    };
+
+    // SAVE INITIAL MARKING (M0)
+    state.initialMarking = {};
+    places.forEach(p => {
+        state.initialMarking[p.id] = parseInt(p.tokens) || 0;
+    });
+
+    // 2. Call API
     try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-        // Use configurable max states
-        const maxStates = state.maxReachabilityStates || 1000;
 
         const response = await fetch('/api/petri/reachability', {
             method: 'POST',
@@ -693,7 +707,12 @@ export async function generateReachabilityGraph(background = false) {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken
             },
-            body: JSON.stringify({ places, transitions, arcs, max_states: maxStates })
+            body: JSON.stringify({
+                places,
+                transitions,
+                arcs,
+                max_states: state.maxReachabilityStates || 1000
+            })
         });
 
         if (!response.ok) {
