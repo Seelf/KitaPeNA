@@ -10,8 +10,10 @@ import { fetchSolution, advanceStep, startAutoPlay, stopAutoPlay, resetSimulatio
 import { drawPetri } from './petri_render.js';
 import { petriState, places, transitions, arcs } from './petri_state.js';
 import { initPetriInteractions, runAutoLayout } from './petri_interactions.js';
+import { initTabs, triggerAutoSave } from './tabs.js';
 
 console.log("App Initializing (Direct execution)...");
+
 
 // 1. Init DOM Elements
 initElements();
@@ -36,7 +38,6 @@ const dbContentGraphs = document.getElementById('dbContentGraphs');
 
 // 3. Init Tabs (Pass switchContext callback)
 // 3. Init Tabs (Moved to end)
-import { initTabs, triggerAutoSave } from './tabs.js';
 // initTabs called at the end
 
 
@@ -678,11 +679,14 @@ async function generateReachabilityGraph() {
             // Layout if needed
             runMisLayout();
 
-            // MARK AS GENERATED (Read Only)
-            import('./state.js').then(s => {
-                s.state.isGenerated = true;
-                import('./ui.js').then(ui => ui.updateReadOnlyUI());
-            });
+            // MARK AS GENERATED (Read Only) and store truncation status
+            state.isGenerated = true;
+            state.graphTruncated = data.truncated || false;
+
+            import('./ui.js').then(ui => ui.updateReadOnlyUI());
+
+            // Force save to persist truncation status immediately
+            triggerAutoSave();
 
             draw();
             updateStats();

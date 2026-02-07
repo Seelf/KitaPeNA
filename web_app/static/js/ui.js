@@ -10,7 +10,13 @@ export function updateStats() {
             stats.textContent = `Places: ${places.length} | Transitions: ${transitions.length} | Arcs: ${arcs.length} | Tokens: ${totalTokens}`;
         } else {
             // MIS / Reachability Graph
-            stats.textContent = `Nodes: ${nodes.length} | Edges: ${edges.length}`;
+            let statusText = `Nodes: ${nodes.length} | Edges: ${edges.length}`;
+            if (state.graphTruncated) {
+                statusText += ' | ⚠️ TRUNCATED (possible unbounded net)';
+            } else if (nodes.length > 0) {
+                statusText += ' | ✓ Complete';
+            }
+            stats.textContent = statusText;
         }
     }
 

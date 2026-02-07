@@ -27,6 +27,7 @@ export const state = {
 
     // Generated Graph State (Read Only Mode)
     isGenerated: false,
+    graphTruncated: false, // True if reachability graph was cut off due to max_states limit
 
     // Independent Cameras
     misCamera: { x: 0, y: 0, zoom: 1 },
