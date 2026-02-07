@@ -1,6 +1,8 @@
 
 import { state, nodes, edges, elements } from './state.js';
 import { places, transitions, arcs } from './petri_state.js';
+import { drawPetri } from './petri_render.js';
+import { saveToLocalStorage } from './storage.js';
 
 export function updateStats() {
     const stats = document.getElementById('graphStats');
@@ -52,10 +54,14 @@ export function updateButtonStates() {
 }
 
 export function updateResultsList() {
-    console.log("Updating Results List. Steps:", state.misSteps.length);
-    if (elements.resultsList) {
+    console.log("Updating Results List. Context:", state.appContext);
+    if (!elements.resultsList) return;
+
+    elements.resultsList.innerHTML = '';
+
+    if (state.appContext === 'MIS') {
+        // --- MIS RESULTS ---
         if (state.misSteps.length > 0) {
-            elements.resultsList.innerHTML = '';
             state.misSteps.forEach((step, index) => {
                 const el = document.createElement('div');
                 el.className = 'result-item';
@@ -75,6 +81,59 @@ export function updateResultsList() {
             });
         } else {
             elements.resultsList.innerHTML = '<div class="empty-state">Click Next or Auto to start simulation.</div>';
+        }
+    } else if (state.appContext === 'PETRI') {
+        // --- PETRI REACHABILITY STATES ---
+        // Check if we have reachability graph nodes
+        const reachabilityNodes = nodes.filter(n => n.marking); // Only nodes with marking data
+
+        if (reachabilityNodes.length > 0) {
+            const header = document.createElement('div');
+            header.className = 'result-header'; // You might need to add CSS for this, or reuse existing
+            header.style.padding = '5px 10px';
+            header.style.fontWeight = 'bold';
+            header.style.color = '#ccc';
+            header.textContent = `Reachable States (${reachabilityNodes.length})`;
+            elements.resultsList.appendChild(header);
+
+            reachabilityNodes.sort((a, b) => a.id - b.id).forEach((node, index) => {
+                const el = document.createElement('div');
+                el.className = 'result-item';
+                if (index === state.selectedReachabilityIndex) el.classList.add('active'); // Highlight
+
+                el.textContent = `State ${node.id}: ${node.label || 'Unknown'}`;
+                el.title = JSON.stringify(node.marking);
+
+                el.onclick = () => {
+                    state.selectedReachabilityIndex = index; // Update index on click
+                    // Restore State Logic
+                    console.log(`Restoring Petri State ${node.id} from list`, node.marking);
+                    // Update places tokens
+                    let restoredCount = 0;
+                    for (const p of places) {
+                        if (node.marking[p.id] !== undefined) {
+                            p.tokens = node.marking[p.id];
+                            restoredCount++;
+                        }
+                    }
+                    if (restoredCount > 0) {
+                        import('./petri_render.js').then(pr => pr.drawPetri());
+                        updateStats();
+                        saveToLocalStorage();
+                        // Highlight selected item
+                        updateResultsList(); // Re-render to show highlight
+                    }
+                };
+                elements.resultsList.appendChild(el);
+            });
+
+            // Scroll to active element
+            const activeEl = elements.resultsList.querySelector('.active');
+            if (activeEl) {
+                activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        } else {
+            elements.resultsList.innerHTML = '<div class="empty-state">No reachable states found. Run "Generate Graph" first.</div>';
         }
     }
 }
@@ -109,9 +168,12 @@ export function updateReadOnlyUI() {
     // Disable Creation Tools ONLY
     [btnModeNode, btnModeEdge].forEach(btn => {
         if (btn) {
-            btn.disabled = isReadOnly;
-            btn.style.opacity = isReadOnly ? '0.3' : '1';
-            btn.style.pointerEvents = isReadOnly ? 'none' : 'auto';
+            // Only update if changed to avoid focus loss
+            if (btn.disabled !== isReadOnly) {
+                btn.disabled = isReadOnly;
+                btn.style.opacity = isReadOnly ? '0.3' : '1';
+                btn.style.pointerEvents = isReadOnly ? 'none' : 'auto';
+            }
         }
     });
 
@@ -125,7 +187,8 @@ export function updateReadOnlyUI() {
     });
 
     // If currently in creation mode, switch to view
-    if (isReadOnly && (state.mode === 'nodes' || state.mode === 'edges')) {
-        setMode('view');
-    }
+    // COMMENTED OUT: This might be causing "switch"-like behavior if tools are active
+    // if (isReadOnly && (state.mode === 'nodes' || state.mode === 'edges')) {
+    //    setMode('view');
+    // }
 }

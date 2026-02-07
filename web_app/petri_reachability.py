@@ -69,6 +69,7 @@ def calculate_reachability_graph(places, transitions, arcs, max_states=100):
     nodes_out.append({
         'id': 0,
         'label': init_state_label,
+        'marking': {sorted_places[i]['id']: count for i, count in enumerate(initial_marking)},
         # Layout will be handled by force-directed algo on frontend if x/y 0
         'x': 0, 
         'y': 0
@@ -127,6 +128,7 @@ def calculate_reachability_graph(places, transitions, arcs, max_states=100):
                     nodes_out.append({
                         'id': next_id,
                         'label': state_label,
+                        'marking': {sorted_places[i]['id']: count for i, count in enumerate(new_marking)}, # Store raw marking for click-to-restore
                         'x': 0,
                         'y': 0
                     })

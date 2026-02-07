@@ -4,6 +4,8 @@ import { updateStats, setMode } from './ui.js';
 import { resetSimulation } from './simulation.js';
 import { saveToLocalStorage } from './storage.js';
 import { triggerAutoSave } from './tabs.js';
+import { places } from './petri_state.js';
+import { drawPetri } from './petri_render.js';
 
 function updateAndSave() {
     updateStats();
@@ -65,10 +67,32 @@ export function initInteractions() {
 
         if (clickedNode) {
             if (state.mode === 'nodes' || state.mode === 'view') {
-                // Drag Mode
+                // Drag Mode or View Mode -> Select Node
                 state.isDraggingNode = true;
                 state.dragNodeId = clickedNode.id;
                 state.selectedNode = clickedNode;
+
+                // RESTORE STATE FROM REACHABILITY NODE
+                if (clickedNode.marking) {
+                    console.log(`Restoring state from Node ${clickedNode.id}:`, clickedNode.marking);
+                    let restoredCount = 0;
+
+                    // Update places tokens
+                    for (const p of places) {
+                        if (clickedNode.marking[p.id] !== undefined) {
+                            p.tokens = clickedNode.marking[p.id];
+                            restoredCount++;
+                        }
+                    }
+
+                    if (restoredCount > 0) {
+                        // Update visual feedback
+                        drawPetri(); // Redraw Petri net (in background context)
+                        updateStats(); // Update token counts UI
+                        saveToLocalStorage(); // Persist changes
+                    }
+                }
+
                 draw();
             } else if (state.mode === 'edges') {
                 // Edge Creation Mode
@@ -207,6 +231,71 @@ export function initInteractions() {
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Delete' || e.key === 'Backspace') {
             deleteSelectedNode();
+        }
+
+        // List Navigation (Arrow keys)
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault(); // Prevent page scroll
+            const isUp = (e.key === 'ArrowUp');
+
+            if (state.appContext === 'MIS') {
+                import('./simulation.js').then(module => {
+                    const maxIndex = state.misSteps.length - 1;
+                    if (maxIndex < 0) return;
+
+                    let newIndex = state.currentStepIndex + (isUp ? -1 : 1);
+                    newIndex = Math.max(0, Math.min(newIndex, maxIndex));
+
+                    if (newIndex !== state.currentStepIndex) {
+                        state.currentStepIndex = newIndex;
+                        module.stopAutoPlay();
+                        module.highlightResultItem(newIndex);
+                        import('./render.js').then(r => r.draw());
+                        updateButtonStates();
+                    }
+                });
+            } else if (state.appContext === 'PETRI') {
+                import('./ui.js').then(ui => {
+                    // We need to know how many items are in the list.
+                    // The list matches `nodes` filtered by `marking`
+                    // BUT `nodes` array might include nodes without marking if logic changed, 
+                    // though currently all reachability nodes have marking.
+                    // We need the sorted list used in ui.js.
+
+                    const reachabilityNodes = nodes.filter(n => n.marking).sort((a, b) => a.id - b.id);
+                    const maxIndex = reachabilityNodes.length - 1;
+                    if (maxIndex < 0) return;
+
+                    // Initialize if -1
+                    if (state.selectedReachabilityIndex === -1) {
+                        state.selectedReachabilityIndex = 0; // Select first if started
+                    } else {
+                        state.selectedReachabilityIndex += (isUp ? -1 : 1);
+                    }
+
+                    state.selectedReachabilityIndex = Math.max(0, Math.min(state.selectedReachabilityIndex, maxIndex));
+
+                    // Trigger Restore
+                    const targetNode = reachabilityNodes[state.selectedReachabilityIndex];
+                    if (targetNode) {
+                        // Restore Logic (Duplicated from interactions.js click or ui.js click)
+                        // Ideally checking marking existence
+                        let restoredCount = 0;
+                        for (const p of places) {
+                            if (targetNode.marking[p.id] !== undefined) {
+                                p.tokens = targetNode.marking[p.id];
+                                restoredCount++;
+                            }
+                        }
+                        if (restoredCount > 0) {
+                            drawPetri();
+                            updateStats();
+                            saveToLocalStorage();
+                            ui.updateResultsList(); // Re-render to show highlight
+                        }
+                    }
+                });
+            }
         }
     });
 

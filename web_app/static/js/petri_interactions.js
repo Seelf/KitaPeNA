@@ -11,8 +11,9 @@ import { updateStats } from './ui.js';
 // Wrapper helper
 function updateAndSave() {
     updateStats();
-    triggerReachabilityUpdate();
+    // triggerReachabilityUpdate(); // Old placeholder
     triggerAutoSave();
+    window.dispatchEvent(new CustomEvent('petri-state-updated'));
 }
 
 // ...
@@ -22,28 +23,28 @@ function updateAndSave() {
 // Example Replacement Locations:
 
 // 1. Clear All
-// line 174: updateStats(); -> updateAndSave();
+// line 174: updateAndSave(); -> updateAndSave();
 
 // 2. Import
-// line 485: updateStats(); -> updateAndSave();
+// line 485: updateAndSave(); -> updateAndSave();
 
 // 3. Delete Place/Trans/Arc
-// line 255: updateStats(); -> updateAndSave();
+// line 255: updateAndSave(); -> updateAndSave();
 
 // 4. Place Creation
-// line 272: updateStats(); -> updateAndSave();
+// line 272: updateAndSave(); -> updateAndSave();
 
 // 5. Transition Creation
-// line 286: updateStats(); -> updateAndSave();
+// line 286: updateAndSave(); -> updateAndSave();
 
 // 6. Token Change
-// line 297: updateStats(); -> updateAndSave();
+// line 297: updateAndSave(); -> updateAndSave();
 
 // 7. Arc Delete (Duplicate)
-// line 326: updateStats(); -> updateAndSave();
+// line 326: updateAndSave(); -> updateAndSave();
 
 // 8. Arc Create
-// line 338: updateStats(); -> updateAndSave();
+// line 338: updateAndSave(); -> updateAndSave();
 
 // 9. Auto Layout
 // line 575: triggerAutoSave(); (added)
@@ -533,7 +534,7 @@ async function importPnhFile(file) {
 
             checkIntegrity();
             runAutoLayout();
-            updateStats();
+            updateAndSave();
             await forceReachabilityUpdate();
             alert(`Imported: ${places.length} places, ${transitions.length} transitions.`);
         } else {
@@ -628,97 +629,5 @@ export function runAutoLayout() {
     triggerAutoSave();
 }
 
-// LIVE REACHABILITY UPDATE
-let updateTimeout = null;
-export function triggerReachabilityUpdate() {
-    // Debounce
-    if (updateTimeout) clearTimeout(updateTimeout);
-    updateTimeout = setTimeout(updateReachabilityGraph, 300);
-}
 
-export async function forceReachabilityUpdate() {
-    if (updateTimeout) clearTimeout(updateTimeout);
-    await updateReachabilityGraph();
-}
 
-async function updateReachabilityGraph() {
-    logToScreen("Updating Reachability Graph...");
-    try {
-        const payload = {
-            places: places,
-            transitions: transitions,
-            arcs: arcs
-        };
-
-        logToScreen(`Sending Payload: ${places.length}P ${transitions.length}T ${arcs.length}A`);
-
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-        const response = await fetch('/api/petri/reachability', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errText = await response.text();
-            logToScreen(`Server Error: ${response.status} - ${errText}`);
-            return;
-        }
-
-        const data = await response.json();
-        if (data.status === 'success') {
-            const { nodes: newNodes, edges: newEdges } = data;
-            logToScreen(`Received Steps: ${newNodes.length} Nodes, ${newEdges.length} Edges`);
-
-            // Dynamic import to break circular dependency if any, 
-            // though we could import at top. But let's be safe.
-            const moduleState = await import('./state.js');
-            const misNodes = moduleState.nodes;
-            const misEdges = moduleState.edges;
-            const state = moduleState.state;
-            state.isGenerated = true; // Mark as generated (Read Only)
-
-            const drawMis = (await import('./render.js')).draw;
-            const { updateReadOnlyUI } = await import('./ui.js');
-
-            // Only update layout if graph was empty or very simple
-            const shouldLayout = (misNodes.length === 0);
-
-            misNodes.length = 0;
-            newNodes.forEach(n => misNodes.push(n));
-
-            misEdges.length = 0;
-            newEdges.forEach(e => misEdges.push(e));
-
-            if (shouldLayout && misNodes.length > 0) {
-                // Simple circle layout
-                const cx = 400, cy = 300, r = 200;
-                misNodes.forEach((n, i) => {
-                    const angle = (i / misNodes.length) * 2 * Math.PI;
-                    n.x = cx + r * Math.cos(angle);
-                    n.y = cy + r * Math.sin(angle);
-                });
-            } else if (misNodes.length > 0) {
-                // Force layout for now to Ensure visibility
-                const cx = 400, cy = 300, r = 200;
-                misNodes.forEach((n, i) => {
-                    const angle = (i / misNodes.length) * 2 * Math.PI;
-                    n.x = cx + r * Math.cos(angle);
-                    n.y = cy + r * Math.sin(angle);
-                });
-            }
-
-            console.log("Reachability Graph Updated:", misNodes.length, "states");
-            logToScreen("Graph Updated Successfully.");
-        } else {
-            logToScreen("API Error: " + data.message);
-        }
-    } catch (e) {
-        console.error("Reachability Update Failed:", e);
-        logToScreen("JS Error: " + e.message);
-    }
-}

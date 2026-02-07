@@ -606,9 +606,10 @@ def calculate_reachability():
         places = data.get('places', [])
         transitions = data.get('transitions', [])
         arcs = data.get('arcs', [])
+        max_states = int(data.get('max_states', 100)) # Default 100, ensure int
         
         # Calculate Reachability Graph
-        nodes_out, edges_out, truncated = petri_reachability.calculate_reachability_graph(places, transitions, arcs)
+        nodes_out, edges_out, truncated = petri_reachability.calculate_reachability_graph(places, transitions, arcs, max_states)
         
         return jsonify({
             'status': 'success',
