@@ -17,6 +17,10 @@ export const state = {
     mouseY: 0,
     dragNodeId: null,
 
+    // Petri Simulation Path (Cycle)
+    reachabilityPath: null, // Array of Node IDs or Nodes to display in order
+    initialMarking: null, // { placeId: tokens }
+
     // Simulation State
     misSteps: [],
     currentStepIndex: -1,

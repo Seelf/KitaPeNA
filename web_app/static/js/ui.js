@@ -101,7 +101,39 @@ export function updateResultsList() {
                 el.className = 'result-item';
                 if (index === state.selectedReachabilityIndex) el.classList.add('active'); // Highlight
 
-                el.textContent = `State ${node.id}: ${node.label || 'Unknown'}`;
+                // Dynamic Label Generation (Client-Side) from current Place labels
+                let labelText = node.label || 'Unknown';
+
+                if (state.appContext === 'PETRI' && node.marking) {
+                    const parts = [];
+                    const items = [];
+
+                    Object.keys(node.marking).forEach(k => {
+                        const pid = parseInt(k);
+                        const count = node.marking[pid];
+                        if (count > 0) {
+                            const place = places.find(p => p.id === pid);
+                            const name = place ? (place.label || `p${pid}`) : `p${pid}`;
+                            items.push({ name, count });
+                        }
+                    });
+
+                    // Sort Alphabetically
+                    items.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+                    items.forEach(item => {
+                        if (item.count > 1) {
+                            parts.push(`${item.count}${item.name}`);
+                        } else {
+                            parts.push(item.name);
+                        }
+                    });
+
+                    if (parts.length > 0) labelText = parts.join(', ');
+                    else labelText = 'ø'; // Empty
+                }
+
+                el.textContent = `State ${node.id}: ${labelText}`;
                 el.title = JSON.stringify(node.marking);
 
                 el.onclick = () => {
