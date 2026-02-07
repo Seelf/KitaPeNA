@@ -143,6 +143,7 @@ function saveCurrentStateToTab(tabId) {
             misSteps: state.misSteps,
             isGenerated: state.isGenerated,
             graphTruncated: state.graphTruncated,
+            maxReachabilityStates: state.maxReachabilityStates,
             misCamera: state.misCamera
             // END REACHABILITY PERSISTENCE
         };
@@ -215,6 +216,11 @@ function restoreStateFromTab(tab) {
         state.misSteps = tab.data.misSteps || [];
         state.isGenerated = tab.data.isGenerated || false;
         state.graphTruncated = tab.data.graphTruncated || false;
+        state.maxReachabilityStates = tab.data.maxReachabilityStates || 1000;
+
+        // Update input if exists
+        const inputMax = document.getElementById('inputMaxStates');
+        if (inputMax) inputMax.value = state.maxReachabilityStates;
 
         // Restore MIS Camera if saved
         if (tab.data.misCamera) {

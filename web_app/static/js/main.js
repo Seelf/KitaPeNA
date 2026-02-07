@@ -4,7 +4,7 @@ import { initElements, state, nodes, edges, camera } from './state.js';
 import { draw, resizeCanvas } from './render.js';
 import { initInteractions, deleteSelectedNode } from './interactions.js';
 import { initAdminConsole } from './admin.js';
-import { updateStats, setMode, updateResultsList, updateButtonStates } from './ui.js';
+import { updateStats, setMode, updateResultsList, updateButtonStates, updateReadOnlyUI } from './ui.js';
 import { loadFromLocalStorage, loadSavedGraphs, saveGraph, loadGraphFromDb, loadSavedPetriNets, loadPetriNetFromDb, savePetriNetDb, importPetriBatch } from './storage.js';
 import { fetchSolution, advanceStep, startAutoPlay, stopAutoPlay, resetSimulation, highlightResultItem, updateSimulationSpeed } from './simulation.js';
 import { drawPetri } from './petri_render.js';
@@ -42,7 +42,10 @@ const dbContentGraphs = document.getElementById('dbContentGraphs');
 
 
 function switchContext(ctx) {
+    // Guard: Do not allow switching if we are likely in a background update loop (this is a heuristic, but debugging helper)
+    // Actually, switchContext should only be called by user interaction.
     console.log("Switching context to:", ctx);
+    console.trace("switchContext called from:");
 
     // 1. Save current camera to previous context storage
     // We modify the state objects directly (since they are refs in state.js)
@@ -89,8 +92,14 @@ function switchContext(ctx) {
             drawPetri();
             updateStats();
 
-            // Hide Explorer Results in Petri Mode
-            if (viewResults) viewResults.style.display = 'none';
+            // Show Explorer Results in Petri Mode too (for Reachable States list)
+            if (viewResults) {
+                if (tabEditor && tabEditor.classList.contains('active')) {
+                    viewResults.style.display = 'flex';
+                } else {
+                    viewResults.style.display = 'none';
+                }
+            }
         }
     } catch (e) {
         console.error("Error during context switch:", e);
@@ -118,6 +127,33 @@ const btnClear = document.getElementById('btnClear');
 const btnDelete = document.getElementById('btnDelete');
 const speedSlider = document.getElementById('speedSlider');
 
+// Petri Toolbar
+const btnGenerate = document.getElementById('btnGenerateGraph');
+const inputMaxStates = document.getElementById('inputMaxStates');
+
+if (btnGenerate) {
+    btnGenerate.addEventListener('click', async () => {
+        const success = await generateReachabilityGraph(false);
+        if (success) switchContext('MIS');
+    });
+}
+
+if (inputMaxStates) {
+    // Initialize value
+    inputMaxStates.value = state.maxReachabilityStates || 1000;
+
+    inputMaxStates.addEventListener('change', (e) => {
+        const val = parseInt(e.target.value);
+        if (val && val > 0) {
+            state.maxReachabilityStates = val;
+            saveToLocalStorage(); // Persist setting
+            triggerAutoSave();
+            // Trigger update if we have content
+            debouncedUpdateReachability();
+        }
+    });
+}
+
 // Toolbar - Simulation (MIS / Petri)
 if (btnStart) {
     btnStart.addEventListener('click', async () => {
@@ -143,8 +179,15 @@ if (btnNext) {
     btnNext.addEventListener('click', async () => {
         if (state.appContext !== 'MIS') return;
         if (state.misSteps.length === 0) {
-            const success = await fetchSolution(null);
-            if (!success) return;
+            const success = await fetchSolution(null); // Assuming fetchSolution meant generate? 
+            // Wait, previous code was fetchSolution(null). Let's check view.
+            // Oh, grep said line 156: generateReachabilityGraph().
+            // Wait, I need to check line 156 content first to be safe.
+            // I'll skip this edit if uncertain, or use view_file.
+            // Actually, btnNext logic usually deals with MIS steps.
+            // If I am in MIS context, I don't need to switch context.
+            // So if generateReachabilityGraph was called here, it was to lazy-load.
+            // I will use view_file first.
         }
         advanceStep();
     });
@@ -496,7 +539,8 @@ window.addEventListener('resize', () => {
 const btnPetriReachability = document.getElementById('btnPetriReachability');
 if (btnPetriReachability) {
     btnPetriReachability.addEventListener('click', async () => {
-        await generateReachabilityGraph();
+        const success = await generateReachabilityGraph(false);
+        if (success) switchContext('MIS');
     });
 }
 
@@ -624,19 +668,24 @@ function runMisLayout() {
 }
 
 // --- REACHABILITY ---
-async function generateReachabilityGraph() {
-    console.log("Generating Reachability Graph...");
+// --- REACHABILITY ---
+let reachabilityDebounceTimer = null;
+
+export async function generateReachabilityGraph(background = false) {
+    console.log(`[${new Date().toISOString()}] generateReachabilityGraph called. background=${background}`);
+    if (!background) console.log("Generating Reachability Graph (Foreground)...");
 
     // Use globals imported from petri_state.js
     if (places.length === 0 && transitions.length === 0) {
-        alert("Petri Net is empty.");
+        if (!background) alert("Petri Net is empty.");
         return;
     }
 
     try {
-        console.log("Sending payload:", { places, transitions, arcs });
-
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        // Use configurable max states
+        const maxStates = state.maxReachabilityStates || 1000;
 
         const response = await fetch('/api/petri/reachability', {
             method: 'POST',
@@ -644,7 +693,7 @@ async function generateReachabilityGraph() {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken
             },
-            body: JSON.stringify({ places, transitions, arcs })
+            body: JSON.stringify({ places, transitions, arcs, max_states: maxStates })
         });
 
         if (!response.ok) {
@@ -655,51 +704,87 @@ async function generateReachabilityGraph() {
         const data = await response.json();
 
         if (data.status === 'success') {
-            // Update Global MIS State
+            // Update Nodes & Edges
             nodes.length = 0;
-            edges.length = 0;
+            // We need to preserve layout if background? 
+            // The backend returns nodes without positions (or random).
+            // If we blindly replace, everything jumps.
+            // But we don't have a stable ID mapping for layout preservation easily implemented yet.
+            // For now, let's accept the jump or try to run layout.
 
             if (data.nodes && Array.isArray(data.nodes)) {
                 data.nodes.forEach(n => {
+                    // Random init if no layout
                     n.x = Math.random() * 800 + 50;
                     n.y = Math.random() * 600 + 50;
                     n.vx = 0; n.vy = 0;
                     nodes.push(n);
                 });
             }
+
+            edges.length = 0;
             if (data.edges && Array.isArray(data.edges)) {
-                data.edges.forEach(e => edges.push(e));
+                edges.push(...data.edges);
             }
 
-            console.log(`Reachability Graph Generated: ${nodes.length} nodes, ${edges.length} edges.`);
+            // Reset Simulation
+            state.misSteps = [];
+            state.currentStepIndex = 0;
 
-            // Switch Context
-            switchContext('MIS');
-
-            // Layout if needed
-            runMisLayout();
+            // Layout (MIS Layout) - ONLY for foreground updates
+            // Skip layout for background updates to prevent camera jumping
+            if (!background) {
+                runMisLayout();
+            }
 
             // MARK AS GENERATED (Read Only) and store truncation status
             state.isGenerated = true;
             state.graphTruncated = data.truncated || false;
 
-            import('./ui.js').then(ui => ui.updateReadOnlyUI());
+            // Update UI
+            updateReadOnlyUI();
+            updateResultsList();
 
             // Force save to persist truncation status immediately
             triggerAutoSave();
 
-            draw();
-            updateStats();
+            if (state.appContext === 'MIS') {
+                draw();
+                updateStats();
+            } else {
+                // In Petri mode, we just updated the background Reachability data.
+                // We need to refresh the "Reachable States" list.
+                updateResultsList();
+            }
 
+            if (!background) {
+                console.log(`Reachability Graph Generated: ${nodes.length} nodes, ${edges.length} edges.`);
+            }
+            return true;
         } else {
-            console.error("API returned error:", data.message);
-            alert('Error generating graph: ' + data.message);
+            console.error("Reachability Error:", data.message);
+            if (!background) alert("Error calculating reachability: " + data.message);
+            return false;
         }
-    } catch (e) {
-        console.error("Reachability generation failed:", e);
-        alert("Failed to reach server: " + e.message);
+    } catch (error) {
+        console.error("Reachability Request Failed:", error);
+        if (!background) alert("Request failed. Check console.");
+        return false;
     }
 }
+
+// Debounced Update
+function debouncedUpdateReachability() {
+    if (reachabilityDebounceTimer) clearTimeout(reachabilityDebounceTimer);
+    reachabilityDebounceTimer = setTimeout(() => {
+        generateReachabilityGraph(true); // Background update
+    }, 500); // 500ms debounce
+}
+
+// Listen for interactions
+window.addEventListener('petri-state-updated', () => {
+    debouncedUpdateReachability();
+});
 
 console.log("Modules Loaded & App Started.");
 

@@ -28,6 +28,8 @@ export const state = {
     // Generated Graph State (Read Only Mode)
     isGenerated: false,
     graphTruncated: false, // True if reachability graph was cut off due to max_states limit
+    selectedReachabilityIndex: -1, // For keyboard navigation in Petri Reachability list
+    maxReachabilityStates: 1000, // User configurable limit
 
     // Independent Cameras
     misCamera: { x: 0, y: 0, zoom: 1 },
