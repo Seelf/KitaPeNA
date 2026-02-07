@@ -142,6 +142,7 @@ function saveCurrentStateToTab(tabId) {
             edges: edges,
             misSteps: state.misSteps,
             isGenerated: state.isGenerated,
+            graphTruncated: state.graphTruncated,
             misCamera: state.misCamera
             // END REACHABILITY PERSISTENCE
         };
@@ -213,6 +214,7 @@ function restoreStateFromTab(tab) {
 
         state.misSteps = tab.data.misSteps || [];
         state.isGenerated = tab.data.isGenerated || false;
+        state.graphTruncated = tab.data.graphTruncated || false;
 
         // Restore MIS Camera if saved
         if (tab.data.misCamera) {

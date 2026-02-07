@@ -608,12 +608,13 @@ def calculate_reachability():
         arcs = data.get('arcs', [])
         
         # Calculate Reachability Graph
-        nodes_out, edges_out = petri_reachability.calculate_reachability_graph(places, transitions, arcs)
+        nodes_out, edges_out, truncated = petri_reachability.calculate_reachability_graph(places, transitions, arcs)
         
         return jsonify({
             'status': 'success',
             'nodes': nodes_out,
-            'edges': edges_out
+            'edges': edges_out,
+            'truncated': truncated
         })
     except Exception as e:
         print(f"Reachability Error: {e}")
