@@ -2,6 +2,7 @@
 import { state, nodes, edges, elements } from './state.js';
 import { places, transitions, arcs } from './petri_state.js';
 import { drawPetri } from './petri_render.js';
+import { concurrencyState } from './concurrency_render.js';
 import { saveToLocalStorage } from './storage.js';
 
 export function updateStats() {
@@ -10,6 +11,10 @@ export function updateStats() {
         if (state.appContext === 'PETRI') {
             const totalTokens = places.reduce((sum, p) => sum + (p.tokens || 0), 0);
             stats.textContent = `Places: ${places.length} | Transitions: ${transitions.length} | Arcs: ${arcs.length} | Tokens: ${totalTokens}`;
+        } else if (state.appContext === 'CONCURRENCY') {
+            const cNodes = concurrencyState.nodes.length;
+            const cEdges = concurrencyState.edges.length;
+            stats.textContent = `Concurrency Graph | Nodes: ${cNodes} | Edges: ${cEdges}`;
         } else {
             // MIS / Reachability Graph
             let statusText = `Nodes: ${nodes.length} | Edges: ${edges.length}`;
@@ -28,6 +33,8 @@ export function updateStats() {
         if (state.appContext === 'PETRI') {
             // For Petri, maybe show places? Or total count? Let's show places + transitions
             iconNum.textContent = places.length + transitions.length;
+        } else if (state.appContext === 'CONCURRENCY') {
+            iconNum.textContent = concurrencyState.nodes.length;
         } else {
             const nextId = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
             iconNum.textContent = nextId;
@@ -166,6 +173,26 @@ export function updateResultsList() {
             }
         } else {
             elements.resultsList.innerHTML = '<div class="empty-state">No reachable states found. Run "Generate Graph" first.</div>';
+        }
+    } else if (state.appContext === 'CONCURRENCY') {
+        const cNodes = concurrencyState.nodes;
+        if (cNodes.length > 0) {
+            const header = document.createElement('div');
+            header.className = 'result-header';
+            header.style.padding = '5px 10px';
+            header.style.fontWeight = 'bold';
+            header.style.color = '#ccc';
+            header.textContent = `Places (${cNodes.length})`;
+            elements.resultsList.appendChild(header);
+
+            cNodes.forEach(node => {
+                const el = document.createElement('div');
+                el.className = 'result-item';
+                el.textContent = node.label || `p${node.id}`;
+                elements.resultsList.appendChild(el);
+            });
+        } else {
+            elements.resultsList.innerHTML = '<div class="empty-state">No concurrency graph. Run "Analysis -> Concurrency" first.</div>';
         }
     }
 }

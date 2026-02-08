@@ -253,12 +253,12 @@ def build_concurrency_graph(places, transitions, arcs):
                     exclusion[j][i] = True
     print(f"DEBUG: Added {conflict_count} structural conflicts.")
 
-    # 4. Transitive Closure (Floyd-Warshall)
-    for k in range(n_places):
-        for i in range(n_places):
-            for j in range(n_places):
-                if exclusion[i][k] and exclusion[k][j]:
-                    exclusion[i][j] = True
+    # 4. Transitive Closure (Floyd-Warshall) - SKIPPING
+    # Incorrect for Petri Net concurrency: Conflict is not necessarily transitive.
+    # Logic: If A conflicts B, and B conflicts C, it does NOT mean A conflicts C.
+    # Example: Fork p1 -> {p2, p3}. p2, p3 concurrent. p1 conflicts p2, p1 conflicts p3.
+    # If transitive: p2 conflicts p1 -> p1 conflicts p3 => p2 conflicts p3? WRONG.
+    pass
                     
     # 5. Build Graph
     # Nodes: Places

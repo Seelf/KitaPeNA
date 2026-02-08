@@ -117,10 +117,17 @@ function switchContext(ctx) {
             // No toolbar for now, or maybe reuse graph toolbar in read-only?
             // Just view for now.
 
-            import('./concurrency.js').then(m => m.updateConcurrencyGraph());
+            import('./concurrency.js').then(m => {
+                m.updateConcurrencyGraph().then(() => {
+                    import('./ui.js').then(ui => {
+                        ui.updateStats();
+                        ui.updateResultsList();
+                    });
+                });
+            });
             // drawConcurrency is called by updateConcurrencyGraph -> runLayout -> draw
 
-            if (viewResults) viewResults.style.display = 'none';
+            if (viewResults) viewResults.style.display = 'flex';
         }
     } catch (e) {
         console.error("Error during context switch:", e);
