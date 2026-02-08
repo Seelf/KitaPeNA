@@ -20,6 +20,8 @@ export const petriState = {
     nextTransitionId: 0,
     mouseX: 0,
     mouseY: 0,
+    snapToGrid: true, // Snap elements to grid
+    gridSize: 50,
 
     // Auto-Layout
     simulationRunning: false

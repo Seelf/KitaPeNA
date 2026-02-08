@@ -37,7 +37,8 @@ export const state = {
 
     // Independent Cameras
     misCamera: { x: 0, y: 0, zoom: 1 },
-    petriCamera: { x: 0, y: 0, zoom: 1 }
+    petriCamera: { x: 0, y: 0, zoom: 1 },
+    concurrencyCamera: { x: 0, y: 0, zoom: 1 }
 };
 
 export const elements = {

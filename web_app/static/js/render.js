@@ -26,6 +26,31 @@ export function resizeCanvas() {
     }
 }
 
+// Draw grid background
+function drawGrid(ctx, canvas, cam) {
+    const gridSize = 50;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+
+    const startX = Math.floor((-cam.x / cam.zoom) / gridSize) * gridSize;
+    const startY = Math.floor((-cam.y / cam.zoom) / gridSize) * gridSize;
+    const endX = Math.ceil((canvas.width - cam.x) / cam.zoom / gridSize) * gridSize;
+    const endY = Math.ceil((canvas.height - cam.y) / cam.zoom / gridSize) * gridSize;
+
+    ctx.beginPath();
+    for (let x = startX; x <= endX; x += gridSize) {
+        ctx.moveTo(x, startY);
+        ctx.lineTo(x, endY);
+    }
+    for (let y = startY; y <= endY; y += gridSize) {
+        ctx.moveTo(startX, y);
+        ctx.lineTo(endX, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+}
+
 // --- DRAWING ---
 export function draw() {
     const { ctx, canvas } = elements;
@@ -38,6 +63,9 @@ export function draw() {
     ctx.save();
     ctx.translate(camera.x, camera.y);
     ctx.scale(camera.zoom, camera.zoom);
+
+    // Draw grid
+    drawGrid(ctx, canvas, camera);
 
     // Draw Edges
     // Draw Edges

@@ -128,6 +128,22 @@ function saveCurrentStateToTab(tabId) {
         };
         tab.data = JSON.parse(JSON.stringify(stateDump));
     } else {
+        // Sync main camera to the appropriate context camera before saving
+        // petri_interactions and other code modifies misCamera directly for all contexts
+        if (state.appContext === 'PETRI') {
+            state.petriCamera.x = misCamera.x;
+            state.petriCamera.y = misCamera.y;
+            state.petriCamera.zoom = misCamera.zoom;
+        } else if (state.appContext === 'MIS') {
+            state.misCamera.x = misCamera.x;
+            state.misCamera.y = misCamera.y;
+            state.misCamera.zoom = misCamera.zoom;
+        } else if (state.appContext === 'CONCURRENCY') {
+            state.concurrencyCamera.x = misCamera.x;
+            state.concurrencyCamera.y = misCamera.y;
+            state.concurrencyCamera.zoom = misCamera.zoom;
+        }
+
         console.log("Saving Petri Tab. MIS Steps:", state.misSteps.length);
         const stateDump = {
             places: places,
@@ -144,7 +160,8 @@ function saveCurrentStateToTab(tabId) {
             isGenerated: state.isGenerated,
             graphTruncated: state.graphTruncated,
             maxReachabilityStates: state.maxReachabilityStates,
-            misCamera: state.misCamera
+            misCamera: state.misCamera,
+            concurrencyCamera: state.concurrencyCamera
             // END REACHABILITY PERSISTENCE
         };
         tab.data = JSON.parse(JSON.stringify(stateDump));
@@ -222,11 +239,39 @@ function restoreStateFromTab(tab) {
         const inputMax = document.getElementById('inputMaxStates');
         if (inputMax) inputMax.value = state.maxReachabilityStates;
 
-        // Restore MIS Camera if saved
+        // Restore all context cameras from tab data
+        if (tab.data.camera) {
+            state.petriCamera.x = tab.data.camera.x || 0;
+            state.petriCamera.y = tab.data.camera.y || 0;
+            state.petriCamera.zoom = tab.data.camera.zoom || 1;
+        }
+
         if (tab.data.misCamera) {
-            state.misCamera.x = tab.data.misCamera.x;
-            state.misCamera.y = tab.data.misCamera.y;
-            state.misCamera.zoom = tab.data.misCamera.zoom;
+            state.misCamera.x = tab.data.misCamera.x || 0;
+            state.misCamera.y = tab.data.misCamera.y || 0;
+            state.misCamera.zoom = tab.data.misCamera.zoom || 1;
+        }
+
+        if (tab.data.concurrencyCamera) {
+            state.concurrencyCamera.x = tab.data.concurrencyCamera.x || 0;
+            state.concurrencyCamera.y = tab.data.concurrencyCamera.y || 0;
+            state.concurrencyCamera.zoom = tab.data.concurrencyCamera.zoom || 1;
+        }
+
+        // Set main camera from the appropriate context camera based on saved activeContext
+        const targetContext = tab.data.activeContext || 'PETRI';
+        if (targetContext === 'PETRI' && tab.data.camera) {
+            misCamera.x = state.petriCamera.x;
+            misCamera.y = state.petriCamera.y;
+            misCamera.zoom = state.petriCamera.zoom;
+        } else if (targetContext === 'MIS' && tab.data.misCamera) {
+            misCamera.x = state.misCamera.x;
+            misCamera.y = state.misCamera.y;
+            misCamera.zoom = state.misCamera.zoom;
+        } else if (targetContext === 'CONCURRENCY' && tab.data.concurrencyCamera) {
+            misCamera.x = state.concurrencyCamera.x;
+            misCamera.y = state.concurrencyCamera.y;
+            misCamera.zoom = state.concurrencyCamera.zoom;
         }
 
         // Force stop simulation on reload
@@ -353,5 +398,9 @@ function restoreSession() {
 // Hook saveSession into state modifiers
 // We need to export a way to force save when content changes (autosave)
 export function triggerAutoSave() {
+    // First, update the active tab's data with current state (including camera)
+    if (activeTabId) {
+        saveCurrentStateToTab(activeTabId);
+    }
     saveSession();
 }

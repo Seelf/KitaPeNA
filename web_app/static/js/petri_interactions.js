@@ -96,6 +96,38 @@ function checkIntegrity() {
     });
 }
 
+// Hit detection for labels (for label dragging)
+function getClickedLabel(worldX, worldY) {
+    const pRadius = 25;
+    const tHeight = 50;
+    const labelWidth = 50; // Approximate text width
+    const labelHeight = 14; // Approximate text height
+
+    // Check place labels
+    for (const p of places) {
+        const labelX = p.x + (p.labelOffsetX || 0);
+        const labelY = p.y + pRadius + 15 + (p.labelOffsetY || 0);
+
+        if (worldX >= labelX - labelWidth / 2 && worldX <= labelX + labelWidth / 2 &&
+            worldY >= labelY - labelHeight / 2 && worldY <= labelY + labelHeight / 2) {
+            return { type: 'place', element: p };
+        }
+    }
+
+    // Check transition labels
+    for (const t of transitions) {
+        const labelX = t.x + (t.labelOffsetX || 0);
+        const labelY = t.y + tHeight / 2 + 15 + (t.labelOffsetY || 0);
+
+        if (worldX >= labelX - labelWidth / 2 && worldX <= labelX + labelWidth / 2 &&
+            worldY >= labelY - labelHeight / 2 && worldY <= labelY + labelHeight / 2) {
+            return { type: 'transition', element: t };
+        }
+    }
+
+    return null;
+}
+
 function getClickedElement(worldX, worldY) {
     // Check transitions (rects)
     const tWidth = 30;
@@ -236,13 +268,57 @@ export function initPetriInteractions() {
     const btnPetriToken = document.getElementById('btnPetriToken');
     const btnPetriDelete = document.getElementById('btnPetriDelete');
 
-    if (btnPetriPan) btnPetriPan.addEventListener('click', () => setActiveTool(btnPetriPan, 'view'));
+    // Snap helper function
+    function snapToGrid(value) {
+        return Math.round(value / petriState.gridSize) * petriState.gridSize;
+    }
+
+    function snapAllElements() {
+        if (!petriState.snapToGrid) return;
+        places.forEach(p => {
+            p.x = snapToGrid(p.x);
+            p.y = snapToGrid(p.y);
+        });
+        transitions.forEach(t => {
+            t.x = snapToGrid(t.x);
+            t.y = snapToGrid(t.y);
+        });
+    }
+
+    if (btnPetriPan) btnPetriPan.addEventListener('click', () => {
+        setActiveTool(btnPetriPan, 'view');
+        // Snap all elements to grid when entering view mode
+        snapAllElements();
+        drawPetri();
+        updateAndSave();
+    });
     if (btnPetriPlace) btnPetriPlace.addEventListener('click', () => setActiveTool(btnPetriPlace, 'place'));
     if (btnPetriTransition) btnPetriTransition.addEventListener('click', () => setActiveTool(btnPetriTransition, 'transition'));
     if (btnPetriArc) btnPetriArc.addEventListener('click', () => setActiveTool(btnPetriArc, 'arc'));
     if (btnPetriToken) btnPetriToken.addEventListener('click', () => setActiveTool(btnPetriToken, 'token'));
     if (btnPetriDelete) btnPetriDelete.addEventListener('click', () => setActiveTool(btnPetriDelete, 'delete'));
     if (btnPetriRename) btnPetriRename.addEventListener('click', () => setActiveTool(btnPetriRename, 'rename'));
+
+    // Snap-to-Grid Toggle with localStorage persistence
+    const chkSnapToGrid = document.getElementById('chkSnapToGrid');
+    if (chkSnapToGrid) {
+        // Load saved preference from localStorage
+        const savedSnap = localStorage.getItem('kitapena_snapToGrid');
+        if (savedSnap !== null) {
+            petriState.snapToGrid = savedSnap === 'true';
+        }
+        chkSnapToGrid.checked = petriState.snapToGrid;
+
+        chkSnapToGrid.addEventListener('change', () => {
+            petriState.snapToGrid = chkSnapToGrid.checked;
+            localStorage.setItem('kitapena_snapToGrid', petriState.snapToGrid);
+            if (petriState.snapToGrid) {
+                snapAllElements();
+                drawPetri();
+                updateAndSave();
+            }
+        });
+    }
 
     document.getElementById('btnPetriClear')?.addEventListener('click', () => {
         if (confirm("Clear Petri Net?")) {
@@ -441,11 +517,20 @@ export function initPetriInteractions() {
             petriState.startPanX = e.clientX;
             petriState.startPanY = e.clientY;
 
-            if (clicked) {
+            // Check label first (higher priority for label dragging)
+            const clickedLabel = getClickedLabel(world.x, world.y);
+            if (clickedLabel) {
+                petriState.isDraggingLabel = true;
+                petriState.dragLabelElement = clickedLabel.element;
+                petriState.isPanning = false;
+                canvas.style.cursor = 'move';
+            } else if (clicked) {
                 petriState.isDragging = true;
                 petriState.dragElement = clicked;
+                canvas.style.cursor = 'grabbing';
+            } else {
+                canvas.style.cursor = 'grabbing';
             }
-            canvas.style.cursor = 'grabbing';
         }
     });
 
@@ -462,7 +547,21 @@ export function initPetriInteractions() {
             drawPetri();
         }
 
-        if (petriState.isDragging && petriState.dragElement) {
+        if (petriState.isDraggingLabel && petriState.dragLabelElement) {
+            // Drag label - update offset
+            const el = petriState.dragLabelElement;
+            const pRadius = 25;
+            const tHeight = 50;
+
+            // Calculate new offset based on mouse position
+            // Determine if it's a place or transition by checking if it has 'tokens' property
+            const isPlace = 'tokens' in el;
+            const baseY = isPlace ? (el.y + pRadius + 15) : (el.y + tHeight / 2 + 15);
+
+            el.labelOffsetX = world.x - el.x;
+            el.labelOffsetY = world.y - baseY;
+            drawPetri();
+        } else if (petriState.isDragging && petriState.dragElement) {
             petriState.dragElement.element.x = world.x;
             petriState.dragElement.element.y = world.y;
             drawPetri();
@@ -479,8 +578,19 @@ export function initPetriInteractions() {
 
     window.addEventListener('mouseup', () => {
         if (state.appContext !== 'PETRI') return;
+
+        // Snap dragged element to grid before releasing
+        if (petriState.snapToGrid && petriState.dragElement) {
+            const el = petriState.dragElement.element;
+            el.x = snapToGrid(el.x);
+            el.y = snapToGrid(el.y);
+            drawPetri();
+        }
+
         petriState.isDragging = false;
         petriState.dragElement = null;
+        petriState.isDraggingLabel = false;
+        petriState.dragLabelElement = null;
         petriState.isPanning = false;
         if (petriState.mode === 'view') canvas.style.cursor = 'grab';
 
@@ -517,6 +627,7 @@ export function initPetriInteractions() {
             camera.y -= e.deltaY;
         }
         drawPetri();
+        triggerAutoSave(); // Save camera position after pan/zoom
     }, { passive: false });
 }
 

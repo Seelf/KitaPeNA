@@ -26,6 +26,7 @@ initAdminConsole();
 
 // --- CONTEXT SWITCHING ---
 const tabContextGraph = document.getElementById('tabContextGraph');
+const tabContextConcurrency = document.getElementById('tabContextConcurrency');
 const tabContextPetri = document.getElementById('tabContextPetri');
 const toolbarGraph = document.getElementById('toolbarGraph');
 const toolbarPetri = document.getElementById('toolbarPetri');
@@ -54,6 +55,8 @@ function switchContext(ctx) {
         state.misCamera = { ...camera };
     } else if (state.appContext === 'PETRI') {
         state.petriCamera = { ...camera };
+    } else if (state.appContext === 'CONCURRENCY') {
+        state.concurrencyCamera = { ...camera };
     }
 
     // 2. Update Context
@@ -61,19 +64,29 @@ function switchContext(ctx) {
 
     // 3. Restore camera for new context
     // We must update the existing camera object properties, not replace the object
-    const sourceCam = (ctx === 'MIS') ? state.misCamera : state.petriCamera;
+    const sourceCam = (ctx === 'MIS') ? state.misCamera : (ctx === 'PETRI' ? state.petriCamera : state.concurrencyCamera);
     if (sourceCam) {
         camera.x = sourceCam.x;
         camera.y = sourceCam.y;
         camera.zoom = sourceCam.zoom;
+    } else if (ctx === 'CONCURRENCY') {
+        // Default init for concurrency if no saved camera
+        camera.x = 0; camera.y = 0; camera.zoom = 1;
     }
 
     try {
+        // Reset active classes
+        if (tabContextGraph) tabContextGraph.classList.remove('active');
+        if (tabContextPetri) tabContextPetri.classList.remove('active');
+        if (tabContextConcurrency) tabContextConcurrency.classList.remove('active');
+
+        // Hide all specific toolbars first
+        if (toolbarGraph) toolbarGraph.style.display = 'none';
+        if (toolbarPetri) toolbarPetri.style.display = 'none';
+
         if (ctx === 'MIS') {
             if (tabContextGraph) tabContextGraph.classList.add('active');
-            if (tabContextPetri) tabContextPetri.classList.remove('active');
             if (toolbarGraph) toolbarGraph.style.display = 'flex';
-            if (toolbarPetri) toolbarPetri.style.display = 'none';
 
             draw();
             updateStats();
@@ -84,10 +97,8 @@ function switchContext(ctx) {
             if (tabEditor && tabEditor.classList.contains('active')) {
                 viewResults.style.display = 'flex';
             }
-        } else {
-            if (tabContextGraph) tabContextGraph.classList.remove('active');
+        } else if (ctx === 'PETRI') {
             if (tabContextPetri) tabContextPetri.classList.add('active');
-            if (toolbarGraph) toolbarGraph.style.display = 'none';
             if (toolbarPetri) toolbarPetri.style.display = 'flex';
 
             drawPetri();
@@ -101,6 +112,15 @@ function switchContext(ctx) {
                     viewResults.style.display = 'none';
                 }
             }
+        } else if (ctx === 'CONCURRENCY') {
+            if (tabContextConcurrency) tabContextConcurrency.classList.add('active');
+            // No toolbar for now, or maybe reuse graph toolbar in read-only?
+            // Just view for now.
+
+            import('./concurrency.js').then(m => m.updateConcurrencyGraph());
+            // drawConcurrency is called by updateConcurrencyGraph -> runLayout -> draw
+
+            if (viewResults) viewResults.style.display = 'none';
         }
     } catch (e) {
         console.error("Error during context switch:", e);
@@ -111,11 +131,13 @@ function switchContext(ctx) {
 
 if (tabContextGraph) tabContextGraph.addEventListener('click', () => switchContext('MIS'));
 if (tabContextPetri) tabContextPetri.addEventListener('click', () => switchContext('PETRI'));
+if (tabContextConcurrency) tabContextConcurrency.addEventListener('click', () => switchContext('CONCURRENCY'));
 
 // --- MAIN RENDER LOOP DELEGATE ---
 // Proxy draw for interactions
 window.requestDraw = () => {
     if (state.appContext === 'MIS') draw();
+    else if (state.appContext === 'CONCURRENCY') import('./concurrency_render.js').then(m => m.drawConcurrency());
     else drawPetri();
 }
 

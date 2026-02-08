@@ -2,6 +2,37 @@
 import { places, transitions, arcs, petriState } from './petri_state.js';
 import { elements, camera } from './state.js';
 
+// Draw grid background
+function drawGrid(ctx, canvas, cam) {
+    const gridSize = 50;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+
+    // Calculate visible range in world coordinates
+    const startX = Math.floor((-cam.x / cam.zoom) / gridSize) * gridSize;
+    const startY = Math.floor((-cam.y / cam.zoom) / gridSize) * gridSize;
+    const endX = Math.ceil((canvas.width - cam.x) / cam.zoom / gridSize) * gridSize;
+    const endY = Math.ceil((canvas.height - cam.y) / cam.zoom / gridSize) * gridSize;
+
+    ctx.beginPath();
+
+    // Vertical lines
+    for (let x = startX; x <= endX; x += gridSize) {
+        ctx.moveTo(x, startY);
+        ctx.lineTo(x, endY);
+    }
+
+    // Horizontal lines
+    for (let y = startY; y <= endY; y += gridSize) {
+        ctx.moveTo(startX, y);
+        ctx.lineTo(endX, y);
+    }
+
+    ctx.stroke();
+    ctx.restore();
+}
+
 export function drawPetri() {
     const { ctx, canvas } = elements;
     if (!ctx || !canvas) return;
@@ -14,9 +45,13 @@ export function drawPetri() {
     ctx.translate(camera.x, camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
+    // Draw grid
+    drawGrid(ctx, canvas, camera);
+
     // DEBUG TRACE
     console.log(`DRAW PETRI: ${places.length} Places, ${transitions.length} Transitions. Camera: ${camera.x.toFixed(1)}, ${camera.y.toFixed(1)}, Z=${camera.zoom}`);
     if (places.length > 0) console.log(`Place[0] coords: ${places[0].x}, ${places[0].y}`);
+
 
     // 1. Draw Arcs
     ctx.lineWidth = 2;
@@ -89,10 +124,13 @@ export function drawPetri() {
 
         ctx.fillRect(t.x - tWidth / 2, t.y - tHeight / 2, tWidth, tHeight);
 
-        // Label
+        // Label (with offset support)
         ctx.fillStyle = '#aaa';
         ctx.font = '12px Inter';
-        ctx.fillText(t.label || `t${t.id}`, t.x, t.y + tHeight / 2 + 15);
+        ctx.textAlign = 'center';
+        const tLabelX = t.x + (t.labelOffsetX || 0);
+        const tLabelY = t.y + tHeight / 2 + 15 + (t.labelOffsetY || 0);
+        ctx.fillText(t.label || `t${t.id}`, tLabelX, tLabelY);
     });
 
     // 3. Draw Places (Circles)
@@ -149,10 +187,13 @@ export function drawPetri() {
             }
         }
 
-        // Label
+        // Label (with offset support)
         ctx.fillStyle = '#aaa';
         ctx.font = '12px Inter';
-        ctx.fillText(p.label || `p${p.id}`, p.x, p.y + pRadius + 15);
+        ctx.textAlign = 'center';
+        const pLabelX = p.x + (p.labelOffsetX || 0);
+        const pLabelY = p.y + pRadius + 15 + (p.labelOffsetY || 0);
+        ctx.fillText(p.label || `p${p.id}`, pLabelX, pLabelY);
     });
 
     ctx.shadowBlur = 0; // Reset shadow
