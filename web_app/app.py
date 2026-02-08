@@ -17,6 +17,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import mis_core
 import networkx as nx
 import petri_reachability
+try:
+    import petri_analysis
+except ImportError as e:
+    print(f"Warning: Could not import petri_analysis: {e}")
+    petri_analysis = None
 
 # --- Configuration ---
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -625,11 +630,31 @@ def calculate_reachability():
 
 
 # --- Reachability Graph API ---
-
 import petri_reachability
 
+@app.route('/api/petri/concurrency', methods=['POST'])
+@csrf.exempt
+def calculate_concurrency():
+    """Calculates the Concurrency Place Relation Graph."""
+    try:
+        data = request.json
+        places = data.get('places', [])
+        transitions = data.get('transitions', [])
+        arcs = data.get('arcs', [])
+        
+        if petri_analysis is None:
+            return jsonify({'status': 'error', 'message': 'Petri Analysis module not available (Import Error). Check server logs.'}), 500
 
-
+        nodes, edges = petri_analysis.build_concurrency_graph(places, transitions, arcs)
+        
+        return jsonify({
+            'status': 'success',
+            'nodes': nodes,
+            'edges': edges
+        })
+    except Exception as e:
+        print(f"Concurrency Analysis Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     port = 5002 # Changed to 5002 to avoid conflicts

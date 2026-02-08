@@ -49,22 +49,28 @@
             <div class="title">Kitapena <span class="badge">Web</span></div>
             <div class="spacer"></div>
             <div class="window-controls">
-                <button id="btnToggleSettings" class="btn small"
-                    style="font-size: 11px; padding: 2px 8px; background: #333; color: #aaa; border: 1px solid #555; margin-right: 10px;">⚙️
-                    View</button>
-                <div id="settingsPanel"
-                    style="display: none; position: absolute; top: 40px; right: 10px; background: #222; border: 1px solid #555; padding: 10px; z-index: 10001; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                    <div style="font-size: 11px; color: #fff; margin-bottom: 5px; font-weight: bold;">VIEW SETTINGS
+                <div style="position: relative; display: inline-block;">
+                    <button id="btnToggleSettings" class="btn small"
+                        style="font-size: 11px; padding: 2px 8px; background: #333; color: #aaa; border: 1px solid #555;">⚙️
+                        View</button>
+                    <div id="settingsPanel"
+                        style="display: none; position: absolute; top: 100%; right: 0; margin-top: 5px; background: #222; border: 1px solid #555; padding: 10px; z-index: 10001; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 150px;">
+                        <div style="font-size: 11px; color: #fff; margin-bottom: 5px; font-weight: bold;">VIEW SETTINGS
+                        </div>
+                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                            <input type="checkbox" id="chkShowSidebar" checked> Show Sidebar
+                        </label>
+                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                            <input type="checkbox" id="chkShowToolbar" checked> Show Toolbar
+                        </label>
+                        <hr style="border: none; border-top: 1px solid #444; margin: 8px 0;">
+                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                            <input type="checkbox" id="chkSnapToGrid" checked> Snap to Grid
+                        </label>
                     </div>
-                    <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
-                        <input type="checkbox" id="chkShowSidebar" checked> Show Sidebar
-                    </label>
-                    <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
-                        <input type="checkbox" id="chkShowToolbar" checked> Show Toolbar
-                    </label>
                 </div>
                 <button id="btnToggleDebug" class="btn small"
-                    style="font-size: 11px; padding: 2px 8px; background: #333; color: lime; border: 1px solid green; margin-right: 10px;">Debug</button>
+                    style="font-size: 11px; padding: 2px 8px; background: #333; color: lime; border: 1px solid green; margin-left: 10px;">Debug</button>
 
                 {% if user.role == 'admin' %}
                 <button id="btnAdminConsole" class="btn small"
@@ -172,6 +178,7 @@
                 <div class="editor-header">
                     <span class="tab active" id="tabContextPetri">Petri Net (Model)</span>
                     <span class="tab" id="tabContextGraph">Reachability Graph (Analysis)</span>
+                    <span class="tab" id="tabContextConcurrency">Concurrency Graph (Structural)</span>
                 </div>
                 <div class="canvas-container" id="canvasContainer">
                     <div id="graphStats" class="graph-stats">Nodes: 0 | Edges: 0</div>
