@@ -38,7 +38,17 @@ export const state = {
     // Independent Cameras
     misCamera: { x: 0, y: 0, zoom: 1 },
     petriCamera: { x: 0, y: 0, zoom: 1 },
-    concurrencyCamera: { x: 0, y: 0, zoom: 1 }
+    concurrencyCamera: { x: 0, y: 0, zoom: 1 },
+
+    // Separate graph data per context to prevent data bleeding
+    misNodes: [],
+    misEdges: [],
+    concurrencyNodes: [],
+    concurrencyEdges: [],
+
+    // View Settings
+    snapReachability: false,
+    snapConcurrency: false
 };
 
 export const elements = {

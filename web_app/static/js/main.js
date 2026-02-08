@@ -5,7 +5,7 @@ import { initElements, state, nodes, edges, camera } from './state.js';
 import { draw, resizeCanvas } from './render.js';
 import { initInteractions, deleteSelectedNode } from './interactions.js';
 import { initAdminConsole } from './admin.js';
-import { updateStats, setMode, updateResultsList, updateButtonStates, updateReadOnlyUI } from './ui.js';
+import { updateStats, setMode, updateResultsList, updateButtonStates, updateReadOnlyUI, initViewSettings } from './ui.js';
 import { loadFromLocalStorage, loadSavedGraphs, saveGraph, loadGraphFromDb, loadSavedPetriNets, loadPetriNetFromDb, savePetriNetDb, importPetriBatch } from './storage.js';
 import { fetchSolution, advanceStep, startAutoPlay, stopAutoPlay, resetSimulation, highlightResultItem, updateSimulationSpeed } from './simulation.js';
 import { drawPetri } from './petri_render.js';
@@ -18,6 +18,7 @@ console.log("App Initializing (Direct execution)...");
 
 // 1. Init DOM Elements
 initElements();
+initViewSettings();
 
 // 2. Init Interactions
 initInteractions();
@@ -46,17 +47,19 @@ const dbContentGraphs = document.getElementById('dbContentGraphs');
 function switchContext(ctx) {
     // Guard: Do not allow switching if we are likely in a background update loop (this is a heuristic, but debugging helper)
     // Actually, switchContext should only be called by user interaction.
-    console.log("Switching context to:", ctx);
-    console.trace("switchContext called from:");
 
-    // 1. Save current camera to previous context storage
-    // We modify the state objects directly (since they are refs in state.js)
+    // 1. Save current camera AND data to previous context storage
     if (state.appContext === 'MIS') {
         state.misCamera = { ...camera };
+        state.misNodes = [...nodes];
+        state.misEdges = [...edges];
     } else if (state.appContext === 'PETRI') {
         state.petriCamera = { ...camera };
+        // Petri uses places/transitions/arcs, not nodes/edges, so no save needed
     } else if (state.appContext === 'CONCURRENCY') {
         state.concurrencyCamera = { ...camera };
+        state.concurrencyNodes = [...nodes];
+        state.concurrencyEdges = [...edges];
     }
 
     // 2. Update Context
@@ -88,6 +91,32 @@ function switchContext(ctx) {
             if (tabContextGraph) tabContextGraph.classList.add('active');
             if (toolbarGraph) toolbarGraph.style.display = 'flex';
 
+            // Restore MIS data - clear foreign context data first, then restore if we have saved data
+
+            // Always clear first to remove CONCURRENCY/PETRI data that shouldn't appear in MIS tab
+            nodes.length = 0;
+            edges.length = 0;
+
+            // Restore saved MIS data if available
+            // Restore saved MIS data if available
+            if (state.misNodes.length > 0) {
+                // Auto-heal TEMPORARILY DISABLED due to potential issues
+                /*
+                if (!state.misNodes[0].marking) {
+                    state.misNodes = [];
+                    state.misEdges = [];
+                } else {
+                    state.misNodes.forEach(n => nodes.push(n));
+                    state.misEdges.forEach(e => edges.push(e));
+                }
+                */
+
+                // Safe restore with debug
+                console.log("Restoring MIS Nodes. Sample:", state.misNodes[0]);
+                state.misNodes.forEach(n => nodes.push(n));
+                state.misEdges.forEach(e => edges.push(e));
+            }
+
             draw();
             updateStats();
             // Enforce Read Only Mode if Generated
@@ -114,19 +143,45 @@ function switchContext(ctx) {
             }
         } else if (ctx === 'CONCURRENCY') {
             if (tabContextConcurrency) tabContextConcurrency.classList.add('active');
-            // No toolbar for now, or maybe reuse graph toolbar in read-only?
-            // Just view for now.
+            // Use same toolbar as MIS (read-only view)
+            if (toolbarGraph) toolbarGraph.style.display = 'flex';
 
-            import('./concurrency.js').then(m => m.updateConcurrencyGraph());
-            // drawConcurrency is called by updateConcurrencyGraph -> runLayout -> draw
+            // Check if we have saved concurrency data to restore
+            if (state.concurrencyNodes && state.concurrencyNodes.length > 0) {
+                // Restore saved data
+                nodes.length = 0;
+                edges.length = 0;
+                state.concurrencyNodes.forEach(n => nodes.push(n));
+                state.concurrencyEdges.forEach(e => edges.push(e));
+                draw();
+                updateStats();
+            } else {
+                // No saved data - load fresh from API
+                nodes.length = 0;
+                edges.length = 0;
+                draw(); // Show empty canvas while loading
 
-            if (viewResults) viewResults.style.display = 'none';
+                import('./concurrency.js').then(m => {
+                    m.updateConcurrencyGraph().then(() => {
+                        // Save loaded data for next time
+                        state.concurrencyNodes = [...nodes];
+                        state.concurrencyEdges = [...edges];
+                        updateStats();
+                        updateResultsList();
+                    });
+                });
+            }
+
+            if (viewResults) viewResults.style.display = 'flex';
         }
     } catch (e) {
         console.error("Error during context switch:", e);
     }
     triggerAutoSave();
-    updateResultsList();
+    // Skip for CONCURRENCY - it's updated asynchronously after API call
+    if (ctx !== 'CONCURRENCY') {
+        updateResultsList();
+    }
 }
 
 if (tabContextGraph) tabContextGraph.addEventListener('click', () => switchContext('MIS'));
@@ -136,8 +191,7 @@ if (tabContextConcurrency) tabContextConcurrency.addEventListener('click', () =>
 // --- MAIN RENDER LOOP DELEGATE ---
 // Proxy draw for interactions
 window.requestDraw = () => {
-    if (state.appContext === 'MIS') draw();
-    else if (state.appContext === 'CONCURRENCY') import('./concurrency_render.js').then(m => m.drawConcurrency());
+    if (state.appContext === 'MIS' || state.appContext === 'CONCURRENCY') draw();
     else drawPetri();
 }
 
@@ -745,19 +799,28 @@ export async function generateReachabilityGraph(background = false) {
         const data = await response.json();
 
         if (data.status === 'success') {
+            // CACHE PREVIOUS POSITIONS
+            const prevPositions = new Map();
+            nodes.forEach(n => {
+                if (n.id !== undefined) prevPositions.set(n.id, { x: n.x, y: n.y });
+            });
+
             // Update Nodes & Edges
             nodes.length = 0;
-            // We need to preserve layout if background? 
-            // The backend returns nodes without positions (or random).
-            // If we blindly replace, everything jumps.
-            // But we don't have a stable ID mapping for layout preservation easily implemented yet.
-            // For now, let's accept the jump or try to run layout.
 
+            let restoredCount = 0;
             if (data.nodes && Array.isArray(data.nodes)) {
                 data.nodes.forEach(n => {
-                    // Random init if no layout
-                    n.x = Math.random() * 800 + 50;
-                    n.y = Math.random() * 600 + 50;
+                    const prev = prevPositions.get(n.id);
+                    if (prev) {
+                        n.x = prev.x;
+                        n.y = prev.y;
+                        restoredCount++;
+                    } else {
+                        // Random init if no layout
+                        n.x = Math.random() * 800 + 50;
+                        n.y = Math.random() * 600 + 50;
+                    }
                     n.vx = 0; n.vy = 0;
                     nodes.push(n);
                 });
@@ -768,14 +831,27 @@ export async function generateReachabilityGraph(background = false) {
                 edges.push(...data.edges);
             }
 
+            // Save to context-specific storage for persistence across tab switches
+            state.misNodes = [...nodes];
+            state.misEdges = [...edges];
+
+            // Invalidate Concurrency Graph since Reachability changed
+            state.concurrencyNodes.length = 0;
+            state.concurrencyEdges.length = 0;
+
             // Reset Simulation
             state.misSteps = [];
             state.currentStepIndex = 0;
 
             // Layout (MIS Layout) - ONLY for foreground updates
             // Skip layout for background updates to prevent camera jumping
+            // ALSO SKIP if we successfully restored all positions (stable graph)
             if (!background) {
-                runMisLayout();
+                if (restoredCount < data.nodes.length) {
+                    runMisLayout();
+                } else {
+                    console.log("Skipping layout - positions restored from cache.");
+                }
             }
 
             // MARK AS GENERATED (Read Only) and store truncation status

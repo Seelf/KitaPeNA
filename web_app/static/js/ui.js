@@ -10,6 +10,9 @@ export function updateStats() {
         if (state.appContext === 'PETRI') {
             const totalTokens = places.reduce((sum, p) => sum + (p.tokens || 0), 0);
             stats.textContent = `Places: ${places.length} | Transitions: ${transitions.length} | Arcs: ${arcs.length} | Tokens: ${totalTokens}`;
+        } else if (state.appContext === 'CONCURRENCY') {
+            // Concurrency now uses global nodes/edges (same as MIS)
+            stats.textContent = `Concurrency Graph | Places: ${nodes.length} | Concurrent Pairs: ${edges.length}`;
         } else {
             // MIS / Reachability Graph
             let statusText = `Nodes: ${nodes.length} | Edges: ${edges.length}`;
@@ -28,6 +31,9 @@ export function updateStats() {
         if (state.appContext === 'PETRI') {
             // For Petri, maybe show places? Or total count? Let's show places + transitions
             iconNum.textContent = places.length + transitions.length;
+        } else if (state.appContext === 'CONCURRENCY') {
+            // CONCURRENCY now uses global nodes (shared with MIS)
+            iconNum.textContent = nodes.length;
         } else {
             const nextId = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
             iconNum.textContent = nextId;
@@ -167,6 +173,26 @@ export function updateResultsList() {
         } else {
             elements.resultsList.innerHTML = '<div class="empty-state">No reachable states found. Run "Generate Graph" first.</div>';
         }
+    } else if (state.appContext === 'CONCURRENCY') {
+        // Concurrency now uses global nodes (same as MIS)
+        if (nodes.length > 0) {
+            const header = document.createElement('div');
+            header.className = 'result-header';
+            header.style.padding = '5px 10px';
+            header.style.fontWeight = 'bold';
+            header.style.color = '#ccc';
+            header.textContent = `Places (${nodes.length})`;
+            elements.resultsList.appendChild(header);
+
+            nodes.forEach(node => {
+                const el = document.createElement('div');
+                el.className = 'result-item';
+                el.textContent = node.label || `p${node.id}`;
+                elements.resultsList.appendChild(el);
+            });
+        } else {
+            elements.resultsList.innerHTML = '<div class="empty-state">No concurrency graph. Switch to Structural view first.</div>';
+        }
     }
 }
 
@@ -223,4 +249,36 @@ export function updateReadOnlyUI() {
     // if (isReadOnly && (state.mode === 'nodes' || state.mode === 'edges')) {
     //    setMode('view');
     // }
+}
+
+export function initViewSettings() {
+    const chkSnapReachability = document.getElementById('chkSnapReachability');
+    if (chkSnapReachability) {
+        // Load saved preference from localStorage
+        const savedSnapReach = localStorage.getItem('kitapena_snapReachability');
+        if (savedSnapReach !== null) {
+            state.snapReachability = savedSnapReach === 'true';
+        }
+        chkSnapReachability.checked = state.snapReachability;
+
+        chkSnapReachability.addEventListener('change', (e) => {
+            state.snapReachability = e.target.checked;
+            localStorage.setItem('kitapena_snapReachability', state.snapReachability);
+        });
+    }
+
+    const chkSnapConcurrency = document.getElementById('chkSnapConcurrency');
+    if (chkSnapConcurrency) {
+        // Load saved preference from localStorage
+        const savedSnapConc = localStorage.getItem('kitapena_snapConcurrency');
+        if (savedSnapConc !== null) {
+            state.snapConcurrency = savedSnapConc === 'true';
+        }
+        chkSnapConcurrency.checked = state.snapConcurrency;
+
+        chkSnapConcurrency.addEventListener('change', (e) => {
+            state.snapConcurrency = e.target.checked;
+            localStorage.setItem('kitapena_snapConcurrency', state.snapConcurrency);
+        });
+    }
 }

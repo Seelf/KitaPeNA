@@ -1,11 +1,11 @@
 
-import { elements } from './state.js';
+import { elements, state } from './state.js';
 
 // State specific to Concurrency Graph
 export const concurrencyState = {
     nodes: [],
     edges: [], // [id1, id2] - undirected
-    camera: { x: 0, y: 0, zoom: 1 },
+    // Camera is managed by state.concurrencyCamera for consistency with context switching
     isDragging: false,
     lastX: 0,
     lastY: 0,
@@ -16,8 +16,8 @@ export const concurrencyState = {
 export function toWorld(screenX, screenY) {
     const { canvas } = elements;
     const rect = canvas.getBoundingClientRect();
-    const x = (screenX - rect.left - concurrencyState.camera.x) / concurrencyState.camera.zoom;
-    const y = (screenY - rect.top - concurrencyState.camera.y) / concurrencyState.camera.zoom;
+    const x = (screenX - rect.left - state.concurrencyCamera.x) / state.concurrencyCamera.zoom;
+    const y = (screenY - rect.top - state.concurrencyCamera.y) / state.concurrencyCamera.zoom;
     return { x, y };
 }
 
@@ -56,11 +56,11 @@ export function drawConcurrency() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    ctx.translate(concurrencyState.camera.x, concurrencyState.camera.y);
-    ctx.scale(concurrencyState.camera.zoom, concurrencyState.camera.zoom);
+    ctx.translate(state.concurrencyCamera.x, state.concurrencyCamera.y);
+    ctx.scale(state.concurrencyCamera.zoom, state.concurrencyCamera.zoom);
 
     // Draw grid
-    drawGrid(ctx, canvas, concurrencyState.camera);
+    drawGrid(ctx, canvas, state.concurrencyCamera);
 
     // Draw Edges (Undirected)
     ctx.strokeStyle = '#00bcd4'; // Cyan
