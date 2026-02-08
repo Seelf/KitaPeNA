@@ -22,7 +22,9 @@ export function resizeCanvas() {
     if (canvas && container) {
         canvas.width = container.clientWidth;
         canvas.height = container.clientHeight;
-        draw();
+        // Use context-aware draw
+        if (window.requestDraw) window.requestDraw();
+        else draw();
     }
 }
 
@@ -214,30 +216,33 @@ export function draw() {
                 ctx.stroke();
 
                 // --- Arrowhead ---
-                // Tangent at the end of the curve (t=1).
-                // Vector CP -> V gives the approximate tangent at V.
-                let arrowAngle;
-                if (Math.abs(curveHeight) < 1) {
-                    arrowAngle = angle;
-                } else {
-                    arrowAngle = Math.atan2(v.y - cpY, v.x - cpX);
+                // Only draw arrowhead if NOT Concurrency Graph
+                if (state.appContext !== 'CONCURRENCY') {
+                    // Tangent at the end of the curve (t=1).
+                    // Vector CP -> V gives the approximate tangent at V.
+                    let arrowAngle;
+                    if (Math.abs(curveHeight) < 1) {
+                        arrowAngle = angle;
+                    } else {
+                        arrowAngle = Math.atan2(v.y - cpY, v.x - cpX);
+                    }
+
+                    // Recalculate arrow position on the boundary of the node
+                    // Node radius ~20.
+                    // We can just step back from V along the ArrowAngle.
+                    const r = 25; // Node radius + buffer
+                    const arrowTipX = v.x - Math.cos(arrowAngle) * r;
+                    const arrowTipY = v.y - Math.sin(arrowAngle) * r;
+
+                    const headLen = 10;
+                    ctx.beginPath();
+                    ctx.moveTo(arrowTipX, arrowTipY);
+                    ctx.lineTo(arrowTipX - headLen * Math.cos(arrowAngle - Math.PI / 6), arrowTipY - headLen * Math.sin(arrowAngle - Math.PI / 6));
+                    ctx.lineTo(arrowTipX - headLen * Math.cos(arrowAngle + Math.PI / 6), arrowTipY - headLen * Math.sin(arrowAngle + Math.PI / 6));
+                    ctx.lineTo(arrowTipX, arrowTipY);
+                    ctx.fillStyle = '#cccccc';
+                    ctx.fill();
                 }
-
-                // Recalculate arrow position on the boundary of the node
-                // Node radius ~20.
-                // We can just step back from V along the ArrowAngle.
-                const r = 25; // Node radius + buffer
-                const arrowTipX = v.x - Math.cos(arrowAngle) * r;
-                const arrowTipY = v.y - Math.sin(arrowAngle) * r;
-
-                const headLen = 10;
-                ctx.beginPath();
-                ctx.moveTo(arrowTipX, arrowTipY);
-                ctx.lineTo(arrowTipX - headLen * Math.cos(arrowAngle - Math.PI / 6), arrowTipY - headLen * Math.sin(arrowAngle - Math.PI / 6));
-                ctx.lineTo(arrowTipX - headLen * Math.cos(arrowAngle + Math.PI / 6), arrowTipY - headLen * Math.sin(arrowAngle + Math.PI / 6));
-                ctx.lineTo(arrowTipX, arrowTipY);
-                ctx.fillStyle = '#cccccc';
-                ctx.fill();
 
                 // --- Label ---
                 // Should be at t=0.5 (the peak/CP for quadratic? No, B(0.5) is midpoint of curve)
@@ -373,6 +378,11 @@ export function draw() {
                 // Offset below radius (20) + padding (15)
                 ctx.fillText(labelText, node.x, node.y + 35);
             }
+        } else if (node.label) {
+            // No marking but has label (Concurrency Graph nodes) - show place name
+            ctx.fillStyle = '#aaaaaa';
+            ctx.font = '11px Inter';
+            ctx.fillText(node.label, node.x, node.y + 35);
         }
     });
 

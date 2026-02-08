@@ -57,67 +57,8 @@ export function initInteractions() {
     if (!canvas) return;
 
     canvas.addEventListener('mousedown', (e) => {
-        if (state.appContext === 'CONCURRENCY') {
-            // Full interaction support for Concurrency (read-only: drag nodes/labels, pan)
-            import('./concurrency_render.js').then(m => {
-                const rect = canvas.getBoundingClientRect();
-                const screenX = e.clientX - rect.left;
-                const screenY = e.clientY - rect.top;
-
-                // Convert to world coords
-                const worldX = (screenX - m.concurrencyState.camera.x) / m.concurrencyState.camera.zoom;
-                const worldY = (screenY - m.concurrencyState.camera.y) / m.concurrencyState.camera.zoom;
-
-                // Check label first (for label dragging)
-                let clickedLabel = null;
-                const labelWidth = 50;
-                const labelHeight = 14;
-                for (const node of m.concurrencyState.nodes) {
-                    const labelX = node.x + (node.labelOffsetX || 0);
-                    const labelY = node.y + 25 + (node.labelOffsetY || 0);
-                    if (worldX >= labelX - labelWidth / 2 && worldX <= labelX + labelWidth / 2 &&
-                        worldY >= labelY - labelHeight / 2 && worldY <= labelY + labelHeight / 2) {
-                        clickedLabel = node;
-                        break;
-                    }
-                }
-
-                if (clickedLabel) {
-                    // Drag label
-                    m.concurrencyState.dragLabel = clickedLabel;
-                    m.concurrencyState.dragNode = null;
-                    m.concurrencyState.isDragging = false;
-                    return;
-                }
-
-                // Check if clicked on a node (radius 20)
-                let clickedNode = null;
-                for (const node of m.concurrencyState.nodes) {
-                    const dx = node.x - worldX;
-                    const dy = node.y - worldY;
-                    if (Math.sqrt(dx * dx + dy * dy) <= 20) {
-                        clickedNode = node;
-                        break;
-                    }
-                }
-
-                if (clickedNode) {
-                    // Drag node
-                    m.concurrencyState.dragNode = clickedNode;
-                    m.concurrencyState.dragLabel = null;
-                    m.concurrencyState.isDragging = false;
-                } else {
-                    // Pan canvas
-                    m.concurrencyState.dragNode = null;
-                    m.concurrencyState.dragLabel = null;
-                    m.concurrencyState.isDragging = true;
-                    m.concurrencyState.lastX = e.clientX;
-                    m.concurrencyState.lastY = e.clientY;
-                }
-            });
-            return;
-        }
-        if (state.appContext !== 'MIS') return;
+        // CONCURRENCY now uses same infrastructure as MIS, so handle them together
+        if (state.appContext !== 'MIS' && state.appContext !== 'CONCURRENCY') return;
 
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -328,49 +269,7 @@ export function initInteractions() {
     });
 
     canvas.addEventListener('mousemove', (e) => {
-        if (state.appContext === 'CONCURRENCY') {
-            import('./concurrency_render.js').then(m => {
-                if (m.concurrencyState.dragLabel) {
-                    // Drag label - update offset
-                    const rect = canvas.getBoundingClientRect();
-                    const screenX = e.clientX - rect.left;
-                    const screenY = e.clientY - rect.top;
-
-                    const worldX = (screenX - m.concurrencyState.camera.x) / m.concurrencyState.camera.zoom;
-                    const worldY = (screenY - m.concurrencyState.camera.y) / m.concurrencyState.camera.zoom;
-
-                    const node = m.concurrencyState.dragLabel;
-                    const baseY = node.y + 25; // Default label position
-
-                    node.labelOffsetX = worldX - node.x;
-                    node.labelOffsetY = worldY - baseY;
-                    m.drawConcurrency();
-                } else if (m.concurrencyState.dragNode) {
-                    // Drag node
-                    const rect = canvas.getBoundingClientRect();
-                    const screenX = e.clientX - rect.left;
-                    const screenY = e.clientY - rect.top;
-
-                    // Convert to world coords
-                    const worldX = (screenX - m.concurrencyState.camera.x) / m.concurrencyState.camera.zoom;
-                    const worldY = (screenY - m.concurrencyState.camera.y) / m.concurrencyState.camera.zoom;
-
-                    m.concurrencyState.dragNode.x = worldX;
-                    m.concurrencyState.dragNode.y = worldY;
-                    m.drawConcurrency();
-                } else if (m.concurrencyState.isDragging) {
-                    // Pan canvas
-                    const dx = e.clientX - m.concurrencyState.lastX;
-                    const dy = e.clientY - m.concurrencyState.lastY;
-                    m.concurrencyState.camera.x += dx;
-                    m.concurrencyState.camera.y += dy;
-                    m.concurrencyState.lastX = e.clientX;
-                    m.concurrencyState.lastY = e.clientY;
-                    m.drawConcurrency();
-                }
-            });
-            return;
-        }
+        // CONCURRENCY shares infrastructure with MIS, no special handling needed
 
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
@@ -387,8 +286,23 @@ export function initInteractions() {
         if (state.isDraggingNode && state.dragNodeId !== null) {
             const node = nodes.find(n => n.id === state.dragNodeId);
             if (node) {
-                node.x = world.x;
-                node.y = world.y;
+                let targetX = world.x;
+                let targetY = world.y;
+
+                // Snapping Logic - matches background grid (50px)
+                const gridSize = 50;
+                let shouldSnap = false;
+
+                if (state.appContext === 'MIS' && state.snapReachability) shouldSnap = true;
+                if (state.appContext === 'CONCURRENCY' && state.snapConcurrency) shouldSnap = true;
+
+                if (shouldSnap) {
+                    targetX = Math.round(targetX / gridSize) * gridSize;
+                    targetY = Math.round(targetY / gridSize) * gridSize;
+                }
+
+                node.x = targetX;
+                node.y = targetY;
                 draw();
             }
         } else if (state.isPanning) {
@@ -406,14 +320,7 @@ export function initInteractions() {
     });
 
     window.addEventListener('mouseup', () => {
-        // Concurrency mouseup - only reset if in CONCURRENCY context
-        if (state.appContext === 'CONCURRENCY') {
-            import('./concurrency_render.js').then(m => {
-                m.concurrencyState.isDragging = false;
-                m.concurrencyState.dragNode = null;
-                m.concurrencyState.dragLabel = null;
-            });
-        }
+        // No special CONCURRENCY handling - uses same infrastructure as MIS
 
         if (state.isDraggingNode) {
             state.isDraggingNode = false;
@@ -430,42 +337,7 @@ export function initInteractions() {
 
     canvas.addEventListener('wheel', (e) => {
         if (state.appContext !== 'MIS' && state.appContext !== 'CONCURRENCY') return;
-
-        if (state.appContext === 'CONCURRENCY') {
-            e.preventDefault();
-            import('./concurrency_render.js').then(m => {
-                const cam = m.concurrencyState.camera;
-
-                if (e.ctrlKey) {
-                    // ZOOM (same as MIS)
-                    const zoomIntensity = 0.002;
-                    const delta = -e.deltaY * zoomIntensity;
-                    const newZoom = Math.min(Math.max(cam.zoom + delta, 0.1), 5);
-
-                    const rect = canvas.getBoundingClientRect();
-                    const mouseX = e.clientX - rect.left;
-                    const mouseY = e.clientY - rect.top;
-
-                    // World before zoom
-                    const worldX = (mouseX - cam.x) / cam.zoom;
-                    const worldY = (mouseY - cam.y) / cam.zoom;
-
-                    cam.zoom = newZoom;
-
-                    // Keep world point under mouse
-                    cam.x = mouseX - worldX * cam.zoom;
-                    cam.y = mouseY - worldY * cam.zoom;
-                } else {
-                    // PAN (same as MIS)
-                    cam.x -= e.deltaX;
-                    cam.y -= e.deltaY;
-                }
-
-                m.drawConcurrency();
-                triggerAutoSave(); // Save camera position after pan/zoom
-            });
-            return;
-        }
+        // CONCURRENCY uses same wheel handling as MIS (shared camera and draw)
 
         e.preventDefault();
         if (e.ctrlKey) {
