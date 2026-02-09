@@ -49,70 +49,85 @@ Proces badawczy w aplikacji wygląda następująco:
 
 ## Struktura Plików i Folderów
 
-Projekt podzielony jest na backend w Pythonie (Flask) oraz rozbudowany frontend w JavaScript (Vanilla ES6 Modules).
+Projekt został zrefaktoryzowany, aby oddzielić logikę backendu od frontendu oraz przenieść starsze narzędzia desktopowe do dedykowanego folderu.
 
 ```
 /
-├── web_app/               # Główny folder aplikacji webowej
-│   ├── app.py             # Entry point (serwer Flask, endpointy API)
-│   ├── petri_reachability.py # Logika backendowa generowania grafu osiągalności
+├── web_app/               # Główna aplikacja webowa (Flask + JS)
+│   ├── app.py             # Serwer aplikacji, routing API
+│   ├── analysis/          # Moduły analityczne (logika biznesowa)
+│   │   ├── reachability.py # Generowanie Grafu Osiągalności (BFS)
+│   │   ├── concurrency.py  # Generowanie Grafu Współbieżności
+│   │   ├── coloring.py     # Algorytmy kolorowania grafów (DSatur, Backtracking)
+│   │   ├── transitivity.py # Sprawdzanie przechodniej orientowalności (TRO)
+│   │   └── mis.py          # Algorytmy wyznaczania MIS (Maksymalnych Zbiorów Niezależnych)
 │   ├── templates/
-│   │   └── index.html     # Główny (i jedyny) plik HTML aplikacji (Single Page App)
+│   │   └── index.html     # Single Page Application (SPA)
 │   └── static/
-│       ├── css/
-│       │   └── style.css  # Stylizacja (Dark Mode, layout VS Code style)
-│       └── js/            # Moduły JavaScript (opis poniżej)
+│       ├── css/           # Style (Dark Mode, Layout)
+│       └── js/            # Logika Frontendowa (opis poniżej)
 │
-├── mis_core.py            # Rdzeń algorytmiczny (logika MIS, obsługa grafów NetworkX)
-├── mis_editor.py          # (Legacy) Wersja Desktopowa aplikacji (PyQt/Tkinter)
-├── MIS.py                 # Skrypty pomocnicze / prototypy
+├── tools/                 # Narzędzia pomocnicze
+│   └── desktop_editor/    # (Legacy) Poprzednia wersja desktopowa (PyQt/Tkinter)
+│       ├── MIS.py
+│       ├── main.py
+│       └── ...
+│
+├── tests/                 # Testy jednostkowe
+│   └── test_mis_logic.py
 └── .gitignore             # Konfiguracja Git
 ```
 
 ### Moduły Frontendowe (`web_app/static/js/`)
 
-Aplikacja kliencka napisana jest w nowoczesnym JavaScript z podziałem na moduły:
+Frontend został podzielony na wyspecjalizowane moduły ES6, komunikujące się przez centralny stan (`state.js`) i system zdarzeń.
 
-| Plik | Opis Funkcjonalności |
-|------|----------------------|
-| **`main.js`** | Punkt wejściowy. Inicjalizacja stanu, obsługa globalnych skrótów klawiszowych, integracja modułów. |
-| **`tabs.js`** | **Zarządzanie kartami**. Obsługa wielu otwartych plików (MDI), zapisywanie/wczytywanie sesji (`localStorage`), izolacja stanu między kartami. |
-| **`petri_state.js`** | Model danych Sieci Petriego (`places`, `transitions`, `arcs`). Logika dodawania/usuwania elementów. |
-| **`petri_render.js`** | Silnik renderujący Sieci Petriego na Canvas HTML5. Rysowanie tokenów, strzałek i etykiet. |
-| **`petri_interactions.js`** | Obsługa myszy dla Sieci Petriego (Drag&Drop, łączenie elementów, dodawanie tokenów). |
-| **`interactions.js`** | Obsługa myszy dla Grafu Osiągalności (MIS). Zaznaczanie, przesuwanie widoku (Pan/Zoom). |
-| **`render.js`** | Silnik renderujący Graf Osiągalności (MIS). Wizualizacja węzłów, krawędzi i podświetlanie wyników. |
-| **`simulation.js`** | Logika symulacji MIS. Odtwarzanie kroków rozwiązania, interakcja z API `/api/solve`. |
-| **`state.js`** | Globalny stan aplikacji dla trybu MIS (lista węzłów, krawędzi, ustawienia kamery). |
-| **`ui.js`** | Funkcje aktualizujące interfejs DOM (Sidebar, Toolbar, Lista Wyników, Statystyki). |
-| **`storage.js`** | (Opcjonalny) Pomocnicze funkcje zapisu lokalnego (zintegrowane głównie w `tabs.js`). |
-
----
-
-## Kluczowe Funkcje i Metody
-
-### Backend (`app.py` & `petri_reachability.py`)
--   **`/api/petri/reachability` (POST)**: Przyjmuje definicję sieci Petriego (JSON), buduje graf osiągalności metodą BFS i zwraca węzły/krawędzie.
--   **`/api/solve` (POST)**: Rozwiązuje problem MIS dla przesłanego grafu.
--   **`/api/petri/saved` (CRUD)**: Zarządzanie zapisanymi sieciami w bazie danych SQLite.
-
-### Frontend (`simulation.js`)
--   **`fetchSolution()`**: Wysyła graf do API, odbiera strumieniowo wyniki (Server-Sent Events / Chunked) i aktualizuje listę kroków.
--   **`triggerAutoSave()`**: (Wstrzyknięte) Automatyczny zapis stanu symulacji do `localStorage` po każdym kroku, zapewniający przetrwanie danych po odświeżeniu strony.
-
-### Frontend (`tabs.js`)
--   **`saveCurrentStateToTab(tabId)`**: Wykonuje głęboką kopię (Deep Copy) całego stanu edytora (Petri + MIS) do obiektu karty.
--   **`restoreStateFromTab(tab)`**: Odtwarza stan edytora z obiektu karty, dbając o izolację i poprawność kontekstu (View vs Model).
--   **`saveSession() / restoreSession()`**: Serializacja całego paska kart do `localStorage`, umożliwiająca "nieśmiertelność" sesji użytkownika.
+| Moduł | Opis Funkcjonalności |
+|-------|----------------------|
+| **`main.js`** | **Core**. Inicjalizacja aplikacji, obsługa głównego paska narzędzi, router kontekstów (Petri / MIS / Concurrency). |
+| **`tabs.js`** | **Zarządzanie sesją**. Obsługa wielu kart (plików), zapis/odczyt `localStorage`, izolacja stanu między kartami. |
+| **`state.js`** | **Single Source of Truth**. Przechowuje globalny stan widoku, dane grafów (`graphs.MIS`, `graphs.CONCURRENCY`) oraz wyniki analiz. |
+| **`petri_state.js`** | Model danych Sieci Petriego (Miejsca, Tranzycje, Łuki). |
+| **`petri_render.js`** | Silnik renderujący Sieci Petriego (Canvas API). |
+| **`petri_interactions.js`** | Obsługa edycji Sieci Petriego (Drag&Drop, łączenie). |
+| **`concurrency.js`** | Obsługa Grafu Współbieżności. Komunikacja z API, pobieranie wyników kolorowania i przechodniości. |
+| **`render.js`** | Silnik renderujący Grafy Osiągalności i Współbieżności. Obsługa layou-u siłowego (Force-Directed). |
+| **`interactions.js`** | Obsługa interakcji na grafach (przesuwanie, zaznaczanie węzłów). |
+| **`ui.js`** | Zarządzanie panelem bocznym (Sidebar), listą wyników, statystykami i legendą kolorowania. |
+| **`storage.js`** | Logika zapisu do bazy danych (SQLite) i obsługi plików `.pnh`. |
 
 ---
 
-## Interfejs Użytkownika
+## Nowe Funkcje (v2.0)
 
-1.  **Toolbar (Lewa/Góra)**: Narzędzia edycji (Dodaj Miejsce, Tranzycję, Łuk, Token). Przełącznik trybów (Model / Analysis).
-2.  **Canvas (Środek)**: Obszar roboczy z obsługą nieskończonego przesuwania i przybliżania.
-3.  **Sidebar (Prawa)**:
-    -   **Explorer**: Lista wyników symulacji (kroki MIS).
-    -   **Saved Graphs**: Baza zapisanych projektów.
-4.  **Tab Bar (Góra)**: Pasek kart z otwartymi projektami.
-5.  **Status Bar (Dół)**: Liczniki elementów (Liczba miejsc, tranzycji, węzłów grafu).
+### 1. Izolacja Kontekstów i Karty
+Aplikacja obsługuje teraz pracę z wieloma plikami jednocześnie. Każda karta posiada własny, **całkowicie odseparowany** stan:
+-   Sieć Petriego
+-   Wygenerowany Graf Osiągalności
+-   Wygenerowany Graf Współbieżności
+-   Wyniki analizy
+
+Przełączanie kart automatycznie zapisuje i odtwarza stan, zapobiegając "wyciekom" danych między projektami.
+
+### 2. Graf Współbieżności (Concurrency Graph)
+Nowy moduł pozwalający na analizę relacji współbieżności w sieci:
+-   Automatyczne generowanie krawędzi współbieżności na podstawie Grafu Osiągalności.
+-   **Analiza TRO (Transitively Orientable)**: Sprawdzanie, czy graf jest grafem porównywalności porządku częściowego.
+-   **Optymalne Kolorowanie**: Wyznaczanie liczby chromatycznej i wizualizacja podziału na klasy niezależne (użycie algorytmu DSatur + Backtracking).
+
+### 3. Zaawansowana Wizualizacja
+-   Nowy silnik renderujący obsługujący zakrzywione krawędzie (Bézier curves) dla lepszej czytelności.
+-   Interaktywna legenda kolorowania z możliwością podświetlania grup węzłów.
+-   Ulepszony tryb ciemny (Dark Mode) spójny z nowoczesnymi IDE.
+
+---
+
+## API Endpoints
+
+Aplikacja udostępnia REST API do obliczeń nieliniowych:
+
+-   `POST /api/petri/reachability` - Generuje graf osiągalności.
+-   `POST /api/petri/concurrency` - Generuje graf współbieżności.
+-   `POST /api/analysis/coloring` - Wyznacza optymalne kolorowanie grafu.
+-   `POST /api/analysis/transitivity` - Sprawdza orientowalność przechodnią (TRO).
+-   `POST /api/solve` - (Legacy) Rozwiązuje problem MIS.
