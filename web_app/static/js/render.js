@@ -314,24 +314,49 @@ export function draw() {
             ctx.fill();
         }
 
+        const COLOR_PALETTE = [
+            '#FF6B6B', '#4ECDC4', '#FFE66D', '#1A535C', '#FF9F1C',
+            '#2EC4B6', '#E71D36', '#7209B7', '#3A0CA3', '#4361EE',
+            '#F72585', '#4895EF', '#56CFE1', '#4CC9F0', '#B5179E'
+        ];
+
+        // ... inside draw ...
+
         // Node Circle
         ctx.beginPath();
+        // Slightly larger radius if colored to emphasize? No, keep standard.
         ctx.arc(node.x, node.y, 20, 0, Math.PI * 2);
 
         // Color logic
-        if (currentMisSet.has(node.id)) {
+        if (state.appContext === 'CONCURRENCY' && node.color) {
+            // Use pre-computed optimal coloring
+            ctx.fillStyle = COLOR_PALETTE[(node.color - 1) % COLOR_PALETTE.length];
+        } else if (currentMisSet.has(node.id)) {
             ctx.fillStyle = '#FF4B4B'; // Red
         } else {
             ctx.fillStyle = '#1E90FF'; // Blue
         }
 
+        // Helper to determine text color
+        function getContrastColor(hexColor) {
+            // Convert hex to RGB
+            const r = parseInt(hexColor.substr(1, 2), 16);
+            const g = parseInt(hexColor.substr(3, 2), 16);
+            const b = parseInt(hexColor.substr(5, 2), 16);
+            // Calculate luminance
+            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+            return (yiq >= 128) ? '#000000' : '#ffffff';
+        }
+
+        const nodeColor = ctx.fillStyle;
         ctx.fill();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
 
         // Draw ID inside (1-based)
-        ctx.fillStyle = '#eee';
+        // Use contrast color based on node fill
+        ctx.fillStyle = getContrastColor(nodeColor);
         ctx.font = 'bold 14px Inter';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';

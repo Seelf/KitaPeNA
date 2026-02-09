@@ -18,11 +18,34 @@ console.log("App Initializing (Direct execution)...");
 
 // 1. Init DOM Elements
 initElements();
-initViewSettings();
+initViewSettings(); // Load view preferences
 
 // 2. Init Interactions
 initInteractions();
 initPetriInteractions();
+
+// 3. Load State & Restore UI
+loadFromLocalStorage();
+
+// RESTORE UI TAB STATE
+// If context was restored as CONCURRENCY or PETRI, we must visualy select that tab
+// and hide/show appropriate elements.
+if (state.appContext === 'CONCURRENCY') {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector('[data-tab="concurrency"]');
+    if (btn) btn.classList.add('active');
+
+    // Ensure sidebar is in view mode or appropriate state
+    updateResultsList();
+} else if (state.appContext === 'PETRI') {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector('[data-tab="petri"]');
+    if (btn) btn.classList.add('active');
+}
+
+// Force draw after restore
+resizeCanvas();
+window.requestAnimationFrame(draw);
 initAdminConsole();
 
 // --- CONTEXT SWITCHING ---
@@ -44,36 +67,40 @@ const dbContentGraphs = document.getElementById('dbContentGraphs');
 // initTabs called at the end
 
 
-function switchContext(ctx) {
+function switchContext(ctx, skipSave = false) {
     // Guard: Do not allow switching if we are likely in a background update loop (this is a heuristic, but debugging helper)
     // Actually, switchContext should only be called by user interaction.
 
-    // 1. Save current camera AND data to previous context storage
-    if (state.appContext === 'MIS') {
-        state.misCamera = { ...camera };
-        state.misNodes = [...nodes];
-        state.misEdges = [...edges];
-    } else if (state.appContext === 'PETRI') {
-        state.petriCamera = { ...camera };
-        // Petri uses places/transitions/arcs, not nodes/edges, so no save needed
-    } else if (state.appContext === 'CONCURRENCY') {
-        state.concurrencyCamera = { ...camera };
-        state.concurrencyNodes = [...nodes];
-        state.concurrencyEdges = [...edges];
+    // 1. SAVE BUFFER: Save active rendering buffer (nodes/edges) to CURRENT context storage
+    // using deep copy to detach from buffer.
+    // skipped if skipSave is true (e.g. when switching files, because the buffer belongs to the OLD file)
+    if (!skipSave) {
+        if (state.appContext === 'MIS') {
+            state.misCamera = { ...camera };
+            state.graphs.MIS.nodes = JSON.parse(JSON.stringify(nodes));
+            state.graphs.MIS.edges = JSON.parse(JSON.stringify(edges));
+        } else if (state.appContext === 'PETRI') {
+            state.petriCamera = { ...camera };
+            // Petri uses places/transitions/arcs, not nodes/edges.
+        } else if (state.appContext === 'CONCURRENCY') {
+            state.concurrencyCamera = { ...camera };
+            state.graphs.CONCURRENCY.nodes = JSON.parse(JSON.stringify(nodes));
+            state.graphs.CONCURRENCY.edges = JSON.parse(JSON.stringify(edges));
+        }
+    } else {
+        console.log(`[MAIN] switchContext: Skipping save of buffer (File Switch detected). Target: ${ctx}`);
     }
 
-    // 2. Update Context
+    // 2. UPDATE CONTEXT
     state.appContext = ctx;
 
-    // 3. Restore camera for new context
-    // We must update the existing camera object properties, not replace the object
+    // 3. RESTORE CAMERA
     const sourceCam = (ctx === 'MIS') ? state.misCamera : (ctx === 'PETRI' ? state.petriCamera : state.concurrencyCamera);
     if (sourceCam) {
         camera.x = sourceCam.x;
         camera.y = sourceCam.y;
         camera.zoom = sourceCam.zoom;
     } else if (ctx === 'CONCURRENCY') {
-        // Default init for concurrency if no saved camera
         camera.x = 0; camera.y = 0; camera.zoom = 1;
     }
 
@@ -87,34 +114,25 @@ function switchContext(ctx) {
         if (toolbarGraph) toolbarGraph.style.display = 'none';
         if (toolbarPetri) toolbarPetri.style.display = 'none';
 
+        // 4. LOAD BUFFER: Populate rendering buffer from NEW context storage
         if (ctx === 'MIS') {
             if (tabContextGraph) tabContextGraph.classList.add('active');
             if (toolbarGraph) toolbarGraph.style.display = 'flex';
 
-            // Restore MIS data - clear foreign context data first, then restore if we have saved data
+            // Hide Concurrency-specific buttons
+            const btnCheckTransitive = document.getElementById('btnCheckTransitive');
+            const concurrencySeparator = document.getElementById('concurrencySeparator');
+            if (btnCheckTransitive) btnCheckTransitive.style.display = 'none';
+            if (concurrencySeparator) concurrencySeparator.style.display = 'none';
 
-            // Always clear first to remove CONCURRENCY/PETRI data that shouldn't appear in MIS tab
+            // RESTORE DATA
             nodes.length = 0;
             edges.length = 0;
 
-            // Restore saved MIS data if available
-            // Restore saved MIS data if available
-            if (state.misNodes.length > 0) {
-                // Auto-heal TEMPORARILY DISABLED due to potential issues
-                /*
-                if (!state.misNodes[0].marking) {
-                    state.misNodes = [];
-                    state.misEdges = [];
-                } else {
-                    state.misNodes.forEach(n => nodes.push(n));
-                    state.misEdges.forEach(e => edges.push(e));
-                }
-                */
-
-                // Safe restore with debug
-                console.log("Restoring MIS Nodes. Sample:", state.misNodes[0]);
-                state.misNodes.forEach(n => nodes.push(n));
-                state.misEdges.forEach(e => edges.push(e));
+            if (state.graphs.MIS.nodes.length > 0) {
+                state.graphs.MIS.nodes.forEach(n => nodes.push(n));
+                state.graphs.MIS.edges.forEach(e => edges.push(e));
+                console.log("Restored MIS Nodes:", nodes.length);
             }
 
             draw();
@@ -146,26 +164,30 @@ function switchContext(ctx) {
             // Use same toolbar as MIS (read-only view)
             if (toolbarGraph) toolbarGraph.style.display = 'flex';
 
-            // Check if we have saved concurrency data to restore
-            if (state.concurrencyNodes && state.concurrencyNodes.length > 0) {
-                // Restore saved data
-                nodes.length = 0;
-                edges.length = 0;
-                state.concurrencyNodes.forEach(n => nodes.push(n));
-                state.concurrencyEdges.forEach(e => edges.push(e));
+            // Show Concurrency-specific buttons
+            const btnCheckTransitive = document.getElementById('btnCheckTransitive');
+            const concurrencySeparator = document.getElementById('concurrencySeparator');
+            if (btnCheckTransitive) btnCheckTransitive.style.display = 'block';
+            if (concurrencySeparator) concurrencySeparator.style.display = 'block';
+
+            // RESTORE DATA
+            // Always restore from graphs.CONCURRENCY. If empty, it's empty.
+            // The lazy-loading logic is handled below if needed, but primary source is graphs.CONCURRENCY.
+            nodes.length = 0;
+            edges.length = 0;
+
+            if (state.graphs.CONCURRENCY.nodes.length > 0) {
+                console.log(`[MAIN] Restoring Concurrency Nodes: ${state.graphs.CONCURRENCY.nodes.length}`);
+                state.graphs.CONCURRENCY.nodes.forEach(n => nodes.push(n));
+                state.graphs.CONCURRENCY.edges.forEach(e => edges.push(e));
                 draw();
                 updateStats();
             } else {
-                // No saved data - load fresh from API
-                nodes.length = 0;
-                edges.length = 0;
-                draw(); // Show empty canvas while loading
-
+                // If empty, try to load fresh from API automatically
+                console.log("[MAIN] Concurrency storage empty. Triggering initial fetch...");
+                draw();
                 import('./concurrency.js').then(m => {
                     m.updateConcurrencyGraph().then(() => {
-                        // Save loaded data for next time
-                        state.concurrencyNodes = [...nodes];
-                        state.concurrencyEdges = [...edges];
                         updateStats();
                         updateResultsList();
                     });
@@ -644,13 +666,70 @@ updateStats();
 // switchContext('PETRI'); // Handled by initTabs now
 
 // MIS Auto Layout
+// MIS / Concurrency Auto Layout
 const btnGraphLayout = document.getElementById('btnGraphLayout');
 if (btnGraphLayout) {
-    btnGraphLayout.addEventListener('click', () => runMisLayout());
+    btnGraphLayout.addEventListener('click', () => {
+        if (state.appContext === 'MIS') {
+            runMisLayout();
+        } else if (state.appContext === 'CONCURRENCY') {
+            import('./concurrency.js').then(m => {
+                if (m.runSimpleLayout) {
+                    m.runSimpleLayout();
+                    // Explicitly save the new layout
+                    state.concurrencyNodes = JSON.parse(JSON.stringify(nodes));
+                    state.concurrencyEdges = JSON.parse(JSON.stringify(edges));
+                    triggerAutoSave();
+                    console.log("Concurrency Layout applied and saved.");
+                }
+            });
+        }
+    });
+}
+
+// Transitive Orientability Check Button (Concurrency Graph only)
+const btnCheckTransitive = document.getElementById('btnCheckTransitive');
+console.log("btnCheckTransitive element:", btnCheckTransitive);
+if (btnCheckTransitive) {
+    btnCheckTransitive.addEventListener('click', () => {
+        console.log("Transitive button clicked! Context:", state.appContext);
+        if (state.appContext !== 'CONCURRENCY') {
+            console.warn("Not in CONCURRENCY context, ignoring");
+            return;
+        }
+
+        import('./concurrency.js').then(async m => {
+            console.log("Concurrency module loaded, checking for function:", !!m.fetchTransitivity);
+            if (m.fetchTransitivity) {
+                try {
+                    const result = await m.fetchTransitivity();
+                    console.log("Transitive Orientability Check Result:", result);
+
+                    // Save result to state for display in results panel
+                    state.troResult = result;
+
+                    // Refresh results panel to show TRO result
+                    updateResultsList();
+                } catch (err) {
+                    console.error("Transitivity check failed:", err);
+                }
+            } else {
+                console.error("fetchTransitivity function not found in module");
+            }
+        }).catch(err => {
+            console.error("Failed to load concurrency module:", err);
+        });
+    });
+} else {
+    console.warn("btnCheckTransitive not found in DOM");
 }
 
 function runMisLayout() {
     // Simple Force-Directed Layout for MIS Graph
+    if (state.appContext !== 'MIS') {
+        console.warn("Attempted to run MIS Layout in non-MIS context. Aborting.");
+        return;
+    }
     const width = 800;
     const height = 600;
     const padding = 50;
@@ -717,29 +796,39 @@ function runMisLayout() {
         });
     }
 
-    // Center Camera to Graph Center
+    // Center graph
     if (nodes.length > 0) {
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         nodes.forEach(n => {
             minX = Math.min(minX, n.x);
-            minY = Math.min(minY, n.y);
             maxX = Math.max(maxX, n.x);
+            minY = Math.min(minY, n.y);
             maxY = Math.max(maxY, n.y);
         });
 
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
+        // Calculate center of bounding box
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
 
-        // Reset camera to center on graph
-        // Assuming canvas center is roughly at 0,0 relative to camera if camera x,y is offset
-        // Camera logic: Screen = World + Offset. 
-        // We want Screen Center (Hardware Width/2, Height/2) to map to World Center.
-        // Let's just set camera to roughly center the graph.
-        // Actually our camera works as: ctx.translate(camera.x, camera.y).
-        // So camera.x/y is the translation.
-        // Ideally we want: camera.x = ScreenWidth/2 - CenterX.
-        // But we don't know screen width here easily without importing elements.
-        // For now, let's just redraw. Users can pan.
+        // Center of the logical canvas (approximate)
+        // We use a fixed center to keep it stable
+        const center = { x: 400, y: 300 };
+
+        // Shift all nodes to center
+        nodes.forEach(n => {
+            n.x -= (cx - center.x);
+            n.y -= (cy - center.y);
+        });
+
+        // POST-LAYOUT SNAPPING
+        // This must happen AFTER centering to ensure the final positions are on grid
+        if (state.snapReachability) {
+            const gridSize = 50;
+            nodes.forEach(n => {
+                n.x = Math.round(n.x / gridSize) * gridSize;
+                n.y = Math.round(n.y / gridSize) * gridSize;
+            });
+        }
     }
     draw();
 }
@@ -749,7 +838,6 @@ function runMisLayout() {
 let reachabilityDebounceTimer = null;
 
 export async function generateReachabilityGraph(background = false) {
-    console.log(`[${new Date().toISOString()}] generateReachabilityGraph called. background=${background}`);
     if (!background) console.log("Generating Reachability Graph (Foreground)...");
 
     // Use globals imported from petri_state.js
@@ -773,9 +861,11 @@ export async function generateReachabilityGraph(background = false) {
     });
 
     // 2. Call API
+    // GUARD: Capture the tab ID that initiated this request
+    const requestingTabId = state.activeTabId;
+
     try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
 
         const response = await fetch('/api/petri/reachability', {
             method: 'POST',
@@ -798,15 +888,22 @@ export async function generateReachabilityGraph(background = false) {
 
         const data = await response.json();
 
+        // GUARD: Check if we are still in the same tab
+        if (state.activeTabId !== requestingTabId) {
+            console.warn(`[REACHABILITY] Ignoring stale update. Requesting Tab: ${requestingTabId}, Current: ${state.activeTabId}`);
+            return false;
+        }
+
         if (data.status === 'success') {
-            // CACHE PREVIOUS POSITIONS
+            const newNodes = [];
+            const newEdges = [];
+
+            // CACHE PREVIOUS POSITIONS (From Graphs Storage, NOT Globals if background)
             const prevPositions = new Map();
-            nodes.forEach(n => {
+            // Use existing stored nodes for position caching to ensure stability even if not currently viewing
+            state.graphs.MIS.nodes.forEach(n => {
                 if (n.id !== undefined) prevPositions.set(n.id, { x: n.x, y: n.y });
             });
-
-            // Update Nodes & Edges
-            nodes.length = 0;
 
             let restoredCount = 0;
             if (data.nodes && Array.isArray(data.nodes)) {
@@ -822,61 +919,63 @@ export async function generateReachabilityGraph(background = false) {
                         n.y = Math.random() * 600 + 50;
                     }
                     n.vx = 0; n.vy = 0;
-                    nodes.push(n);
+                    newNodes.push(n);
                 });
             }
 
-            edges.length = 0;
             if (data.edges && Array.isArray(data.edges)) {
-                edges.push(...data.edges);
+                newEdges.push(...data.edges);
             }
 
-            // Save to context-specific storage for persistence across tab switches
-            state.misNodes = [...nodes];
-            state.misEdges = [...edges];
+            // UPDATE STORAGE (Always safe)
+            state.graphs.MIS.nodes = newNodes;
+            state.graphs.MIS.edges = newEdges;
 
             // Invalidate Concurrency Graph since Reachability changed
-            state.concurrencyNodes.length = 0;
-            state.concurrencyEdges.length = 0;
+            // Also update storage, not globals
+            state.graphs.CONCURRENCY.nodes = [];
+            state.graphs.CONCURRENCY.edges = [];
 
             // Reset Simulation
             state.misSteps = [];
             state.currentStepIndex = 0;
 
-            // Layout (MIS Layout) - ONLY for foreground updates
-            // Skip layout for background updates to prevent camera jumping
-            // ALSO SKIP if we successfully restored all positions (stable graph)
-            if (!background) {
-                if (restoredCount < data.nodes.length) {
-                    runMisLayout();
-                } else {
-                    console.log("Skipping layout - positions restored from cache.");
-                }
-            }
-
             // MARK AS GENERATED (Read Only) and store truncation status
             state.isGenerated = true;
             state.graphTruncated = data.truncated || false;
 
-            // Update UI
-            updateReadOnlyUI();
-            updateResultsList();
-
             // Force save to persist truncation status immediately
             triggerAutoSave();
 
+            // SYNC TO VIEW ONLY IF ACTIVE
             if (state.appContext === 'MIS') {
+                nodes.length = 0;
+                edges.length = 0;
+                newNodes.forEach(n => nodes.push(n));
+                newEdges.forEach(e => edges.push(e));
+
+                // Layout (MIS Layout) - ONLY for foreground updates or significant changes
+                if (!background) {
+                    if (restoredCount < newNodes.length) {
+                        runMisLayout();
+                    } else {
+                        console.log("Skipping layout - positions restored from cache.");
+                    }
+                }
+
+                updateReadOnlyUI();
+                updateResultsList();
                 draw();
                 updateStats();
             } else {
-                // In Petri mode, we just updated the background Reachability data.
-                // We need to refresh the "Reachable States" list.
-                updateResultsList();
+                // In Petri/Concurrency mode, just update the background lists
+                // We likely need to refresh "Reachable States" list in Petri mode
+                if (state.appContext === 'PETRI') {
+                    updateResultsList();
+                }
+                console.log(`Background Reachability Update: ${newNodes.length} nodes stored.`);
             }
 
-            if (!background) {
-                console.log(`Reachability Graph Generated: ${nodes.length} nodes, ${edges.length} edges.`);
-            }
             return true;
         } else {
             console.error("Reachability Error:", data.message);

@@ -12,6 +12,7 @@ let nextTabId = 1;
 let contextSwitcher = null; // Callback
 
 const tabBar = document.getElementById('editorTabBar');
+let autoSaveTimer = null;
 
 export function initTabs(switchContextCallback) {
     contextSwitcher = switchContextCallback;
@@ -61,6 +62,9 @@ export function createNewTab(type = 'PETRI', name = null, content = null) {
 export function activateTab(id) {
     if (activeTabId === id) return;
 
+    // Stop any pending auto-saves from previous tab context
+    cancelAutoSave();
+
     // 1. Save current state to the active tab (if it exists)
     if (activeTabId) {
         saveCurrentStateToTab(activeTabId);
@@ -68,6 +72,7 @@ export function activateTab(id) {
 
     // 2. Set new active
     activeTabId = id;
+    state.activeTabId = id; // Set global guard
     const tab = tabs.find(t => t.id === id);
     if (!tab) return;
 
@@ -82,7 +87,8 @@ export function activateTab(id) {
         // Prefer saved context (e.g. if we were viewing Reachability Graph in a Petri tab)
         // Fallback to tab.type (e.g. Petri for Petri tab)
         const targetContext = tab.data.activeContext || tab.type;
-        contextSwitcher(targetContext);
+        // Pass TRUE to skip saving the old buffer (which belongs to the PREVIOUS file)
+        contextSwitcher(targetContext, true);
     }
 
     saveSession(); // Save after activation
@@ -118,18 +124,19 @@ function saveCurrentStateToTab(tabId) {
     if (!tab) return;
 
     // Use JSON parse/stringify for Deep Copy to ensure total isolation of tab states
-    // This prevents shared object references (e.g. modifying a node in Tab A changing it in Tab B if they were cloned)
     if (tab.type === 'MIS') {
         const stateDump = {
-            nodes: nodes,
-            edges: edges,
+            // NEW: Save entire graphs container
+            graphs: state.graphs,
             camera: misCamera,
-            activeContext: state.appContext
+            activeContext: state.appContext,
+            // Results
+            troResult: state.troResult,
+            coloringResult: state.coloringResult
         };
         tab.data = JSON.parse(JSON.stringify(stateDump));
     } else {
         // Sync main camera to the appropriate context camera before saving
-        // petri_interactions and other code modifies misCamera directly for all contexts
         if (state.appContext === 'PETRI') {
             state.petriCamera.x = misCamera.x;
             state.petriCamera.y = misCamera.y;
@@ -144,7 +151,17 @@ function saveCurrentStateToTab(tabId) {
             state.concurrencyCamera.zoom = misCamera.zoom;
         }
 
-        console.log("Saving Petri Tab. MIS Steps:", state.misSteps.length);
+        // Before saving, ensure global nodes BUFFER is synced to specific storage if dirty/active
+        if (state.appContext === 'MIS') {
+            console.log(`[TABS] Saving MIS Buffer to Storage. Nodes: ${nodes.length}`);
+            state.graphs.MIS.nodes = JSON.parse(JSON.stringify(nodes));
+            state.graphs.MIS.edges = JSON.parse(JSON.stringify(edges));
+        } else if (state.appContext === 'CONCURRENCY') {
+            console.log(`[TABS] Saving Concurrency Buffer to Storage. Nodes: ${nodes.length}`);
+            state.graphs.CONCURRENCY.nodes = JSON.parse(JSON.stringify(nodes));
+            state.graphs.CONCURRENCY.edges = JSON.parse(JSON.stringify(edges));
+        }
+
         const stateDump = {
             places: places,
             transitions: transitions,
@@ -153,15 +170,21 @@ function saveCurrentStateToTab(tabId) {
             nextTransitionId: petriState.nextTransitionId,
             camera: state.petriCamera,
             activeContext: state.appContext,
-            // START REACHABILITY PERSISTENCE
-            nodes: nodes,
-            edges: edges,
+
+            // START REACHABILITY PERSISTENCE (ISOLATED)
+            // NEW: Save entire graphs container
+            graphs: state.graphs,
+
             misSteps: state.misSteps,
             isGenerated: state.isGenerated,
             graphTruncated: state.graphTruncated,
             maxReachabilityStates: state.maxReachabilityStates,
             misCamera: state.misCamera,
-            concurrencyCamera: state.concurrencyCamera
+            concurrencyCamera: state.concurrencyCamera,
+
+            // Results persistence
+            troResult: state.troResult,
+            coloringResult: state.coloringResult
             // END REACHABILITY PERSISTENCE
         };
         tab.data = JSON.parse(JSON.stringify(stateDump));
@@ -169,17 +192,40 @@ function saveCurrentStateToTab(tabId) {
 }
 
 function restoreStateFromTab(tab) {
+    // CRITICAL: WIPE GLOBAL BUFFERS IMMEDIATELY
+    // This prevents any stale data from previous tab from lingering
+    nodes.length = 0;
+    edges.length = 0;
+
+    // Reset Global State Defaults first
+    state.troResult = null;
+    state.coloringResult = null;
+
+    // Explicitly reset graphs to avoid leaking if tab data is missing
+    state.graphs = {
+        MIS: { nodes: [], edges: [] },
+        CONCURRENCY: { nodes: [], edges: [] }
+    };
+
     if (tab.type === 'MIS') {
-        nodes.length = 0;
-        edges.length = 0;
-        if (tab.data.nodes) tab.data.nodes.forEach(n => nodes.push(n));
-        if (tab.data.edges) tab.data.edges.forEach(e => edges.push(e));
+        // Restore Graphs
+        if (tab.data.graphs) {
+            state.graphs = tab.data.graphs;
+        } else {
+            // Legacy Fallback
+            if (tab.data.misNodes) state.graphs.MIS.nodes = tab.data.misNodes;
+            if (tab.data.misEdges) state.graphs.MIS.edges = tab.data.misEdges;
+        }
 
         if (tab.data.camera) {
             misCamera.x = tab.data.camera.x;
             misCamera.y = tab.data.camera.y;
             misCamera.zoom = tab.data.camera.zoom;
         }
+
+        // Restore Results
+        if (tab.data.troResult) state.troResult = tab.data.troResult;
+        if (tab.data.coloringResult) state.coloringResult = tab.data.coloringResult;
 
     } else {
         places.length = 0;
@@ -189,45 +235,35 @@ function restoreStateFromTab(tab) {
         if (tab.data.transitions) tab.data.transitions.forEach(t => transitions.push(t));
         if (tab.data.arcs) tab.data.arcs.forEach(a => arcs.push(a));
 
-        // Dynamically calculate next IDs if not present explicitly (safe for imported files)
+        // Dynamically calculate next IDs
         const maxPlaceId = places.reduce((max, p) => Math.max(max, p.id), -1);
         const maxTransId = transitions.reduce((max, t) => Math.max(max, t.id), -1);
 
         petriState.nextPlaceId = (tab.data.nextPlaceId !== undefined) ? tab.data.nextPlaceId : (maxPlaceId + 1);
         petriState.nextTransitionId = (tab.data.nextTransitionId !== undefined) ? tab.data.nextTransitionId : (maxTransId + 1);
 
-        // Clear previous Reachability Graph state BEFORE restoring
-        nodes.length = 0;
-        edges.length = 0;
+        // RESTORE ISOLATED DATA
+        // DEEP COPY to ensure working state does not reference tab storage directly
+        if (tab.data.graphs) {
+            console.log(`[TABS] Restoring Graphs from Data. MIS Nodes: ${tab.data.graphs.MIS?.nodes?.length}, CONCURRENCY Nodes: ${tab.data.graphs.CONCURRENCY?.nodes?.length}`);
+            state.graphs = JSON.parse(JSON.stringify(tab.data.graphs));
+            console.log(`[TABS] State.graphs restored. MIS Nodes: ${state.graphs.MIS.nodes.length}`);
+        } else {
+            console.log("[TABS] No graphs in tab data. creating fresh structure.");
+            // Legacy Migration (create fresh structure)
+            state.graphs = {
+                MIS: { nodes: [], edges: [] },
+                CONCURRENCY: { nodes: [], edges: [] }
+            };
 
-        if (tab.data.nodes) {
-            const seenIds = new Set();
-            tab.data.nodes.forEach(n => {
-                if (!seenIds.has(n.id)) {
-                    nodes.push(n);
-                    seenIds.add(n.id);
-                }
-            });
-        }
-        if (tab.data.edges) {
-            const seenEdges = new Set();
-            tab.data.edges.forEach(e => {
-                let key;
-                if (Array.isArray(e)) {
-                    // ID format: [source, target, label]
-                    // Label can be a string or object {label: "t1"}
-                    const rawLabel = e[2];
-                    const labelStr = (rawLabel && typeof rawLabel === 'object' && rawLabel.label) ? rawLabel.label : String(rawLabel || '');
-                    key = `${e[0]}-${e[1]}-${labelStr}`;
-                } else {
-                    key = `${e.source}-${e.target}-${e.label || ''}`;
-                }
-
-                if (!seenEdges.has(key)) {
-                    edges.push(e);
-                    seenEdges.add(key);
-                }
-            });
+            if (tab.data.misData) {
+                state.graphs.MIS.nodes = JSON.parse(JSON.stringify(tab.data.misData.nodes || []));
+                state.graphs.MIS.edges = JSON.parse(JSON.stringify(tab.data.misData.edges || []));
+            }
+            if (tab.data.concurrencyData) {
+                state.graphs.CONCURRENCY.nodes = JSON.parse(JSON.stringify(tab.data.concurrencyData.nodes || []));
+                state.graphs.CONCURRENCY.edges = JSON.parse(JSON.stringify(tab.data.concurrencyData.edges || []));
+            }
         }
 
         state.misSteps = tab.data.misSteps || [];
@@ -235,11 +271,15 @@ function restoreStateFromTab(tab) {
         state.graphTruncated = tab.data.graphTruncated || false;
         state.maxReachabilityStates = tab.data.maxReachabilityStates || 1000;
 
+        // Restore Results
+        if (tab.data.troResult) state.troResult = tab.data.troResult;
+        if (tab.data.coloringResult) state.coloringResult = tab.data.coloringResult;
+
         // Update input if exists
         const inputMax = document.getElementById('inputMaxStates');
         if (inputMax) inputMax.value = state.maxReachabilityStates;
 
-        // Restore all context cameras from tab data
+        // Restore all context cameras
         if (tab.data.camera) {
             state.petriCamera.x = tab.data.camera.x || 0;
             state.petriCamera.y = tab.data.camera.y || 0;
@@ -257,39 +297,13 @@ function restoreStateFromTab(tab) {
             state.concurrencyCamera.y = tab.data.concurrencyCamera.y || 0;
             state.concurrencyCamera.zoom = tab.data.concurrencyCamera.zoom || 1;
         }
-
-        // Set main camera from the appropriate context camera based on saved activeContext
-        const targetContext = tab.data.activeContext || 'PETRI';
-        if (targetContext === 'PETRI' && tab.data.camera) {
-            misCamera.x = state.petriCamera.x;
-            misCamera.y = state.petriCamera.y;
-            misCamera.zoom = state.petriCamera.zoom;
-        } else if (targetContext === 'MIS' && tab.data.misCamera) {
-            misCamera.x = state.misCamera.x;
-            misCamera.y = state.misCamera.y;
-            misCamera.zoom = state.misCamera.zoom;
-        } else if (targetContext === 'CONCURRENCY' && tab.data.concurrencyCamera) {
-            misCamera.x = state.concurrencyCamera.x;
-            misCamera.y = state.concurrencyCamera.y;
-            misCamera.zoom = state.concurrencyCamera.zoom;
-        }
-
-        // Force stop simulation on reload
-        state.isPlaying = false;
-        state.currentStepIndex = -1; // Reset step index or keep it? 
-        // User said "stop simulation", maybe they want to restart cleanly?
-        // But if we have results, maybe we want to see them?
-        // Let's keep results but stop playing.
-
-        // We need to trigger UI updates for results list
-        // We can't import updateResultsList here easily because circular deps?
-        // tabs.js imports updateStats loop...
-        // We'll rely on the main loop or call an update function on main?
-        // Let's rely on activateTab calling render/updateStats eventually?
-        // activateTab calls renderTabBar and switchContext.
-        // switchContext updates UI.
-        // END REACHABILITY RESTORE
     }
+
+    // Force stop simulation on reload
+    state.isPlaying = false;
+    state.currentStepIndex = -1;
+
+    // Trigger results update (needs to happen after we return, handled by activateTab -> switchContext -> updateResultsList)
 }
 
 function renderTabBar() {
@@ -397,10 +411,17 @@ function restoreSession() {
 
 // Hook saveSession into state modifiers
 // We need to export a way to force save when content changes (autosave)
-export function triggerAutoSave() {
-    // First, update the active tab's data with current state (including camera)
-    if (activeTabId) {
-        saveCurrentStateToTab(activeTabId);
+export function cancelAutoSave() {
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
     }
-    saveSession();
+}
+
+export function triggerAutoSave() {
+    cancelAutoSave();
+    autoSaveTimer = setTimeout(() => {
+        if (activeTabId) saveCurrentStateToTab(activeTabId);
+        saveSession();
+    }, 1000);
 }

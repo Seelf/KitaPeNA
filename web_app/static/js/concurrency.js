@@ -4,27 +4,52 @@ import { state, nodes, edges, elements, camera } from './state.js';
 import { draw } from './render.js';
 
 // Simple force-directed layout (same logic as MIS uses)
-function runSimpleLayout() {
+export function runSimpleLayout() {
+    if (nodes.length === 0) return;
+
     const width = elements.canvas ? elements.canvas.width : 800;
     const height = elements.canvas ? elements.canvas.height : 600;
     const center = { x: width / 2, y: height / 2 };
-    const k = 120; // Layout constant
-    const iterations = 200;
+
+    // Initialize positions in a small circle if nodes are clustered
+    const allSamePos = nodes.every(n =>
+        Math.abs(n.x - nodes[0].x) < 10 && Math.abs(n.y - nodes[0].y) < 10
+    );
+
+    if (allSamePos || nodes.some(n => isNaN(n.x) || isNaN(n.y))) {
+        // Arrange in a compact circle
+        const radius = 50 + nodes.length * 5; // Small initial radius
+        nodes.forEach((n, i) => {
+            const angle = (2 * Math.PI * i) / nodes.length;
+            n.x = center.x + radius * Math.cos(angle);
+            n.y = center.y + radius * Math.sin(angle);
+        });
+    }
+
+    // Reset velocities
+    nodes.forEach(n => { n.vx = 0; n.vy = 0; });
+
+    const k = 20; // Ideal edge length (smaller = tighter graph)
+    const iterations = 300;
 
     for (let iter = 0; iter < iterations; iter++) {
-        // Repulsion between all nodes
-        for (let i = 0; i < nodes.length; i++) {
-            if (!nodes[i].vx) nodes[i].vx = 0;
-            if (!nodes[i].vy) nodes[i].vy = 0;
+        const cooling = 1 - iter / iterations; // Cooling factor
 
-            for (let j = 0; j < nodes.length; j++) {
-                if (i === j) continue;
+        // Repulsion between all node pairs
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
                 const dx = nodes[i].x - nodes[j].x;
                 const dy = nodes[i].y - nodes[j].y;
-                const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
-                const force = (k * k) / dist;
-                nodes[i].vx += (dx / dist) * force;
-                nodes[i].vy += (dy / dist) * force;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                const force = (k * k) / dist * cooling;
+
+                const fx = (dx / dist) * force;
+                const fy = (dy / dist) * force;
+
+                nodes[i].vx += fx;
+                nodes[i].vy += fy;
+                nodes[j].vx -= fx;
+                nodes[j].vy -= fy;
             }
         }
 
@@ -36,55 +61,173 @@ function runSimpleLayout() {
 
             const dx = n1.x - n2.x;
             const dy = n1.y - n2.y;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
-            const force = (dist * dist) / k;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const force = (dist / k) * cooling;
 
-            n1.vx -= (dx / dist) * force;
-            n1.vy -= (dy / dist) * force;
-            n2.vx += (dx / dist) * force;
-            n2.vy += (dy / dist) * force;
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+
+            n1.vx -= fx;
+            n1.vy -= fy;
+            n2.vx += fx;
+            n2.vy += fy;
         });
 
-        // Center gravity
+        // Strong center gravity
         nodes.forEach(n => {
-            n.vx += (center.x - n.x) * 0.03;
-            n.vy += (center.y - n.y) * 0.03;
+            n.vx += (center.x - n.x) * 0.02 * cooling;
+            n.vy += (center.y - n.y) * 0.02 * cooling;
         });
 
-        // Apply velocity with damping
+        // Apply velocity with damping and speed limit
         nodes.forEach(n => {
-            n.vx *= 0.5;
-            n.vy *= 0.5;
+            n.vx *= 0.85;
+            n.vy *= 0.85;
             const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
-            if (speed > 30) {
-                n.vx = (n.vx / speed) * 30;
-                n.vy = (n.vy / speed) * 30;
+            const maxSpeed = 50 * cooling + 5;
+            if (speed > maxSpeed) {
+                n.vx = (n.vx / speed) * maxSpeed;
+                n.vy = (n.vy / speed) * maxSpeed;
             }
             n.x += n.vx;
             n.y += n.vy;
         });
     }
 
-    // Center graph
-    if (nodes.length > 0) {
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    // Final centering pass
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+        minX = Math.min(minX, n.x);
+        maxX = Math.max(maxX, n.x);
+        minY = Math.min(minY, n.y);
+        maxY = Math.max(maxY, n.y);
+    });
+    const graphCx = (minX + maxX) / 2;
+    const graphCy = (minY + maxY) / 2;
+
+    nodes.forEach(n => {
+        n.x -= graphCx - center.x;
+        n.y -= graphCy - center.y;
+    });
+
+    // Snap to grid if enabled
+    if (state.snapConcurrency) {
+        const gridSize = 50;
         nodes.forEach(n => {
-            minX = Math.min(minX, n.x);
-            maxX = Math.max(maxX, n.x);
-            minY = Math.min(minY, n.y);
-            maxY = Math.max(maxY, n.y);
+            n.x = Math.round(n.x / gridSize) * gridSize;
+            n.y = Math.round(n.y / gridSize) * gridSize;
         });
-        const cx = (minX + maxX) / 2;
-        const cy = (minY + maxY) / 2;
-        nodes.forEach(n => {
-            n.x -= (cx - center.x);
-            n.y -= (cy - center.y);
+    }
+
+    // Reset camera to show centered graph
+    camera.x = 0;
+    camera.y = 0;
+    camera.zoom = 1;
+
+    console.log(`Layout complete. ${nodes.length} nodes arranged.`);
+    draw();
+}
+
+/**
+ * Check if the concurrency graph is transitively orientable (comparability graph).
+ * Calls the backend API for analysis.
+ */
+export async function fetchTransitivity() {
+    if (nodes.length === 0) {
+        return { isOrientable: true, message: "Empty graph is trivially transitively orientable." };
+    }
+
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const payload = {
+            nodes: nodes.map(n => ({ id: n.id, label: n.label })),
+            edges: edges // [u, v] format
+        };
+
+        const response = await fetch('/api/analysis/transitivity', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(payload)
         });
+
+        const data = await response.json();
+        if (data.status === 'success') {
+            return {
+                isOrientable: data.isOrientable,
+                message: data.message
+            };
+        } else {
+            console.error("Transitivity API Error:", data.message);
+            return {
+                isOrientable: false,
+                message: `Analysis Error: ${data.message}`
+            };
+        }
+    } catch (err) {
+        console.error("Failed to fetch transitivity:", err);
+        return {
+            isOrientable: false,
+            message: "Network Error during analysis."
+        };
     }
 }
 
+/**
+ * Computes optimal graph coloring via backend.
+ * Returns { chromaticNumber, coloring: Map<nodeId, colorIndex> }
+ */
+export async function fetchColoring() {
+    if (nodes.length === 0) return { chromaticNumber: 0, coloring: new Map() };
+
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const payload = {
+            nodes: nodes.map(n => ({ id: n.id, label: n.label })),
+            edges: edges
+        };
+
+        const response = await fetch('/api/analysis/coloring', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (data.status === 'success') {
+            // Convert coloring object {id: color} to Map
+            const colorMap = new Map();
+            if (data.coloring) {
+                Object.entries(data.coloring).forEach(([k, v]) => {
+                    colorMap.set(parseInt(k), v);
+                });
+            }
+            return {
+                chromaticNumber: data.chromaticNumber,
+                coloring: colorMap
+            };
+        } else {
+            console.error("Coloring API Error:", data.message);
+            return { chromaticNumber: 0, coloring: new Map() };
+        }
+    } catch (err) {
+        console.error("Failed to fetch coloring:", err);
+        return { chromaticNumber: 0, coloring: new Map() };
+    }
+}
+
+
+
 export async function updateConcurrencyGraph() {
     console.log("Updating Concurrency Graph (using existing MIS infrastructure)...");
+
+    // GUARD: Capture the tab ID that initiated this request
+    const requestingTabId = state.activeTabId;
 
     const payload = {
         places: places.map(p => ({ ...p, tokens: parseInt(p.tokens) || 0 })),
@@ -110,25 +253,27 @@ export async function updateConcurrencyGraph() {
 
         const data = await response.json();
 
-        if (data.status === 'success') {
-            // RACE CONDITION CHECK: 
-            // If user switched away from CONCURRENCY tab while API was loading, DO NOT update globals.
-            if (state.appContext !== 'CONCURRENCY') {
-                console.warn("Concurrency API returned but context changed. Aborting update.");
-                return;
-            }
+        // GUARD: Check if we are still in the same tab
+        if (state.activeTabId !== requestingTabId) {
+            console.warn(`[CONCURRENCY] Ignoring stale update. Requesting Tab: ${requestingTabId}, Current: ${state.activeTabId}`);
+            return;
+        }
 
+        if (data.status === 'success') {
             console.log("Concurrency Graph Data:", data);
 
-            // CACHE PREVIOUS POSITIONS
-            const prevPositions = new Map();
-            nodes.forEach(n => {
-                if (n.id !== undefined) prevPositions.set(n.id, { x: n.x, y: n.y });
-            });
+            const newNodes = [];
+            const newEdges = [];
 
-            // Clear global nodes and edges
-            nodes.length = 0;
-            edges.length = 0;
+            // CACHE PREVIOUS POSITIONS (From Graphs Storage)
+            const prevPositions = new Map();
+            // Use existing stored nodes from GRAPH storage
+            state.graphs.CONCURRENCY.nodes.forEach(n => {
+                if (n.id !== undefined) {
+                    prevPositions.set(n.id, { x: n.x, y: n.y });
+                }
+            });
+            console.log(`[CONCURRENCY DEBUG] Cached ${prevPositions.size} previous positions.`);
 
             // Populate nodes from places
             const width = elements.canvas ? elements.canvas.width : 800;
@@ -148,7 +293,7 @@ export async function updateConcurrencyGraph() {
                     posY = Math.random() * height * 0.6 + height * 0.2;
                 }
 
-                nodes.push({
+                newNodes.push({
                     id: n.id,
                     label: n.label || `p${n.id}`,
                     x: posX,
@@ -157,27 +302,33 @@ export async function updateConcurrencyGraph() {
                 });
             });
 
-            // Populate edges (undirected concurrency relations)
-            // render.js expects edge format: [sourceId, targetId, optionalLabel]
+            // Populate edges
             data.edges.forEach(edge => {
-                edges.push([edge[0], edge[1]]);
+                newEdges.push([edge[0], edge[1]]);
             });
 
-            // REMOVED CAMERA RESET to preserve user view
+            // UPDATE STORAGE (Always safe)
+            state.graphs.CONCURRENCY.nodes = newNodes;
+            state.graphs.CONCURRENCY.edges = newEdges;
 
-            // Run layout ONLY if significantly changed
-            if (restoredCount < nodes.length) {
-                runSimpleLayout();
+            // SYNC TO VIEW ONLY IF ACTIVE
+            if (state.appContext === 'CONCURRENCY') {
+                nodes.length = 0;
+                edges.length = 0;
+                newNodes.forEach(n => nodes.push(n));
+                newEdges.forEach(e => edges.push(e));
+
+                // Run layout ONLY if significantly changed
+                if (restoredCount < nodes.length) {
+                    runSimpleLayout();
+                } else {
+                    console.log("Skipping concurrency layout - positions preserved.");
+                }
+
+                draw();
             } else {
-                console.log("Skipping concurrency layout - positions preserved.");
+                console.log("Concurrency Graph updated in background storage.");
             }
-
-            // Save data to state for persistence across tab switches
-            state.concurrencyNodes = [...nodes];
-            state.concurrencyEdges = [...edges];
-
-            // Draw
-            draw();
 
         } else {
             console.error("Concurrency API Error:", data.message);

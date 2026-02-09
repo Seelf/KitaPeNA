@@ -10,6 +10,18 @@ import { drawPetri } from './petri_render.js';
 function updateAndSave() {
     updateStats();
     resetSimulation();
+
+    console.log(`[INTERACTIONS DEBUG] updateAndSave called. Context: ${state.appContext}`);
+    // Aggressively update specific state storage to prevent data loss on refresh
+    if (state.appContext === 'MIS') {
+        state.misNodes = JSON.parse(JSON.stringify(nodes));
+        state.misEdges = JSON.parse(JSON.stringify(edges));
+    } else if (state.appContext === 'CONCURRENCY') {
+        state.concurrencyNodes = JSON.parse(JSON.stringify(nodes));
+        state.concurrencyEdges = JSON.parse(JSON.stringify(edges));
+        console.log(`[INTERACTIONS] Synced Concurrency State. Nodes: ${nodes.length}`);
+    }
+
     saveToLocalStorage();
     triggerAutoSave();
 }
