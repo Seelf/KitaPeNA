@@ -1,6 +1,6 @@
 
 import collections
-import petri_reachability
+from . import reachability as petri_reachability
 
 def build_concurrency_graph(places, transitions, arcs, max_states=1000):
     """

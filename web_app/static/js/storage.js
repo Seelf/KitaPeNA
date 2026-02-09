@@ -1,5 +1,5 @@
 
-import { nodes, edges, camera } from './state.js';
+import { state, nodes, edges, camera } from './state.js';
 import { draw } from './render.js';
 import { updateStats } from './ui.js';
 import { resetSimulation } from './simulation.js';
@@ -7,11 +7,19 @@ import { resetSimulation } from './simulation.js';
 import { triggerAutoSave } from './tabs.js';
 
 // --- LOCAL STORAGE ---
+// --- LOCAL STORAGE ---
 export function saveToLocalStorage() {
     const data = {
         nodes: nodes,
         edges: edges,
-        camera: camera
+        camera: camera,
+        // Extended State for Persistence
+        appContext: state.appContext,
+        troResult: state.troResult,
+        coloringResult: state.coloringResult,
+        misSteps: state.misSteps,
+        // NEW: Save the entire graphs container
+        graphs: state.graphs
     };
     localStorage.setItem('mis_autosave', JSON.stringify(data));
 
@@ -24,6 +32,24 @@ export function loadFromLocalStorage() {
         const dataStr = localStorage.getItem('mis_autosave');
         if (dataStr) {
             const data = JSON.parse(dataStr);
+            console.log("Loading from storage...", data);
+
+            // Restore Context & Results
+            if (data.appContext) state.appContext = data.appContext;
+            if (data.troResult) state.troResult = data.troResult;
+            if (data.coloringResult) state.coloringResult = data.coloringResult;
+            if (data.misSteps) state.misSteps = data.misSteps || [];
+
+            // Restore Graphs Container
+            if (data.graphs) {
+                state.graphs = data.graphs;
+            } else {
+                // Migration path: Try to recover from old keys if graphs not present
+                if (data.misNodes) state.graphs.MIS = { nodes: data.misNodes || [], edges: data.misEdges || [] };
+                if (data.concurrencyNodes) state.graphs.CONCURRENCY = { nodes: data.concurrencyNodes || [], edges: data.concurrencyEdges || [] };
+            }
+
+            // Restore Active Buffer (visuals)
             if (Array.isArray(data.nodes) && Array.isArray(data.edges)) {
                 nodes.length = 0;
                 nodes.push(...data.nodes);
@@ -37,7 +63,17 @@ export function loadFromLocalStorage() {
                 }
 
                 updateStats();
-                console.log("Graph restored from localStorage.");
+                console.log("Graph restored from localStorage. Context:", state.appContext);
+
+                // If in concurrency mode, ensure UI updates
+                if (state.appContext === 'CONCURRENCY') {
+                    // We need to trigger the UI update in main.js or here
+                    // But updateResultsList needs elements to be ready.
+                    // It is safe to call it if elements are init.
+                    if (elements.resultsList) {
+                        import('./ui.js').then(ui => ui.updateResultsList());
+                    }
+                }
             }
         }
     } catch (e) {

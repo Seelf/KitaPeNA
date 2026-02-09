@@ -14,13 +14,15 @@ from werkzeug.security import check_password_hash, generate_password_hash
 # Ensure we can import mis_core from the parent directory
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import mis_core
+from web_app.analysis import mis as mis_core
 import networkx as nx
-import petri_reachability
+from web_app.analysis import reachability as petri_reachability
 try:
-    import petri_analysis
+    from web_app.analysis import concurrency as petri_analysis
+    from web_app.analysis import transitivity
+    from web_app.analysis import coloring
 except ImportError as e:
-    print(f"Warning: Could not import petri_analysis: {e}")
+    print(f"Warning: Could not import analysis modules: {e}")
     petri_analysis = None
 
 # --- Configuration ---
@@ -630,7 +632,7 @@ def calculate_reachability():
 
 
 # --- Reachability Graph API ---
-import petri_reachability
+# petri_reachability is already imported at the top
 
 @app.route('/api/petri/concurrency', methods=['POST'])
 @csrf.exempt
@@ -654,6 +656,44 @@ def calculate_concurrency():
         })
     except Exception as e:
         print(f"Concurrency Analysis Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/analysis/transitivity', methods=['POST'])
+@csrf.exempt
+def check_transitivity():
+    """Checks if the graph is Transitively Orientable."""
+    try:
+        data = request.json
+        nodes = data.get('nodes', [])
+        edges = data.get('edges', [])
+        
+        result = transitivity.check_transitive_orientability(nodes, edges)
+        
+        return jsonify({
+            'status': 'success',
+            **result
+        })
+    except Exception as e:
+        print(f"Transitivity Analysis Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/analysis/coloring', methods=['POST'])
+@csrf.exempt
+def get_coloring():
+    """Computes Optimal Coloring."""
+    try:
+        data = request.json
+        nodes = data.get('nodes', [])
+        edges = data.get('edges', [])
+        
+        result = coloring.get_optimal_coloring(nodes, edges)
+        
+        return jsonify({
+            'status': 'success',
+            **result
+        })
+    except Exception as e:
+        print(f"Coloring Analysis Error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':

@@ -6,9 +6,12 @@ export const edges = [];
 export const camera = { x: 0, y: 0, zoom: 1 };
 
 export const state = {
-    appContext: 'MIS', // 'MIS' or 'PETRI'
+    // State Identifiers
+    appContext: 'PETRI', // 'PETRI', 'MIS', 'CONCURRENCY'
+    activeTabId: null, // Guard for async operations across tabs
     selectedNode: null,
-    mode: 'view', // 'view', 'nodes', 'edges'
+    // Mode
+    mode: 'select', // 'select', 'node', 'edge's'
     isDraggingNode: false,
     isPanning: false,
     startPanX: 0,
@@ -40,11 +43,14 @@ export const state = {
     petriCamera: { x: 0, y: 0, zoom: 1 },
     concurrencyCamera: { x: 0, y: 0, zoom: 1 },
 
-    // Separate graph data per context to prevent data bleeding
-    misNodes: [],
-    misEdges: [],
-    concurrencyNodes: [],
-    concurrencyEdges: [],
+    // CONNECTED GRAPHS DATA (Separated by Context)
+    graphs: {
+        MIS: { nodes: [], edges: [] },
+        CONCURRENCY: { nodes: [], edges: [] }
+    },
+
+    troResult: null, // Transitive Orientability result { isOrientable, message }
+    coloringResult: null, // Optimal Coloring result { chromaticNumber, coloring: Map/Object }
 
     // View Settings
     snapReachability: false,

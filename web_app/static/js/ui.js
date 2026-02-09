@@ -176,19 +176,127 @@ export function updateResultsList() {
     } else if (state.appContext === 'CONCURRENCY') {
         // Concurrency now uses global nodes (same as MIS)
         if (nodes.length > 0) {
-            const header = document.createElement('div');
-            header.className = 'result-header';
-            header.style.padding = '5px 10px';
-            header.style.fontWeight = 'bold';
-            header.style.color = '#ccc';
-            header.textContent = `Places (${nodes.length})`;
-            elements.resultsList.appendChild(header);
+            // Fetch and Render Concurrency Analysis
+            import('./concurrency.js').then(async m => {
 
-            nodes.forEach(node => {
-                const el = document.createElement('div');
-                el.className = 'result-item';
-                el.textContent = node.label || `p${node.id}`;
-                elements.resultsList.appendChild(el);
+                // 1. Transitive Orientability
+                // Use cached result if available, otherwise fetch
+                let troResult = state.troResult;
+                if (!troResult) {
+                    try {
+                        troResult = await m.fetchTransitivity();
+                    } catch (e) {
+                        console.warn("Could not fetch TRO result:", e);
+                    }
+                }
+
+                if (troResult) {
+                    const troContainer = document.createElement('div');
+                    troContainer.className = 'result-header';
+                    troContainer.style.padding = '8px 10px';
+                    troContainer.style.fontWeight = 'bold';
+                    troContainer.style.color = troResult.isOrientable ? '#4ade80' : '#f87171';
+                    troContainer.style.backgroundColor = troResult.isOrientable ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)';
+                    troContainer.style.borderRadius = '4px';
+                    troContainer.style.marginBottom = '10px';
+                    troContainer.innerHTML = troResult.isOrientable
+                        ? '✅ <strong>Transitively Orientable</strong><br><small style="font-weight:normal;color:#a3e635">This is a comparability graph</small>'
+                        : '❌ <strong>NOT Transitively Orientable</strong><br><small style="font-weight:normal;color:#fca5a5">Not a comparability graph</small>';
+                    elements.resultsList.appendChild(troContainer);
+                }
+
+                // 2. Optimal Coloring
+                let coloringResult = state.coloringResult;
+                if (!coloringResult) {
+                    try {
+                        coloringResult = await m.fetchColoring();
+                    } catch (e) {
+                        console.warn("Could not fetch Coloring result:", e);
+                    }
+                }
+
+                if (coloringResult) {
+                    // Convert stored object back to Map if necessary (JSON stringify converts Map to Object)
+                    let colors = coloringResult.coloring;
+                    if (!(colors instanceof Map)) {
+                        // Check if it's an object (from JSON) or array of pairs
+                        if (typeof colors === 'object' && !Array.isArray(colors)) {
+                            colors = new Map(Object.entries(colors).map(([k, v]) => [parseInt(k), v]));
+                        } else {
+                            // Fallback or re-fetch if format is weird
+                            colors = new Map();
+                        }
+                    }
+
+                    const chromaticNum = coloringResult.chromaticNumber;
+
+                    // Apply colors to nodes for rendering (Re-apply in case of reload)
+                    let colorsChanged = false;
+                    nodes.forEach(node => {
+                        if (colors.has(node.id)) {
+                            const newColor = colors.get(node.id);
+                            if (node.color !== newColor) {
+                                node.color = newColor;
+                                colorsChanged = true;
+                            }
+                        }
+                    });
+
+                    if (colorsChanged) {
+                        import('./render.js').then(r => r.draw());
+                    }
+
+                    // Render Legend
+                    const header = document.createElement('div');
+                    header.className = 'result-header';
+                    header.style.padding = '5px 10px';
+                    header.style.fontWeight = 'bold';
+                    header.style.color = '#ccc';
+                    header.innerHTML = `Optimal Coloring (χ = ${chromaticNum})`;
+                    elements.resultsList.appendChild(header);
+
+                    // Group nodes by color
+                    const colorGroups = new Map();
+                    for (let c = 1; c <= chromaticNum; c++) {
+                        colorGroups.set(c, []);
+                    }
+
+                    colors.forEach((color, nodeId) => {
+                        if (!colorGroups.has(color)) colorGroups.set(color, []);
+                        const node = nodes.find(n => n.id === nodeId);
+                        if (node) colorGroups.get(color).push(node);
+                    });
+
+                    // Render groups
+                    const palette = [
+                        '#ffadad', '#ffd6a5', '#fdffb6', '#caffbf', '#9bf6ff', '#a0c4ff', '#bdb2ff', '#ffc6ff', '#fffffc'
+                    ];
+
+                    colorGroups.forEach((groupNodes, colorIndex) => {
+                        const colorHex = palette[(colorIndex - 1) % palette.length] || '#cccccc';
+
+                        const groupHeader = document.createElement('div');
+                        groupHeader.style.backgroundColor = colorHex;
+                        groupHeader.style.color = '#333';
+                        groupHeader.style.padding = '4px 8px';
+                        groupHeader.style.marginTop = '8px';
+                        groupHeader.style.borderRadius = '4px';
+                        groupHeader.style.fontSize = '0.9em';
+                        groupHeader.style.fontWeight = 'bold';
+                        groupHeader.textContent = `Color ${colorIndex}`;
+                        elements.resultsList.appendChild(groupHeader);
+
+                        groupNodes.forEach(node => {
+                            const el = document.createElement('div');
+                            el.className = 'result-item';
+                            el.style.borderLeft = `3px solid ${colorHex}`;
+                            el.textContent = node.label || `p${node.id}`;
+                            el.onmouseenter = () => { node.highlight = true; import('./render.js').then(r => r.draw()); };
+                            el.onmouseleave = () => { node.highlight = false; import('./render.js').then(r => r.draw()); };
+                            elements.resultsList.appendChild(el);
+                        });
+                    });
+                }
             });
         } else {
             elements.resultsList.innerHTML = '<div class="empty-state">No concurrency graph. Switch to Structural view first.</div>';
