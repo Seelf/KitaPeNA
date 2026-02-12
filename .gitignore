@@ -20,3 +20,6 @@ env/
 
 # Logs
 *.log
+
+# Web app
+web_app/temp_pnh
