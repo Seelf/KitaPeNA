@@ -54,7 +54,11 @@ export const state = {
 
     // View Settings
     snapReachability: false,
-    snapConcurrency: false
+    snapConcurrency: false,
+    showSidebar: true,
+    showToolbar: true,
+    activeActivityTab: 'tabEditor',
+    activeDbTab: 'btnDbPetri'
 };
 
 export const elements = {

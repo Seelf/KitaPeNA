@@ -6,12 +6,14 @@ import { draw, resizeCanvas } from './render.js';
 import { initInteractions, deleteSelectedNode } from './interactions.js';
 import { initAdminConsole } from './admin.js';
 import { updateStats, setMode, updateResultsList, updateButtonStates, updateReadOnlyUI, initViewSettings } from './ui.js';
-import { loadFromLocalStorage, loadSavedGraphs, saveGraph, loadGraphFromDb, loadSavedPetriNets, loadPetriNetFromDb, savePetriNetDb, importPetriBatch } from './storage.js';
+import { saveToLocalStorage, loadFromLocalStorage, loadSavedGraphs, saveGraph, loadGraphFromDb, loadSavedPetriNets, loadPetriNetFromDb, savePetriNetDb, importPetriBatch } from './storage.js';
 import { fetchSolution, advanceStep, startAutoPlay, stopAutoPlay, resetSimulation, highlightResultItem, updateSimulationSpeed } from './simulation.js';
 import { drawPetri } from './petri_render.js';
 import { petriState, places, transitions, arcs } from './petri_state.js';
 import { initPetriInteractions, runAutoLayout } from './petri_interactions.js';
 import { initTabs, triggerAutoSave } from './tabs.js';
+import { initBenchmarking } from './benchmarking.js';
+import { initAlgoManager } from './algo_manager.js';
 
 console.log("App Initializing (Direct execution)...");
 
@@ -59,8 +61,11 @@ const toolbarPetri = document.getElementById('toolbarPetri');
 const tabEditor = document.getElementById('tabEditor');
 const viewResults = document.getElementById('viewResults');
 const tabDb = document.getElementById('tabDb');
+const tabPerformance = document.getElementById('tabPerformance');
 const dbContentPetri = document.getElementById('dbContentPetri');
 const dbContentGraphs = document.getElementById('dbContentGraphs');
+const viewPerformance = document.getElementById('viewPerformance');
+const mainEditorArea = document.getElementById('mainEditorArea');
 
 // 3. Init Tabs (Pass switchContext callback)
 // 3. Init Tabs (Moved to end)
@@ -398,26 +403,54 @@ const btnSavePetri = document.getElementById('btnSavePetri');
 const btnImportBatch = document.getElementById('btnImportBatch');
 const fileInputBatch = document.getElementById('fileInputBatch');
 
-if (tabEditor && tabDb && viewResults && viewDb) {
+// 3. Init Tabs (Pass switchContext callback)
+initBenchmarking();
+initAlgoManager();
+
+if (tabEditor && tabDb && viewResults && viewDb && tabPerformance && viewPerformance && mainEditorArea) {
     tabEditor.addEventListener('click', () => {
         tabEditor.classList.add('active');
         tabDb.classList.remove('active');
+        tabPerformance.classList.remove('active');
+
+        mainEditorArea.style.display = 'flex';
+        viewPerformance.style.display = 'none';
+        viewDb.style.display = 'none';
 
         // Show Results only if MIS context
         if (state.appContext === 'MIS') {
             viewResults.style.display = 'flex';
+        } else if (state.appContext === 'PETRI') {
+            // Petri View Logic for Results
+            viewResults.style.display = 'flex';
+        } else if (state.appContext === 'CONCURRENCY') {
+            viewResults.style.display = 'flex';
         } else {
             viewResults.style.display = 'none';
         }
-
-        viewDb.style.display = 'none';
+        state.activeActivityTab = 'tabEditor';
+        saveToLocalStorage();
     });
 
     tabDb.addEventListener('click', () => {
         tabDb.classList.add('active');
         tabEditor.classList.remove('active');
-        viewResults.style.display = 'none';
+        tabPerformance.classList.remove('active');
+
+        // Let's check HTML again.
+        // <div class="main-split">
+        //    <div class="activity-bar">...</div>
+        //    <div class="editor-area">...</div>
+        //    <div id="viewPerformance">...</div>
+        //    <div class="sidebar-panel">...</div>
+
+        // So 'editor-area' and 'viewPerformance' are siblings.
+        // We should toggle them.
+
         viewDb.style.display = 'flex';
+
+        state.activeActivityTab = 'tabDb';
+        saveToLocalStorage();
 
         // Initial Load based on active tab
         if (btnDbGraphs && btnDbGraphs.classList.contains('active')) {
@@ -488,6 +521,9 @@ if (btnDbGraphs && btnDbPetri) {
         btnDbPetri.classList.remove('active');
         dbContentGraphs.style.display = 'flex';
         dbContentPetri.style.display = 'none';
+
+        state.activeDbTab = 'btnDbGraphs';
+        saveToLocalStorage();
         loadSavedGraphs(savedGraphsList, (id) => {
             loadGraphFromDb(id).then(success => { if (success) { tabEditor.click(); switchContext('MIS'); } });
         });
@@ -498,6 +534,9 @@ if (btnDbGraphs && btnDbPetri) {
         btnDbGraphs.classList.remove('active');
         dbContentPetri.style.display = 'flex';
         dbContentGraphs.style.display = 'none';
+
+        state.activeDbTab = 'btnDbPetri';
+        saveToLocalStorage();
         loadSavedPetriNets(savedPetriList, (id) => {
             loadPetriNetFromDb(id).then(data => {
                 if (data && data.content) {
@@ -538,6 +577,22 @@ if (btnDbGraphs && btnDbPetri) {
                 }
             });
         });
+    });
+
+    tabPerformance.addEventListener('click', () => {
+        console.log("Performance Tab Clicked");
+        tabPerformance.classList.add('active');
+        tabEditor.classList.remove('active');
+        tabDb.classList.remove('active');
+
+        // Toggle Views
+        if (mainEditorArea) mainEditorArea.style.display = 'none';
+        if (viewDb) viewDb.style.display = 'none';
+        if (viewResults) viewResults.style.display = 'none';
+        if (viewPerformance) viewPerformance.style.display = 'flex';
+
+        state.activeActivityTab = 'tabPerformance';
+        saveToLocalStorage();
     });
 }
 
@@ -1044,25 +1099,6 @@ if (btnToggleSettings && settingsPanel) {
         settingsPanel.style.display = (settingsPanel.style.display === 'none') ? 'block' : 'none';
     });
 
-    // Sidebar Toggle
-    if (chkShowSidebar) {
-        chkShowSidebar.addEventListener('change', (e) => {
-            const rightPanel = document.querySelector('.sidebar-panel');
-            if (rightPanel) rightPanel.style.display = e.target.checked ? 'flex' : 'none';
-        });
-    }
-
-    // Toolbar Toggle (Floating)
-    if (chkShowToolbar) {
-        chkShowToolbar.addEventListener('change', (e) => {
-            const tGraph = document.getElementById('toolbarGraph');
-            const tPetri = document.getElementById('toolbarPetri');
-
-            if (tGraph) tGraph.style.visibility = e.target.checked ? 'visible' : 'hidden';
-            if (tPetri) tPetri.style.visibility = e.target.checked ? 'visible' : 'hidden';
-        });
-    }
-
     // Close on click outside
     window.addEventListener('click', (e) => {
         if (!settingsPanel.contains(e.target) && e.target !== btnToggleSettings) {
@@ -1111,6 +1147,23 @@ if (resizer && sidebar) {
         document.addEventListener('mouseup', onMouseUp);
     });
 }
+
+// 4. RESTORE ACTIVE TABS (AFTER INIT)
+setTimeout(() => {
+    console.log("[MAIN] Restoring Active Tabs from state:", state.activeActivityTab, state.activeDbTab);
+
+    // Activity Tab
+    if (state.activeActivityTab) {
+        const el = document.getElementById(state.activeActivityTab);
+        if (el) el.click();
+    }
+
+    // DB Sub-tab
+    if (state.activeDbTab) {
+        const el = document.getElementById(state.activeDbTab);
+        if (el) el.click();
+    }
+}, 100);
 
 // 3. Init Tabs (Pass switchContext callback)
 initTabs((ctx) => {

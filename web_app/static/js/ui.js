@@ -389,4 +389,56 @@ export function initViewSettings() {
             localStorage.setItem('kitapena_snapConcurrency', state.snapConcurrency);
         });
     }
+
+    const chkShowSidebar = document.getElementById('chkShowSidebar');
+    if (chkShowSidebar) {
+        const savedShowSidebar = localStorage.getItem('kitapena_showSidebar');
+        if (savedShowSidebar !== null) {
+            state.showSidebar = savedShowSidebar === 'true';
+        }
+        chkShowSidebar.checked = state.showSidebar;
+
+        const applySidebar = (show) => {
+            const rightPanel = document.querySelector('.sidebar-panel');
+            if (rightPanel) {
+                rightPanel.style.display = show ? 'flex' : 'none';
+                // Trigger resize to fix canvas
+                window.dispatchEvent(new Event('resize'));
+            }
+        };
+
+        // Initial apply
+        applySidebar(state.showSidebar);
+
+        chkShowSidebar.addEventListener('change', (e) => {
+            state.showSidebar = e.target.checked;
+            localStorage.setItem('kitapena_showSidebar', state.showSidebar);
+            applySidebar(state.showSidebar);
+        });
+    }
+
+    const chkShowToolbar = document.getElementById('chkShowToolbar');
+    if (chkShowToolbar) {
+        const savedShowToolbar = localStorage.getItem('kitapena_showToolbar');
+        if (savedShowToolbar !== null) {
+            state.showToolbar = savedShowToolbar === 'true';
+        }
+        chkShowToolbar.checked = state.showToolbar;
+
+        const applyToolbar = (show) => {
+            const tGraph = document.getElementById('toolbarGraph');
+            const tPetri = document.getElementById('toolbarPetri');
+            if (tGraph) tGraph.style.visibility = show ? 'visible' : 'hidden';
+            if (tPetri) tPetri.style.visibility = show ? 'visible' : 'hidden';
+        };
+
+        // Initial apply
+        applyToolbar(state.showToolbar);
+
+        chkShowToolbar.addEventListener('change', (e) => {
+            state.showToolbar = e.target.checked;
+            localStorage.setItem('kitapena_showToolbar', state.showToolbar);
+            applyToolbar(state.showToolbar);
+        });
+    }
 }

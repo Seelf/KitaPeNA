@@ -1,8 +1,13 @@
 import sys
 import os
+import multiprocessing
+import queue
 import sqlite3
 import json
 import requests
+import re
+import subprocess
+import time   
 # Author: Dawid Konarczak
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, send_from_directory, Response, stream_with_context
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -23,7 +28,10 @@ try:
     from web_app.analysis import coloring
 except ImportError as e:
     print(f"Warning: Could not import analysis modules: {e}")
+    print(f"Warning: Could not import analysis modules: {e}")
     petri_analysis = None
+
+from web_app.analysis.benchmarking.runner import BenchmarkRunner
 
 # --- Configuration ---
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -41,6 +49,26 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 TURNSTILE_SITE_KEY = os.environ.get('TURNSTILE_SITE_KEY', '1x00000000000000000000AA')
 TURNSTILE_SECRET_KEY = os.environ.get('TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA')
 TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+
+# Global process tracker for benchmarks
+active_benchmark_process = None
+
+def benchmark_worker(mode, algo_names, iterations, args_dict, q):
+    """
+    Worker function to run benchmarks in a separate process.
+    """
+    try:
+        from web_app.analysis.benchmarking.runner import BenchmarkRunner
+        runner = BenchmarkRunner()
+        if mode == 'random':
+            res = runner.run_suite(algo_names, **args_dict, iterations=iterations)
+        else:
+            # args_dict already has 'graphs'
+            res = runner.run_specific(algo_names, **args_dict, iterations=iterations)
+        q.put(res)
+    except Exception as e:
+        import traceback
+        q.put({'error': str(e), 'traceback': traceback.format_exc()})
 
 # Extensions
 csrf = CSRFProtect(app)
@@ -110,6 +138,100 @@ def init_db():
 
 # Initialize DB
 init_db()
+
+# --- Custom C++ Algorithms API ---
+CUSTOM_ALGOS_DIR = os.path.join(base_dir, 'analysis', 'custom_algos')
+if not os.path.exists(CUSTOM_ALGOS_DIR):
+    os.makedirs(CUSTOM_ALGOS_DIR)
+
+@app.route('/api/algorithms', methods=['GET'])
+def list_algorithms():
+    """List all custom C++ algorithms."""
+    algos = []
+    if os.path.exists(CUSTOM_ALGOS_DIR):
+        for f in os.listdir(CUSTOM_ALGOS_DIR):
+            if f.endswith('.cpp'):
+                name = f[:-4]
+                compiled = os.path.exists(os.path.join(CUSTOM_ALGOS_DIR, f"{name}.so"))
+                algos.append({'name': name, 'compiled': compiled})
+    return jsonify(algos)
+
+@app.route('/api/algorithms/<name>', methods=['GET'])
+def get_algorithm_source(name):
+    """Get the source code of a specific algorithm."""
+    path = os.path.join(CUSTOM_ALGOS_DIR, f"{name}.cpp")
+    if not os.path.exists(path):
+        return jsonify({'error': 'Algorithm not found'}), 404
+    try:
+        with open(path, 'r') as f:
+            code = f.read()
+        return jsonify({'name': name, 'code': code})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/algorithms', methods=['POST'])
+@csrf.exempt
+def save_algorithm():
+    """Save and Compile a C++ algorithm."""
+    data = request.json
+    name = data.get('name')
+    code = data.get('code')
+    
+    if not name or not code:
+        return jsonify({'error': 'Name and code are required'}), 400
+    
+    # Sanitize name
+    if not re.match(r'^\w+$', name):
+        return jsonify({'error': 'Invalid name. Use alphanumeric and underscores only.'}), 400
+
+    cpp_path = os.path.join(CUSTOM_ALGOS_DIR, f"{name}.cpp")
+    so_path = os.path.join(CUSTOM_ALGOS_DIR, f"{name}.so")
+    
+    try:
+        # 1. Save Code
+        with open(cpp_path, 'w') as f:
+            f.write(code)
+            
+        # 2. Compile
+        # clang++ -shared -fPIC -O3 -undefined dynamic_lookup -o output.so input.cpp
+        cmd = [
+            'clang++', 
+            '-shared', '-fPIC', '-O3', 
+            '-undefined', 'dynamic_lookup', 
+            '-o', so_path, 
+            cpp_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            return jsonify({
+                'success': False, 
+                'message': 'Compilation Failed', 
+                'stderr': result.stderr
+            }), 400
+            
+        return jsonify({'success': True, 'message': 'Saved and Compiled successfully.'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/algorithms/<name>', methods=['DELETE'])
+@csrf.exempt
+def delete_algorithm(name):
+    """Delete a custom algorithm."""
+    if not re.match(r'^\w+$', name):
+        return jsonify({'error': 'Invalid name'}), 400
+        
+    cpp_path = os.path.join(CUSTOM_ALGOS_DIR, f"{name}.cpp")
+    so_path = os.path.join(CUSTOM_ALGOS_DIR, f"{name}.so")
+    
+    try:
+        if os.path.exists(cpp_path): os.remove(cpp_path)
+        if os.path.exists(so_path): os.remove(so_path)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # --- Routes ---
 
@@ -524,6 +646,27 @@ def import_petri():
     
     return jsonify({'status': 'error', 'message': 'Unknown error'}), 500
 
+@app.route('/api/pnh', methods=['GET'])
+def list_pnh_files():
+    """Lists .pnh files in the web_app/pnh_files/ directory."""
+    pnh_dir = os.path.join(base_dir, 'pnh_files')
+    if not os.path.exists(pnh_dir):
+        os.makedirs(pnh_dir)
+    
+    files = []
+    for f in os.listdir(pnh_dir):
+        if f.endswith('.pnh'):
+            f_path = os.path.join(pnh_dir, f)
+            files.append({
+                'name': f,
+                'mtime': os.path.getmtime(f_path),
+                'size': os.path.getsize(f_path)
+            })
+    
+    # Sort by mtime descending
+    files.sort(key=lambda x: x['mtime'], reverse=True)
+    return jsonify(files)
+
 # --- Petri Net Database API ---
 
 @app.route('/api/petri/saved', methods=['GET'])
@@ -543,6 +686,14 @@ def get_saved_petri_net(net_id):
     if net is None:
         return jsonify({'error': 'Petri net not found'}), 404
     return jsonify(dict(net))
+
+@app.route('/api/petri', methods=['GET'])
+def get_petri_nets():
+    """Retrieves all saved Petri nets metadata."""
+    conn = get_db_connection()
+    nets = conn.execute('SELECT id, name, created_at FROM petri_nets ORDER BY created_at DESC').fetchall()
+    conn.close()
+    return jsonify([dict(n) for n in nets])
 
 @app.route('/api/petri/saved', methods=['POST'])
 @csrf.exempt
@@ -570,6 +721,62 @@ def delete_petri_net(net_id):
     conn.commit()
     conn.close()
     return jsonify({'status': 'deleted'})
+
+def export_pnh(data):
+    """
+    Converts a dictionary (places, transitions, arcs) to PNH string format.
+    """
+    places = data.get('places', [])
+    transitions = data.get('transitions', [])
+    arcs = data.get('arcs', [])
+    
+    num_places = len(places)
+    num_transitions = len(transitions)
+    
+    lines = []
+    
+    # Header
+    lines.append(f"{num_places} places")
+    lines.append(f"{num_transitions + 1} rows") # +1 for marking
+    
+    # Sort places and transitions by ID to ensure consistency
+    places.sort(key=lambda x: x['id'])
+    transitions.sort(key=lambda x: x['id'])
+    
+    p_map = {p['id']: i for i, p in enumerate(places)}
+    t_map = {t['id']: i for i, t in enumerate(transitions)}
+    
+    # Build Matrix for each transition
+    for t in transitions:
+        row = [0] * num_places
+        
+        # Incoming arcs (Place -> Transition): -1
+        for arc in arcs:
+            if arc['type'] == 'place_to_transition' and arc['targetId'] == t['id']:
+                pid = arc['sourceId']
+                if pid in p_map:
+                    row[p_map[pid]] = -1
+                    
+        # Outgoing arcs (Transition -> Place): +1
+        for arc in arcs:
+            if arc['type'] == 'transition_to_place' and arc['sourceId'] == t['id']:
+                pid = arc['targetId']
+                if pid in p_map:
+                    row[p_map[pid]] = 1
+        
+        # Format row (dense or space separated? PNH examples used space)
+        # 1 -1 0 0 ...
+        lines.append(" ".join(map(str, row)))
+        
+    # Initial Marking (Last row)
+    marking_row = [0] * num_places
+    for p in places:
+        if p['id'] in p_map:
+            marking_row[p_map[p['id']]] = p.get('tokens', 0)
+            
+    lines.append(" ".join(map(str, marking_row)))
+    
+    return "\n".join(lines)
 
 @app.route('/api/petri/import_batch', methods=['POST'])
 @csrf.exempt
@@ -694,6 +901,252 @@ def get_coloring():
         })
     except Exception as e:
         print(f"Coloring Analysis Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/benchmark/stop', methods=['POST'])
+@csrf.exempt
+def stop_benchmark():
+    global active_benchmark_process
+    if active_benchmark_process and active_benchmark_process.is_alive():
+        print(f"[Server] Force stopping benchmark process (PID: {active_benchmark_process.pid})...")
+        active_benchmark_process.terminate()
+        active_benchmark_process.join(timeout=2)
+        if active_benchmark_process.is_alive():
+            active_benchmark_process.kill() # Harder kill if terminate failed
+        active_benchmark_process = None
+        return jsonify({'status': 'stopped'})
+    return jsonify({'status': 'no_active_benchmark'})
+
+@app.route('/api/benchmark', methods=['POST'])
+@csrf.exempt
+def run_benchmark():
+    global active_benchmark_process
+    try:
+        from web_app.analysis.benchmarking.runner import BenchmarkRunner
+        
+        data = request.json
+        mode = data.get('mode', 'random') # 'random' or 'saved'
+        iterations = int(data.get('iterations', 5))
+        
+        iterations = int(data.get('iterations', 5))
+    
+        # Algorithm Selection
+        algo_names = data.get('algorithms', [])
+        
+        # Legacy Fallback
+        if not algo_names:
+            if data.get('algoPyColoring'): algo_names.append('python_coloring')
+            if data.get('algoCpp'): algo_names.append('cpp_solve')
+            if data.get('algoCppDSatur'): algo_names.append('cpp_dsatur')
+        
+        if not algo_names:
+            return jsonify({'error': 'No algorithms selected'}), 400
+
+        runner = BenchmarkRunner()
+        
+        if mode == 'saved':
+            graph_ids = data.get('graph_ids', [])
+            if not graph_ids:
+                 return jsonify({'error': 'No graphs selected'}), 400
+            
+            # Fetch from DB
+            conn = get_db_connection()
+            # Prepare placeholders securely
+            placeholders = ','.join('?' for _ in graph_ids)
+            query = f'SELECT id, name, nodes, edges FROM graphs WHERE id IN ({placeholders})'
+            rows = conn.execute(query, graph_ids).fetchall()
+            conn.close()
+            
+            graphs = []
+            for r in rows:
+                try:
+                    g_nodes = json.loads(r['nodes'])
+                    g_edges = json.loads(r['edges'])
+                    
+                    # NORMALIZE EDGES: Handle both [u,v] lists and {source:u, target:v} dicts
+                    norm_edges = []
+                    for e in g_edges:
+                        if isinstance(e, dict):
+                            # Handle dict format
+                            s = e.get('source')
+                            t = e.get('target')
+                            norm_edges.append([s, t])
+                        elif isinstance(e, list) and len(e) >= 2:
+                            norm_edges.append([e[0], e[1]])
+                        else:
+                            # Skip invalid
+                            pass
+                            
+                    graphs.append({'id': r['id'], 'name': r['name'], 'nodes': g_nodes, 'edges': norm_edges})
+                except Exception as e:
+                    print(f"Error parsing graph {r['id']}: {e}")
+
+            if not graphs:
+                return jsonify({'error': 'No valid graphs found or parsing failed.'}), 404
+                
+        elif mode == 'petri':
+            petri_ids = data.get('petri_ids', [])
+            if not petri_ids:
+                return jsonify({'error': 'No Petri nets selected'}), 400
+
+            conn = get_db_connection()
+            placeholders = ','.join('?' for _ in petri_ids)
+            query = f'SELECT id, name, content_json FROM petri_nets WHERE id IN ({placeholders})'
+            rows = conn.execute(query, petri_ids).fetchall()
+            conn.close()
+
+            petri_graph_type = data.get('petri_graph_type', 'concurrency')
+
+            graphs = []
+            for r in rows:
+                try:
+                    content = json.loads(r['content_json'])
+                    
+                    # Generate Temp PNH File
+                    pnh_str = export_pnh(content)
+                    temp_dir = os.path.join(base_dir, 'temp_pnh')
+                    if not os.path.exists(temp_dir):
+                        os.makedirs(temp_dir)
+                    
+                    pnh_filename = f"petri_{r['id']}_{int(time.time())}.pnh"
+                    pnh_path = os.path.abspath(os.path.join(temp_dir, pnh_filename))
+                    
+                    with open(pnh_path, 'w') as f:
+                        f.write(pnh_str)
+
+                    nodes = []
+                    edges = []
+                    
+                    if petri_graph_type == 'reachability':
+                        # Use Reachability Graph
+                        r_nodes, r_edges, _ = petri_reachability.calculate_reachability_graph(
+                            content.get('places', []),
+                            content.get('transitions', []),
+                            content.get('arcs', [])
+                        )
+                        nodes = r_nodes
+                        edges = [[e[0], e[1]] for e in r_edges]
+                    elif petri_graph_type == 'pnh':
+                        # Pass PNH Path directly to researcher's C++ code
+                        graphs.append({
+                            'id': r['id'],
+                            'name': r['name'] + " (PNH)",
+                            'pnh_path': pnh_path,
+                            'nodes': [],
+                            'edges': []
+                        })
+                        continue # Skip standard graph processing
+                    else:
+                        # Default: Concurrency Graph
+                        if petri_analysis:
+                            c_nodes, c_edges = petri_analysis.build_concurrency_graph(
+                                content.get('places', []),
+                                content.get('transitions', []),
+                                content.get('arcs', [])
+                            )
+                            nodes = c_nodes
+                            edges = []
+                            for e in c_edges:
+                                if isinstance(e, dict):
+                                    edges.append([e['source'], e['target']])
+                                elif isinstance(e, list):
+                                    edges.append([e[0], e[1]])
+                        else:
+                             print("Petri analysis module missing.")
+
+                    graphs.append({
+                        'id': r['id'], 
+                        'name': f"RG: {r['name']}", 
+                        'nodes': nodes, 
+                        'edges': edges,
+                        'pnh_path': pnh_path # Pass the path
+                    })
+
+                except Exception as e:
+                    print(f"Error processing Petri net {r['id']}: {e}")
+
+            if not graphs:
+                 return jsonify({'error': 'No valid Petri graphs generated.'}), 404
+            
+        elif mode == 'pnh_files':
+            filenames = data.get('filenames', [])
+            if not filenames:
+                 return jsonify({'error': 'No PNH files selected'}), 400
+            
+            pnh_dir = os.path.join(base_dir, 'pnh_files')
+            graphs = []
+            for fname in filenames:
+                p_path = os.path.abspath(os.path.join(pnh_dir, fname))
+                if not os.path.exists(p_path): continue
+                
+                graphs.append({
+                    'id': fname,
+                    'name': fname,
+                    'pnh_path': p_path,
+                    'nodes': [],
+                    'edges': []
+                })
+            
+            if not graphs:
+                 return jsonify({'error': 'No valid PNH files found.'}), 404
+            
+        elif mode == 'random':
+            # Nothing special here, just data gathering for worker
+            pass
+
+        # --- Common Multi-processing Execution Logic ---
+        q = multiprocessing.Queue()
+        
+        # Prepare execution args
+        exec_args = {}
+        if mode == 'random':
+            exec_args = {
+                'start_n': int(data.get('start_n', 10)),
+                'end_n': int(data.get('end_n', 50)),
+                'step_n': int(data.get('step_n', 10)),
+                'density': float(data.get('density', 0.5))
+            }
+        else:
+            # saved, petri, pnh_files use graphs list
+            exec_args = {'graphs': graphs}
+
+        p = multiprocessing.Process(target=benchmark_worker, args=(mode, algo_names, iterations, exec_args, q))
+        active_benchmark_process = p
+        p.start()
+        
+        result = None
+        while p.is_alive():
+            try:
+                # Poll queue while process is running
+                result = q.get(timeout=0.2)
+                break
+            except Exception:
+                # Check if we should abort (if active_benchmark_process was set to None by the stop endpoint)
+                if active_benchmark_process is None:
+                    # The stop endpoint already killed the process, just return error to FE
+                    return jsonify({'error': 'Benchmark stopped by user.'}), 400
+                continue
+        
+        # Final check if result was missed
+        if result is None:
+            try:
+                result = q.get(timeout=0.5)
+            except Exception:
+                pass
+                
+        active_benchmark_process = None
+        
+        if result:
+            if 'error' in result:
+                return jsonify(result), 500
+            return jsonify(result)
+        else:
+            return jsonify({'error': 'Process terminated or failed to return results.'}), 500
+
+    except Exception as e:
+        print(f"Benchmark Error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
