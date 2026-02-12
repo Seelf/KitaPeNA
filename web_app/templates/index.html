@@ -13,6 +13,10 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap"
         rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+    <!-- Monaco Editor Loader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
 </head>
 <style>
     /* Critical render path styles */
@@ -148,6 +152,56 @@
             </div>
         </div>
 
+        <!-- ALGO MANAGER MODAL -->
+        <div id="algoModal" class="modal">
+            <div class="modal-content algo-manager-modal">
+                <div class="modal-header">
+                    <span class="title">⚙️ Algorithm Manager (C++)</span>
+                    <button id="closeAlgoModal" class="close-btn">✕</button>
+                </div>
+
+                <div class="modal-body algo-manager-body">
+                    <!-- Left: List -->
+                    <div class="modal-sidebar">
+                        <div class="section-header">
+                            <h4>Algorithms</h4>
+                            <button id="btnNewAlgo" class="btn-xs highlight">+ New</button>
+                        </div>
+                        <div id="customAlgoList" class="standard-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Editor -->
+                    <div class="modal-main editor-panel">
+                        <div class="editor-header-input"
+                            style="display: flex; background: #252526; border-bottom: 1px solid var(--border-color);">
+                            <input type="text" id="editAlgoName" placeholder="Algorithm Name (e.g. my_greedy_v2)"
+                                style="flex: 1; border: none; background: transparent;">
+                            <select id="algoLanguageSelect" class="btn-xs"
+                                style="margin: 5px; background: #333; border: 1px solid #444; color: #ccc;">
+                                <option value="cpp">C++</option>
+                                <option value="python">Python</option>
+                                <option value="php">PHP</option>
+                                <option value="javascript">JavaScript</option>
+                                <option value="plain">Plain Text</option>
+                            </select>
+                        </div>
+
+                        <div id="monacoEditorContainer" style="flex: 1; min-height: 0;"></div>
+
+                        <div class="modal-footer">
+                            <div id="compileStatus" class="status-text">Ready</div>
+                            <div class="actions">
+                                <button id="btnDeleteAlgo" class="btn-danger">Delete</button>
+                                <button id="btnSaveCompile" class="btn-primary">Save & Compile</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content Area -->
         <div class="main-split">
             <!-- Left: Sidebar (Tools) -->
@@ -167,10 +221,19 @@
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                     </svg>
                 </div>
+                <!-- Performance Tab -->
+                <div class="icon" id="tabPerformance" title="Performance Benchmarks">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
             </div>
 
-            <!-- Center: Canvas Editor -->
-            <div class="editor-area">
+            <!-- Center: Canvas Editor (Default) -->
+            <div class="editor-area" id="mainEditorArea">
+                <!-- ... (existing canvas content) ... -->
                 <!-- Custom Tab Bar Wrapper (Active Files) -->
                 <div class="tabs-wrapper">
                     <button id="btnTabScrollLeft" class="tab-scroll-btn" title="Scroll Left">‹</button>
@@ -188,8 +251,7 @@
                 </div>
                 <div class="canvas-container" id="canvasContainer">
                     <div id="graphStats" class="graph-stats">Nodes: 0 | Edges: 0</div>
-
-                    <!-- Graph MIS Toolbar -->
+                    <!-- Toolbars ... -->
                     <div class="floating-toolbar" id="toolbarGraph">
                         <button class="tool-btn" id="btnModeView" title="Move / Pan">✋</button>
                         <button class="tool-btn" id="btnModeNode" title="Add Node">
@@ -275,7 +337,157 @@
                 </div>
             </div>
 
-            <!-- Resizer Handle -->
+            <!-- Performance View (Hidden by default) -->
+            <!-- Performance View (Hidden by default) -->
+            <div id="viewPerformance" class="performance-view">
+                <div class="performance-header">
+                    <div class="icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </div>
+                    Algorithm Benchmarks
+                </div>
+
+                <div class="perf-container">
+                    <!-- Sidebar Config -->
+                    <div class="perf-sidebar">
+                        <div class="config-section">
+                            <h4>Graph Source</h4>
+                            <div class="input-group">
+                                <select id="benchSourceSelect">
+                                    <option value="random">Random Graphs</option>
+                                    <option value="saved">Saved Graphs</option>
+                                    <option value="petri" selected>Petri Nets</option>
+                                    <option value="pnh">PNH Files (Local)</option>
+                                </select>
+                            </div>
+
+                            <!-- Random Config -->
+                            <div id="configRandom">
+                                <div class="input-group">
+                                    <label>Node Count (N) Range</label>
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="number" id="benchStartN" value="10" placeholder="Start">
+                                        <input type="number" id="benchEndN" value="100" placeholder="End">
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>Step Size</label>
+                                    <input type="number" id="benchStepN" value="10">
+                                </div>
+                                <div class="input-group">
+                                    <label>Density (0.0 - 1.0)</label>
+                                    <input type="number" id="benchDensity" value="0.5" step="0.1" max="1.0" min="0.0">
+                                </div>
+                            </div>
+
+                            <!-- Saved Config -->
+                            <div id="configSaved" style="display: none;">
+                                <div class="input-group">
+                                    <label>Select Graphs</label>
+                                    <div class="list-controls">
+                                        <span onclick="window.selectListItems('benchSavedList', true)">All</span> |
+                                        <span onclick="window.selectListItems('benchSavedList', false)">None</span>
+                                    </div>
+                                    <input type="text" id="searchBenchGraphs" placeholder="Search Graphs...">
+                                    <div id="benchSavedList">
+                                        <div style="padding: 5px; color: #888; font-style: italic;">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="configPetri" style="display: none;">
+                                <div class="input-group">
+                                    <label>Graph Representation</label>
+                                    <select id="benchPetriGraphType">
+                                        <option value="concurrency" selected>Concurrency Graph (Default)</option>
+                                        <option value="reachability">Reachability Graph</option>
+                                        <option value="pnh">PNH File (Direct)</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Select Petri Nets</label>
+                                    <div class="list-controls">
+                                        <span onclick="window.selectListItems('benchPetriList', true)">All</span> |
+                                        <span onclick="window.selectListItems('benchPetriList', false)">None</span>
+                                    </div>
+                                    <input type="text" id="searchBenchPetri" placeholder="Search...">
+                                    <div id="benchPetriList">
+                                        <div style="padding: 5px; color: #888; font-style: italic;">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="configPnh" style="display: none;">
+                                <div class="input-group">
+                                    <label>Select PNH Files</label>
+                                    <div class="list-controls">
+                                        <span onclick="window.selectListItems('benchPnhFileList', true)">All</span> |
+                                        <span onclick="window.selectListItems('benchPnhFileList', false)">None</span>
+                                    </div>
+                                    <input type="text" id="searchBenchPnh" placeholder="Search filenames...">
+                                    <div id="benchPnhFileList">
+                                        <div style="padding: 5px; color: #888; font-style: italic;">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Iterations per Graph</label>
+                                <input type="number" id="benchIterations" value="5">
+                            </div>
+                        </div>
+
+                        <div class="config-section">
+                            <div class="section-header">
+                                <h4>Algorithms</h4>
+                                <button id="btnManageAlgos" class="btn-xs">Manage</button>
+                            </div>
+                            <div class="list-controls">
+                                <span onclick="window.selectListItems('algoListContainer', true)">All</span> |
+                                <span onclick="window.selectListItems('algoListContainer', false)">None</span>
+                            </div>
+                            <input type="text" id="searchAlgos" placeholder="Search algorithms...">
+                            <div id="algoListContainer" class="algo-list">
+                                <!-- Dynamic Algos Here -->
+                            </div>
+                        </div>
+
+                        <div class="config-section run-section">
+                            <h4>Actions</h4>
+                            <button id="btnRunBenchmark" class="btn-run-bench">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                Run Benchmark
+                            </button>
+                            <div id="benchmarkStatus" class="perf-status">Ready</div>
+
+                            <div class="console-wrapper">
+                                <div class="console-header">
+                                    <span>Execution Console</span>
+                                    <div class="header-actions">
+                                        <button id="btnClearConsole" class="btn-xs" title="Clear Console">🗑️</button>
+                                        <button id="btnExpandConsole" class="btn-xs" title="Fullscreen">⛶</button>
+                                    </div>
+                                </div>
+                                <div id="benchConsole" class="bench-console">
+                                    <div class="console-line system">Console initialized. Ready for benchmark...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Chart Area -->
+                    <div class="perf-main">
+                        <canvas id="perfChart"></canvas>
+                    </div>
+                </div>
+            </div>
             <div id="resizer" class="resizer"></div>
 
             <!-- Right: Results Panel -->
@@ -348,6 +560,27 @@
             </div>
         </footer>
     </div>
+
+    <!-- Large Console Modal -->
+    <div id="largeConsoleModal" class="modal">
+        <div class="modal-content large-console-content">
+            <div class="modal-header">
+                <h3>Benchmark Execution Console</h3>
+                <span id="closeLargeConsole" class="close-btn">&times;</span>
+            </div>
+            <div class="large-console-wrapper">
+                <div class="console-header">
+                    <span>Live Output</span>
+                    <div class="header-actions">
+                        <button id="btnClearLargeConsole" class="btn-xs" title="Clear Console">🗑️</button>
+                    </div>
+                </div>
+                <div id="largeBenchConsole" class="bench-console large"></div>
+            </div>
+        </div>
+    </div>
+
+
 
     <!-- Main App Logic (ES Modules) -->
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v=curvedEdgesv3"></script>

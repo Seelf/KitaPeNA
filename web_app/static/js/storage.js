@@ -16,10 +16,11 @@ export function saveToLocalStorage() {
         // Extended State for Persistence
         appContext: state.appContext,
         troResult: state.troResult,
-        coloringResult: state.coloringResult,
         misSteps: state.misSteps,
         // NEW: Save the entire graphs container
-        graphs: state.graphs
+        graphs: state.graphs,
+        activeActivityTab: state.activeActivityTab,
+        activeDbTab: state.activeDbTab
     };
     localStorage.setItem('mis_autosave', JSON.stringify(data));
 
@@ -39,6 +40,8 @@ export function loadFromLocalStorage() {
             if (data.troResult) state.troResult = data.troResult;
             if (data.coloringResult) state.coloringResult = data.coloringResult;
             if (data.misSteps) state.misSteps = data.misSteps || [];
+            if (data.activeActivityTab) state.activeActivityTab = data.activeActivityTab;
+            if (data.activeDbTab) state.activeDbTab = data.activeDbTab;
 
             // Restore Graphs Container
             if (data.graphs) {
