@@ -1,341 +1,374 @@
 
 import { state } from './state.js';
 import { updateStats } from './ui.js';
-import { savePetriNetDb, loadPetriNetFromDb, importPetriBatch } from './storage.js';
+import { savePetriNetDb, loadPetriNetFromDb } from './storage.js';
 
 // DOM Elements
 let viewDatabaseExplorer, dbGrid, dbSearchInput, dbSortSelect, btnRefreshDb;
 let importNetInput;
 let dbStats;
-let dbDetailHeader, dbDetailContent, dbDetailEmpty;
-let dbDetailName, dbDetailMeta, dbDetailProps;
-let btnDbOpen, btnDbDelete;
-let btnDownloadPnh, btnDownloadPnml, btnDownloadJson;
 
-let currentNets = []; // Local cache of fetched nets
-let selectedNet = null; // Currently selected Net object
+// Pagination state
+let currentPage = 1;
+const itemsPerPage = 20;
+let isLoading = false;
+let hasMore = true;
+let currentNets = [];
+let observer = null;
+let sentinel = null;
 
 export function initDatabaseExplorer() {
     viewDatabaseExplorer = document.getElementById('viewDatabaseExplorer');
-    dbGrid = document.getElementById('dbGrid'); // This is now the sidebar list container
+    dbGrid = document.getElementById('dbGrid');
     dbSearchInput = document.getElementById('dbSearchInput');
     dbSortSelect = document.getElementById('dbSortSelect');
     btnRefreshDb = document.getElementById('btnRefreshDb');
     importNetInput = document.getElementById('importNetInput');
     dbStats = document.getElementById('dbStats');
 
-    // Detail Panel Elements
-    dbDetailHeader = document.getElementById('dbDetailHeader');
-    dbDetailContent = document.getElementById('dbDetailContent');
-    dbDetailEmpty = document.getElementById('dbDetailEmpty');
-    dbDetailName = document.getElementById('dbDetailName');
-    dbDetailMeta = document.getElementById('dbDetailMeta');
-    dbDetailProps = document.getElementById('dbDetailProps');
+    if (!viewDatabaseExplorer || !dbGrid) return;
 
-    // Detail Actions
-    btnDbOpen = document.getElementById('btnDbOpen');
-    btnDbDelete = document.getElementById('btnDbDelete');
-    btnDownloadPnh = document.getElementById('btnDownloadPnh');
-    btnDownloadPnml = document.getElementById('btnDownloadPnml');
-    btnDownloadJson = document.getElementById('btnDownloadJson');
-
-    if (!viewDatabaseExplorer) return;
+    // Create sentinel element for infinite scroll trigger
+    sentinel = document.createElement('div');
+    sentinel.className = 'db-sentinel';
+    sentinel.innerHTML = '<span style="color:#888; font-size:12px;">Loading more...</span>';
+    sentinel.style.cssText = 'text-align:center; padding:20px; width:100%; grid-column:1/-1;';
 
     // Event Listeners
-    if (btnRefreshDb) btnRefreshDb.addEventListener('click', fetchNets);
+    if (btnRefreshDb) btnRefreshDb.addEventListener('click', () => loadDatabaseItems(true));
 
     if (dbSearchInput) {
-        dbSearchInput.addEventListener('input', () => renderList());
+        let debounceTimer;
+        dbSearchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => loadDatabaseItems(true), 400);
+        });
     }
 
     if (dbSortSelect) {
-        dbSortSelect.addEventListener('change', () => renderList());
+        dbSortSelect.addEventListener('change', () => loadDatabaseItems(true));
     }
 
     if (importNetInput) {
         importNetInput.addEventListener('change', handleImport);
     }
 
-    // Action Buttons (Bound to selectedNet)
-    if (btnDbOpen) btnDbOpen.addEventListener('click', () => handleAction('open'));
-    if (btnDbDelete) btnDbDelete.addEventListener('click', () => handleAction('delete'));
-    if (btnDownloadPnh) btnDownloadPnh.addEventListener('click', () => handleAction('download-pnh'));
-    if (btnDownloadPnml) btnDownloadPnml.addEventListener('click', () => handleAction('download-pnml'));
-    if (btnDownloadJson) btnDownloadJson.addEventListener('click', () => handleAction('download-json'));
+    // Use dbGrid itself as scroll root since it's the scrollable container
+    observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && !isLoading && hasMore) {
+                loadDatabaseItems(false);
+            }
+        });
+    }, {
+        root: dbGrid,
+        rootMargin: '200px',
+        threshold: 0
+    });
 }
 
 export function openDatabaseExplorer() {
     if (!viewDatabaseExplorer) return;
     viewDatabaseExplorer.style.display = 'flex';
-    fetchNets();
+    loadDatabaseItems(true);
 }
 
 export function closeExplorer() {
     if (!viewDatabaseExplorer) return;
     viewDatabaseExplorer.style.display = 'none';
-
-    // Switch back to editor if needed, usually managed by main.js tabs logic
     const tabEditor = document.getElementById('tabEditor');
     if (tabEditor) tabEditor.click();
 }
 
-async function fetchNets() {
-    if (dbGrid) dbGrid.innerHTML = '<div class="empty-state">Loading...</div>';
-    if (dbStats) dbStats.textContent = 'Fetching data...';
+async function loadDatabaseItems(reset = false) {
+    if (reset) {
+        currentPage = 1;
+        currentNets = [];
+        hasMore = true;
+        // Detach sentinel and observer
+        if (observer && sentinel) observer.unobserve(sentinel);
+        if (sentinel && sentinel.parentNode) sentinel.remove();
+        if (dbGrid) dbGrid.innerHTML = '';
+        if (dbStats) dbStats.textContent = 'Loading...';
+    }
+
+    if (isLoading || !hasMore) return;
+    isLoading = true;
+
+    const query = dbSearchInput ? dbSearchInput.value : '';
+    const sort = dbSortSelect ? dbSortSelect.value : 'date_desc';
 
     try {
-        const response = await fetch('/api/petri/saved');
+        const params = new URLSearchParams({
+            page: currentPage,
+            per_page: itemsPerPage,
+            q: query,
+            sort: sort
+        });
+
+        const response = await fetch(`/api/petri/saved?${params.toString()}`);
         if (!response.ok) throw new Error('Failed to fetch nets');
 
         const data = await response.json();
-        currentNets = data.nets || []; // Expecting { nets: [...] }
+        const newNets = data.nets || [];
+        const total = data.total || 0;
 
-        renderList();
+        // On first load / reset, clear the grid
+        if (reset && dbGrid) dbGrid.innerHTML = '';
 
-        // If a net was selected try to re-select it by ID, else clear selection
-        if (selectedNet) {
-            const stillExists = currentNets.find(n => n.id === selectedNet.id);
-            if (stillExists) selectNet(stillExists);
-            else clearSelection();
-        } else {
-            // Maybe select first one? Or clear.
-            clearSelection();
+        // Remove sentinel before appending cards
+        if (sentinel && sentinel.parentNode) sentinel.remove();
+        if (observer && sentinel) observer.unobserve(sentinel);
+
+        // Append new cards
+        currentNets = reset ? newNets : [...currentNets, ...newNets];
+        renderNewItems(newNets);
+
+        // Update stats
+        if (dbStats) {
+            dbStats.textContent = `${currentNets.length} / ${total} nets`;
         }
+
+        // Determine if more pages exist
+        if (currentNets.length >= total || newNets.length < itemsPerPage) {
+            hasMore = false;
+        } else {
+            currentPage++;
+            // Append sentinel and start observing
+            if (dbGrid && sentinel && observer) {
+                dbGrid.appendChild(sentinel);
+                observer.observe(sentinel);
+            }
+        }
+
+        // Empty state
+        if (currentNets.length === 0 && dbGrid) {
+            dbGrid.innerHTML = '<div class="empty-state">No matching nets found.</div>';
+        }
+
     } catch (err) {
-        console.error("Error fetching nets:", err);
-        if (dbGrid) dbGrid.innerHTML = `<div class="empty-state error">Error: ${err.message}</div>`;
+        console.error("[DB] Error fetching nets:", err);
+        if (reset && dbGrid) {
+            dbGrid.innerHTML = `<div class="empty-state error">Error: ${err.message}</div>`;
+        }
+    } finally {
+        isLoading = false;
     }
 }
 
-function renderList() {
+function renderNewItems(nets) {
     if (!dbGrid) return;
-    dbGrid.innerHTML = '';
 
-    // Filter
-    const query = dbSearchInput ? dbSearchInput.value.toLowerCase() : '';
-    let filtered = currentNets.filter(net => net.name.toLowerCase().includes(query));
-
-    // Sort
-    const sortMode = dbSortSelect ? dbSortSelect.value : 'date_desc';
-    filtered.sort((a, b) => {
-        const dateA = a.created_at || 0;
-        const dateB = b.created_at || 0;
-        const nameA = a.name.toLowerCase();
-        const nameB = b.name.toLowerCase();
-
-        switch (sortMode) {
-            case 'date_asc': return dateA - dateB;
-            case 'date_desc': return dateB - dateA; // Default
-            case 'name_asc': return nameA.localeCompare(nameB);
-            case 'name_desc': return nameB.localeCompare(nameA);
-            default: return dateB - dateA;
-        }
+    nets.forEach(net => {
+        const card = createNetCard(net);
+        dbGrid.appendChild(card);
     });
+}
 
-    // Update Stats
-    if (dbStats) {
-        dbStats.textContent = `${filtered.length} nets`;
+function createNetCard(net) {
+    const card = document.createElement('div');
+    card.className = 'net-card';
+
+    // Stats extraction
+    const stats = net.stats || { places: 0, transitions: 0, arcs: 0, class: '' };
+    const dateStr = net.created_at ? new Date(net.created_at).toLocaleDateString() : 'Unknown';
+
+    card.innerHTML = `
+        <div class="net-card-header">
+            <div class="net-info-group">
+                <div class="net-title" title="${net.name}">${net.name}</div>
+                <div class="net-id-badge">#${net.id} • ${dateStr}</div>
+            </div>
+        </div>
+
+        <div class="net-stats-row">
+            <div class="stat-badge" title="Places">
+                <span>⚪</span> <span>${stats.places}</span>
+            </div>
+            <div class="stat-badge" title="Transitions">
+                <span>⬛</span> <span>${stats.transitions}</span>
+            </div>
+            <div class="stat-badge" title="Arcs">
+                <span>fw</span> <span>${stats.arcs}</span>
+            </div>
+        </div>
+
+        <div class="class-input-group">
+            <div class="class-label">Class:</div>
+            <input type="text" class="class-input" value="${stats.class || ''}" placeholder="e.g. MG, SM..." data-id="${net.id}">
+        </div>
+
+        <div class="card-actions">
+            <button class="action-btn-small primary btn-open">Open</button>
+            <button class="action-btn-small icon-only btn-download-pnh" title="Download PNH">PNH</button>
+            <button class="action-btn-small icon-only btn-download-pnml" title="Download PNML">XML</button>
+            <button class="action-btn-small icon-only btn-download-json" title="Download JSON">JSON</button>
+            <button class="action-btn-small icon-only danger btn-delete" title="Delete">🗑</button>
+        </div>
+    `;
+
+    // Bind Events
+    const btnOpen = card.querySelector('.btn-open');
+    btnOpen.addEventListener('click', () => loadNetToEditor(net));
+
+    const btnDelete = card.querySelector('.btn-delete');
+    btnDelete.addEventListener('click', () => handleAction(net, 'delete'));
+
+    const btnPnh = card.querySelector('.btn-download-pnh');
+    btnPnh.addEventListener('click', () => handleAction(net, 'download-pnh'));
+
+    const btnPnml = card.querySelector('.btn-download-pnml');
+    btnPnml.addEventListener('click', () => handleAction(net, 'download-pnml'));
+
+    const btnJson = card.querySelector('.btn-download-json');
+    btnJson.addEventListener('click', () => handleAction(net, 'download-json'));
+
+    const inputClass = card.querySelector('.class-input');
+    inputClass.addEventListener('change', (e) => updateNetClass(net, e.target.value));
+
+    return card;
+}
+
+async function updateNetClass(netMetadata, newClass) {
+    // We need to fetch full content, update class, and save back.
+    // Or we should have a PATCH endpoint, but we only made PUT.
+    // Ideally we fetch content -> update -> PUT.
+
+    try {
+        // Fetch full content
+        const res = await fetch(`/api/petri/saved/${netMetadata.id}`);
+        if (!res.ok) throw new Error("Failed to fetch net details");
+        const fullNet = await res.json();
+
+        // Update content
+        const content = fullNet.content || (fullNet.content_json ? JSON.parse(fullNet.content_json) : fullNet);
+        // Note: API returns dict(net). content_json is string there? 
+        // In app.py get_saved_petri_net returns dict(net). 
+        // If row_factory is sqlite3.Row, it returns columns. 'content_json' is a column.
+        // Wait, get_saved_petri_net in app.py logic...
+        // Let's check get_petri_net in database.py. It returns * from petri_nets.
+        // So it has content_json string.
+
+        let contentObj;
+        if (typeof fullNet.content_json === 'string') {
+            contentObj = JSON.parse(fullNet.content_json);
+        } else if (fullNet.content) {
+            contentObj = fullNet.content;
+        } else {
+            // Maybe it was already parsed? No, sqlite returns string.
+            // If we used the `stats` logic in get_all, that was get_all.
+            // get_petri_net just returns row dict.
+            contentObj = typeof fullNet.content_json === 'string' ? JSON.parse(fullNet.content_json) : {};
+        }
+
+        contentObj.model_class = newClass;
+
+        // PUT update
+        const updateRes = await fetch(`/api/petri/saved/${netMetadata.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: fullNet.name,
+                content: contentObj
+            })
+        });
+
+        if (updateRes.ok) {
+            // Update local cache stats
+            if (!netMetadata.stats) netMetadata.stats = {};
+            netMetadata.stats.class = newClass;
+            // Visual feedback?
+            // Already updated in input.
+        } else {
+            alert("Failed to update class.");
+        }
+    } catch (e) {
+        console.error("Update failed", e);
+        alert("Update failed: " + e.message);
     }
+}
 
-    if (filtered.length === 0) {
-        dbGrid.innerHTML = '<div class="empty-state">No matching nets.</div>';
+async function handleAction(netMetadata, action) {
+    // For downloads/delete, we might need full content if not present
+    // But for Delete we only need ID.
+    if (action === 'delete') {
+        if (confirm(`Delete "${netMetadata.name}"?`)) {
+            try {
+                const res = await fetch(`/api/petri/saved/${netMetadata.id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    // Refresh completely to ensure pagination consistency
+                    loadDatabaseItems(true);
+                } else {
+                    alert("Failed to delete.");
+                }
+            } catch (e) { console.error(e); alert("Delete failed"); }
+        }
         return;
     }
 
-    // Render List Items
-    filtered.forEach(net => {
-        const item = createlistitem(net);
-        dbGrid.appendChild(item);
-    });
-}
-
-function createlistitem(net) {
-    const div = document.createElement('div');
-    div.className = 'db-list-item';
-    if (selectedNet && selectedNet.id === net.id) {
-        div.classList.add('selected');
-    }
-
-    // Check if ID is string or number
-    const displayId = String(net.id).substring(0, 6);
-    const dateObj = net.created_at ? new Date(net.created_at * 1000) : null;
-    const dateStr = dateObj ? dateObj.toLocaleDateString() : 'Unknown';
-
-    div.innerHTML = `
-        <div class="db-item-title" title="${net.name}">${net.name}</div>
-        <div class="db-item-meta">
-            <span>#${displayId}</span>
-            <span>${dateStr}</span>
-        </div>
-    `;
-
-    div.addEventListener('click', () => selectNet(net));
-
-    return div;
-}
-
-async function selectNet(net) {
-    selectedNet = net;
-    renderList(); // Re-render to update 'selected' class highlight
-
-    // Show Details UI
-    dbDetailEmpty.style.display = 'none';
-    dbDetailHeader.style.display = 'block';
-    dbDetailContent.style.display = 'block';
-
-    // Populate Header
-    dbDetailName.textContent = net.name;
-    const dateStr = net.created_at ? new Date(net.created_at * 1000).toLocaleString() : 'Unknown';
-    dbDetailMeta.textContent = `ID: ${net.id} | Created: ${dateStr}`;
-
-    // Populate Properties (Requires full load first?)
-    // Usually fetching /saved returns light metadata. We need to check if content is there.
-    let fullNetData = net;
-    if (!net.content && !net.places) {
-        try {
-            // We reuse the existing load function from storage.js which fetches by ID
-            const loaded = await loadPetriNetFromDb(net.id);
-            if (loaded) {
-                fullNetData = loaded;
-                // Update local cache too so subsequent clicks are fast
-                const idx = currentNets.findIndex(n => n.id === net.id);
-                if (idx !== -1) currentNets[idx] = fullNetData;
-            }
-        } catch (e) {
-            console.error("Failed to load details", e);
-            dbDetailProps.innerHTML = '<div style="color:red">Error loading details.</div>';
-            return;
-        }
-    }
-    selectedNet = fullNetData; // Update reference to full data
-
-    // Extract stats
-    const content = fullNetData.content || fullNetData;
-    const numPlaces = (content.places || []).length;
-    const numTrans = (content.transitions || []).length;
-    const numArcs = (content.arcs || []).length;
-
-    // Render Props Grid
-    dbDetailProps.innerHTML = `
-        <div class="prop-item">
-            <div class="prop-label">Places</div>
-            <div class="prop-value">${numPlaces}</div>
-        </div>
-        <div class="prop-item">
-            <div class="prop-label">Transitions</div>
-            <div class="prop-value">${numTrans}</div>
-        </div>
-        <div class="prop-item">
-            <div class="prop-label">Arcs</div>
-            <div class="prop-value">${numArcs}</div>
-        </div>
-        <div class="prop-item">
-            <div class="prop-label">Marking Sum</div>
-            <div class="prop-value">${countTokens(content.places)}</div>
-        </div>
-    `;
-}
-
-function countTokens(places) {
-    if (!places) return 0;
-    return places.reduce((sum, p) => sum + (p.tokens || 0), 0);
-}
-
-function clearSelection() {
-    selectedNet = null;
-    renderList();
-    dbDetailEmpty.style.display = 'flex';
-    dbDetailHeader.style.display = 'none';
-    dbDetailContent.style.display = 'none';
-}
-
-async function handleAction(action) {
-    if (!selectedNet) return;
-
-    const net = selectedNet; // Already fully loaded in selectNet
-    const content = net.content || net;
-
-    switch (action) {
-        case 'open':
-            loadNetToEditor(net);
-            break;
-        case 'download-pnh':
-            downloadFile(net.name + '.pnh', convertToPnh(content));
-            break;
-        case 'download-pnml':
-            downloadFile(net.name + '.pnml', convertToPnml(content, net.name));
-            break;
-        case 'download-json':
-            downloadFile(net.name + '.json', JSON.stringify(content, null, 2));
-            break;
-        case 'delete':
-            if (confirm(`Are you sure you want to delete "${net.name}"?`)) {
-                await deleteNet(net.id);
-            }
-            break;
-    }
-}
-
-function loadNetToEditor(netData) {
-    // We can dispatch an event or directly manipulate the tabs/context
-    // Using CustomEvent as before
-    const event = new CustomEvent('requestLoadNet', {
-        detail: {
-            id: netData.id,
-            name: netData.name,
-            content: netData.content || netData
-        }
-    });
-    // But we need to listen for this in main or handle it here?
-    // Actually main.js handles tab switching. We need to tell main.js to load this net.
-    // Let's reuse `loadPetriNetFromDb` logic? No, main.js has logic for "tab open".
-
-    // Dispatch event that main.js can listen to, OR just call the import directly.
-    // Wait, main.js doesn't listen to 'requestLoadNet'.
-
-    // Better way: Close explorer, switch to editor, then trigger load.
-    // Since we are in a module, we can't easily call main.js functions unless exported.
-    // But we can trigger a click on a hidden button or similar hack, OR use window global.
-
-    // Let's use localStorage + reload? No.
-    // How about window.loadNetToEditor global?
-
-    // Or, we can modify main.js to listen for a custom event.
-    // I will add a listener in main.js quickly in next step if needed. 
-    // BUT wait, in existing main.js (read previously), I saw no custom event listener.
-    // Let's dispatch event and I'll add the listener to main.js in a follow-up if needed.
-
-    // However, `main.js` has `loadPetriNetFromDb` imported.
-    // We can try to emulate the "Open" behavior.
-
-    // Re-reading main.js: it has logic inside `tabDb` click handler to load nets.
-    // We can expose a function on window.
-
-    if (window.openPetriNetInEditor) {
-        window.openPetriNetInEditor(netData);
-    } else {
-        // Fallback: Dispatch event
-        document.dispatchEvent(new CustomEvent('open-petri-net', { detail: netData }));
-    }
-
-    closeExplorer();
-}
-
-
-async function deleteNet(id) {
+    // For downloads, we need content.
     try {
-        const response = await fetch(`/api/petri/saved/${id}`, { method: 'DELETE' });
-        if (response.ok) {
-            currentNets = currentNets.filter(n => n.id !== id);
-            clearSelection();
-            renderList(); // Will also show update stats
-        } else {
-            alert("Failed to delete net.");
+        const res = await fetch(`/api/petri/saved/${netMetadata.id}`);
+        if (!res.ok) throw new Error("Fetch failed");
+        const fullNet = await res.json();
+        let content = fullNet.content_json ? JSON.parse(fullNet.content_json) : null;
+        if (!content) throw new Error("No content");
+
+        switch (action) {
+            case 'download-pnh':
+                downloadFile(fullNet.name + '.pnh', convertToPnh(content));
+                break;
+            case 'download-pnml':
+                downloadFile(fullNet.name + '.pnml', convertToPnml(content, fullNet.name));
+                break;
+            case 'download-json':
+                downloadFile(fullNet.name + '.json', JSON.stringify(content, null, 2));
+                break;
         }
     } catch (e) {
-        console.error("Delete failed", e);
-        alert("Delete failed: " + e.message);
+        console.error(e);
+        alert("Action failed: " + e.message);
     }
+}
+
+function loadNetToEditor(netMetadata) {
+    // We need to fetch full content to load it
+    // Or dispatch event and let main handle?
+    // main handles 'open-petri-net' by calling `loadPetriNetFromDb`? 
+    // No, main.js has no listener for 'open-petri-net' yet.
+    // I should strictly implement loading here or dispatch event.
+    // Given I can fetch here, I will fetch and then use global function if available or dispatch.
+
+    // Actually, `loadPetriNetFromDb` is imported from storage.js.
+    // But `loadPetriNetFromDb` in storage.js usually just returns data or updates state?
+    // storage.js `loadPetriNetFromDb` fetches and returns.
+
+    // I will fetch here.
+    async function doLoad() {
+        try {
+            const res = await fetch(`/api/petri/saved/${netMetadata.id}`);
+            if (!res.ok) throw new Error("Fetch failed");
+            const fullNet = await res.json();
+            const content = typeof fullNet.content_json === 'string' ? JSON.parse(fullNet.content_json) : fullNet.content_json;
+
+            // Dispatch event to Main to load this into Editor
+            // We can use a custom event on window
+            const event = new CustomEvent('petri-net-loaded', {
+                detail: {
+                    id: fullNet.id,
+                    name: fullNet.name,
+                    content: content
+                }
+            });
+            window.dispatchEvent(event);
+
+            closeExplorer();
+        } catch (e) {
+            console.error(e);
+            alert("Failed to open net.");
+        }
+    }
+    doLoad();
 }
 
 async function handleImport(e) {
@@ -360,7 +393,7 @@ async function handleImport(e) {
 
             if (netContent) {
                 await savePetriNetDb(name, netContent);
-                fetchNets();
+                loadDatabaseItems(true); // Refresh list
                 alert(`Import successful: ${name}`);
             }
         } catch (err) {
@@ -369,9 +402,10 @@ async function handleImport(e) {
         }
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset
+    e.target.value = '';
 }
 
+// Converters (Keep existing logic)
 function parsePnh(content) {
     const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0 && !l.trim().startsWith('#'));
     if (lines.length < 3) throw new Error("Invalid PNH format");
@@ -428,15 +462,11 @@ function parsePnh(content) {
     return { places, transitions, arcs };
 }
 
-// --- CONVERTERS ---
-
 function convertToPnh(json) {
     const places = json.places || [];
     const transitions = json.transitions || [];
-    const arcs = json.arcs || []; // [{source, target, weight}, ...]
+    const arcs = json.arcs || [];
 
-    // 1. Map IDs to indices (dense format requires 0..N-1)
-    // We assume IDs are somewhat arbitrary, so we re-index them for the matrix.
     const pMap = new Map();
     places.forEach((p, i) => pMap.set(p.id, i));
 
@@ -447,48 +477,35 @@ function convertToPnh(json) {
     const numT = transitions.length;
 
     let lines = [];
-    // Header
     lines.push(`${numP}`);
     lines.push(`${numT}`);
 
-    // Matrix: numT rows, numP columns
     for (let t = 0; t < numT; t++) {
         let row = [];
         const tId = transitions[t].id;
 
         for (let p = 0; p < numP; p++) {
             const pId = places[p].id;
-
-            // Check arc P->T (input)
             const arcIn = arcs.find(a => a.source === pId && a.target === tId);
-            // Check arc T->P (output)
             const arcOut = arcs.find(a => a.source === tId && a.target === pId);
 
             let val = 0;
-            if (arcIn) {
-                // -1 is 'x'
-                val -= (arcIn.weight || 1);
-            }
-            if (arcOut) {
-                val += (arcOut.weight || 1);
-            }
+            if (arcIn) val -= (arcIn.weight || 1);
+            if (arcOut) val += (arcOut.weight || 1);
 
-            // Representation
             if (val === 0) row.push('0');
             else if (val > 0) row.push(String(val));
-            else row.push('x'); // strict format
+            else row.push('x');
         }
         lines.push(row.join(' '));
     }
 
-    // Marking (Dense row of digits)
     let marking = [];
     for (let p = 0; p < numP; p++) {
         marking.push(places[p].tokens || 0);
     }
     lines.push(marking.join(' '));
 
-    // Metadata (Names)
     const pNames = places.map(p => p.label || p.name || `p${p.id}`).join(';');
     lines.push(`;Places=${pNames}`);
 
@@ -503,7 +520,6 @@ function convertToPnml(json, netName) {
     xml += '<pnml>\n';
     xml += `  <net id="${netName}" type="http://www.pnml.org/version-2009/grammar/ptnet">\n`;
 
-    // Places
     const places = json.places || [];
     places.forEach(p => {
         xml += `    <place id="p${p.id}">\n`;
@@ -515,7 +531,6 @@ function convertToPnml(json, netName) {
         xml += `    </place>\n`;
     });
 
-    // Transitions
     const transitions = json.transitions || [];
     transitions.forEach(t => {
         xml += `    <transition id="t${t.id}">\n`;
@@ -526,14 +541,12 @@ function convertToPnml(json, netName) {
         xml += `    </transition>\n`;
     });
 
-    // Arcs
     const arcs = json.arcs || [];
     let arcIdCounter = 0;
     arcs.forEach(a => {
         const isSourcePlace = places.some(p => p.id === a.source);
         const sourceId = isSourcePlace ? `p${a.source}` : `t${a.source}`;
         const targetId = isSourcePlace ? `t${a.target}` : `p${a.target}`;
-
         xml += `    <arc id="a${arcIdCounter++}" source="${sourceId}" target="${targetId}">\n`;
         xml += `      <inscription><text>${a.weight || 1}</text></inscription>\n`;
         xml += `    </arc>\n`;

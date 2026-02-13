@@ -269,11 +269,12 @@ async function loadBenchmarkPetriNets() {
     list.innerHTML = '<div style="padding: 5px; color: #888;">Loading...</div>';
 
     try {
-        const resp = await fetch('/api/petri');
-        const nets = await resp.json();
+        const resp = await fetch('/api/petri/saved?per_page=9999');
+        const data = await resp.json();
+        const nets = data.nets || data;
 
         list.innerHTML = '';
-        if (nets.length === 0) {
+        if (!nets || nets.length === 0) {
             list.innerHTML = '<div style="padding: 5px; color: #888;">No saved Petri nets found.</div>';
             return;
         }

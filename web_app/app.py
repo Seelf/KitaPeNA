@@ -32,10 +32,11 @@ except ImportError as e:
     petri_analysis = None
 
 from web_app.analysis.benchmarking.runner import BenchmarkRunner
+from web_app.data import database as db
 
 # --- Configuration ---
 base_dir = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(base_dir, 'graphs.db')
+# db_path moved to database.py
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Change this to a fixed key in production!
@@ -98,46 +99,16 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
-    conn.close()
+    user = db.get_user_by_id(user_id)
     if user:
         return User(user['id'], user['username'], user['role'], user['is_blocked'])
     return None
 
 # --- Database Helper ---
-def get_db_connection():
-    """Establishes a connection to the SQLite database."""
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Defs moved to web_app/data/database.py
 
-def init_db():
-    pass # Managed by init_admin.py now for Users, but tables kept here for context
-    # Keeping old init_db logic is fine for other tables
-    conn = get_db_connection()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS graphs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            nodes TEXT NOT NULL,
-            edges TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS petri_nets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            content_json TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-# Initialize DB
-init_db()
+# Initialize DB (Ensures tables exist)
+db.init_db()
 
 # --- Custom C++ Algorithms API ---
 CUSTOM_ALGOS_DIR = os.path.join(base_dir, 'analysis', 'custom_algos')
@@ -273,9 +244,7 @@ def login():
                 return render_template('login.html', site_key=TURNSTILE_SITE_KEY)
 
         # 2. Verify Credentials
-        conn = get_db_connection()
-        user_row = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-        conn.close()
+        user_row = db.get_user_by_username(username)
         
         if user_row:
              if check_password_hash(user_row['password_hash'], password):
@@ -387,10 +356,8 @@ def list_users():
     if not current_user.can_manage():
         return jsonify({'error': 'Unauthorized'}), 403
     
-    conn = get_db_connection()
-    users = conn.execute('SELECT id, username, role, is_blocked, created_at FROM users').fetchall()
-    conn.close()
-    return jsonify([dict(u) for u in users])
+    users = db.get_all_users()
+    return jsonify(users)
 
 @app.route('/api/admin/users', methods=['POST'])
 @login_required
@@ -408,15 +375,9 @@ def add_user():
         
     pwhash = generate_password_hash(password)
     
-    conn = get_db_connection()
-    try:
-        conn.execute('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-                     (username, pwhash, role))
-        conn.commit()
-    except sqlite3.IntegrityError:
+    success = db.create_user(username, pwhash, role)
+    if not success:
         return jsonify({'error': 'Username exists'}), 400
-    finally:
-        conn.close()
         
     return jsonify({'status': 'success'})
 
@@ -432,10 +393,7 @@ def block_user(user_id):
     data = request.json
     block_status = data.get('block', True)
     
-    conn = get_db_connection()
-    conn.execute('UPDATE users SET is_blocked = ? WHERE id = ?', (1 if block_status else 0, user_id))
-    conn.commit()
-    conn.close()
+    db.update_user_block_status(user_id, block_status)
     
     return jsonify({'status': 'success'})
 
@@ -448,10 +406,7 @@ def delete_user(user_id):
     if user_id == current_user.id:
         return jsonify({'error': 'Cannot delete yourself'}), 400
         
-    conn = get_db_connection()
-    conn.execute('DELETE FROM users WHERE id = ?', (user_id,))
-    conn.commit()
-    conn.close()
+    db.delete_user(user_id)
     
     return jsonify({'status': 'success'})
 
@@ -466,10 +421,7 @@ def change_password():
         
     pwhash = generate_password_hash(new_password)
     
-    conn = get_db_connection()
-    conn.execute('UPDATE users SET password_hash = ? WHERE id = ?', (pwhash, current_user.id))
-    conn.commit()
-    conn.close()
+    db.update_user_password(current_user.id, pwhash)
     
     return jsonify({'status': 'success'})
 
@@ -478,20 +430,16 @@ def change_password():
 @app.route('/api/graphs', methods=['GET'])
 def get_graphs():
     """Retrieves all saved graphs metadata."""
-    conn = get_db_connection()
-    graphs = conn.execute('SELECT id, name, created_at FROM graphs ORDER BY created_at DESC').fetchall()
-    conn.close()
-    return jsonify([dict(g) for g in graphs])
+    graphs = db.get_all_graphs()
+    return jsonify(graphs)
 
 @app.route('/api/graphs/<int:graph_id>', methods=['GET'])
 def get_graph(graph_id):
     """Retrieves a specific graph by ID."""
-    conn = get_db_connection()
-    graph = conn.execute('SELECT * FROM graphs WHERE id = ?', (graph_id,)).fetchone()
-    conn.close()
+    graph = db.get_graph(graph_id)
     if graph is None:
         return jsonify({'error': 'Graph not found'}), 404
-    return jsonify(dict(graph))
+    return jsonify(graph)
 
 @app.route('/api/graphs', methods=['POST'])
 @csrf.exempt
@@ -499,26 +447,19 @@ def save_graph():
     """Saves a new graph to the database."""
     data = request.json
     name = data.get('name')
-    nodes = json.dumps(data.get('nodes'))
-    edges = json.dumps(data.get('edges'))
+    nodes = data.get('nodes')
+    edges = data.get('edges')
     
     if not name:
         return jsonify({'error': 'Name is required'}), 400
 
-    conn = get_db_connection()
-    conn.execute('INSERT INTO graphs (name, nodes, edges) VALUES (?, ?, ?)',
-                 (name, nodes, edges))
-    conn.commit()
-    conn.close()
+    db.save_graph(name, nodes, edges)
     return jsonify({'status': 'success'})
 
 @app.route('/api/graphs/<int:graph_id>', methods=['DELETE'])
 def delete_graph(graph_id):
     """Deletes a graph by ID."""
-    conn = get_db_connection()
-    conn.execute('DELETE FROM graphs WHERE id = ?', (graph_id,))
-    conn.commit()
-    conn.close()
+    db.delete_graph(graph_id)
     return jsonify({'status': 'deleted'})
 
 # --- Petri Net Import ---
@@ -671,29 +612,65 @@ def list_pnh_files():
 
 @app.route('/api/petri/saved', methods=['GET'])
 def get_saved_petri_nets():
-    """Retrieves all saved Petri nets metadata."""
-    conn = get_db_connection()
-    nets = conn.execute('SELECT id, name, created_at FROM petri_nets ORDER BY created_at DESC').fetchall()
-    conn.close()
-    return jsonify([dict(n) for n in nets])
+    """Retrieves saved Petri nets metadata with pagination."""
+    try:
+        # Pagination params
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        
+        # Filter/Sort params
+        search_query = request.args.get('q', '')
+        sort_param = request.args.get('sort', 'date_desc')
+        
+        # Parse sort param
+        if sort_param == 'date_asc':
+            sort_by = 'created_at'
+            order = 'ASC'
+        elif sort_param == 'date_desc':
+            sort_by = 'created_at'
+            order = 'DESC'
+        elif sort_param == 'name_asc':
+            sort_by = 'name'
+            order = 'ASC'
+        elif sort_param == 'name_desc':
+            sort_by = 'name'
+            order = 'DESC'
+        else:
+            sort_by = 'created_at'
+            order = 'DESC'
+            
+        offset = (page - 1) * per_page
+        
+        data = db.get_all_petri_nets(
+            limit=per_page, 
+            offset=offset, 
+            search_query=search_query, 
+            sort_by=sort_by, 
+            order=order
+        )
+        
+        return jsonify({
+            'nets': data['nets'],
+            'total': data['total'],
+            'page': page,
+            'per_page': per_page
+        })
+    except Exception as e:
+        print(f"Error fetching nets: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/petri/saved/<int:net_id>', methods=['GET'])
 def get_saved_petri_net(net_id):
     """Retrieves a specific Petri net by ID."""
-    conn = get_db_connection()
-    net = conn.execute('SELECT * FROM petri_nets WHERE id = ?', (net_id,)).fetchone()
-    conn.close()
+    net = db.get_petri_net(net_id)
     if net is None:
         return jsonify({'error': 'Petri net not found'}), 404
-    return jsonify(dict(net))
+    return jsonify(net)
 
 @app.route('/api/petri', methods=['GET'])
 def get_petri_nets():
-    """Retrieves all saved Petri nets metadata."""
-    conn = get_db_connection()
-    nets = conn.execute('SELECT id, name, created_at FROM petri_nets ORDER BY created_at DESC').fetchall()
-    conn.close()
-    return jsonify([dict(n) for n in nets])
+    """Retrieves saved Petri nets metadata (Alias for /saved)."""
+    return get_saved_petri_nets()
 
 @app.route('/api/petri/saved', methods=['POST'])
 @csrf.exempt
@@ -701,26 +678,33 @@ def save_petri_net():
     """Saves a new Petri net to the database."""
     data = request.json
     name = data.get('name')
-    content = json.dumps(data.get('content')) # places, transitions, arcs
+    content = data.get('content') # places, transitions, arcs
     
     if not name:
         return jsonify({'error': 'Name is required'}), 400
 
-    conn = get_db_connection()
-    conn.execute('INSERT INTO petri_nets (name, content_json) VALUES (?, ?)',
-                 (name, content))
-    conn.commit()
-    conn.close()
+    db.save_petri_net(name, content)
     return jsonify({'status': 'success'})
 
 @app.route('/api/petri/saved/<int:net_id>', methods=['DELETE'])
 def delete_petri_net(net_id):
     """Deletes a Petri net by ID."""
-    conn = get_db_connection()
-    conn.execute('DELETE FROM petri_nets WHERE id = ?', (net_id,))
-    conn.commit()
-    conn.close()
+    db.delete_petri_net(net_id)
     return jsonify({'status': 'deleted'})
+
+@app.route('/api/petri/saved/<int:net_id>', methods=['PUT'])
+@csrf.exempt
+def update_petri_net(net_id):
+    """Updates an existing Petri net (name and content)."""
+    data = request.json
+    name = data.get('name')
+    content = data.get('content') # Full content object
+
+    if not name or not content:
+        return jsonify({'error': 'Name and content are required'}), 400
+
+    db.update_petri_net(net_id, name, content)
+    return jsonify({'status': 'success'})
 
 def export_pnh(data):
     """

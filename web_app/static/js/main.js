@@ -399,26 +399,22 @@ initDatabaseExplorer(); // Init DB Explorer Elements
 
 const viewDatabaseExplorer = document.getElementById('viewDatabaseExplorer');
 
-if (tabEditor && tabDb && tabPerformance && mainEditorArea && viewPerformance) {
+// EDITOR TAB
+if (tabEditor && tabDb && tabPerformance && viewPerformance) {
 
-    // EDITOR TAB
     tabEditor.addEventListener('click', () => {
         tabEditor.classList.add('active');
         tabDb.classList.remove('active');
         tabPerformance.classList.remove('active');
 
-        // Show Editor, Hide Others
-        mainEditorArea.style.display = 'flex';
+        // Show Editor Container (includes Sidebar), Hide Others
+        const mainEditorContainer = document.getElementById('mainEditorContainer');
+        if (mainEditorContainer) mainEditorContainer.style.display = 'flex';
+
         viewPerformance.style.display = 'none';
         if (viewDatabaseExplorer) viewDatabaseExplorer.style.display = 'none';
 
-        // Show Sidebar & Resizer
-        const resizer = document.getElementById('resizer');
-        const sidebar = document.querySelector('.sidebar-panel');
-        if (resizer) resizer.style.display = '';
-        if (sidebar) sidebar.style.display = '';
-
-        // Restore Sidebar Results if needed
+        // Restore Sidebar Results if needed (Logic for results list content)
         if (state.appContext === 'MIS' || state.appContext === 'PETRI' || state.appContext === 'CONCURRENCY') {
             if (viewResults) viewResults.style.display = 'flex';
         } else {
@@ -441,19 +437,16 @@ if (tabEditor && tabDb && tabPerformance && mainEditorArea && viewPerformance) {
         tabEditor.classList.remove('active');
         tabPerformance.classList.remove('active');
 
-        // Show DB, Hide Others
+        // Show DB, Hide Editor Container
         if (viewDatabaseExplorer) {
             viewDatabaseExplorer.style.display = 'flex';
             openDatabaseExplorer(); // Trigger fetch
         }
-        mainEditorArea.style.display = 'none';
-        viewPerformance.style.display = 'none';
 
-        // Hide Sidebar & Resizer
-        const resizer = document.getElementById('resizer');
-        const sidebar = document.querySelector('.sidebar-panel');
-        if (resizer) resizer.style.display = 'none';
-        if (sidebar) sidebar.style.display = 'none';
+        const mainEditorContainer = document.getElementById('mainEditorContainer');
+        if (mainEditorContainer) mainEditorContainer.style.display = 'none';
+
+        viewPerformance.style.display = 'none';
 
         state.activeActivityTab = 'tabDb';
         saveToLocalStorage();
@@ -467,14 +460,11 @@ if (tabEditor && tabDb && tabPerformance && mainEditorArea && viewPerformance) {
 
         // Show Performance, Hide Others
         viewPerformance.style.display = 'flex';
-        mainEditorArea.style.display = 'none';
-        if (viewDatabaseExplorer) viewDatabaseExplorer.style.display = 'none';
 
-        // Hide Sidebar & Resizer
-        const resizer = document.getElementById('resizer');
-        const sidebar = document.querySelector('.sidebar-panel');
-        if (resizer) resizer.style.display = 'none';
-        if (sidebar) sidebar.style.display = 'none';
+        const mainEditorContainer = document.getElementById('mainEditorContainer');
+        if (mainEditorContainer) mainEditorContainer.style.display = 'none';
+
+        if (viewDatabaseExplorer) viewDatabaseExplorer.style.display = 'none';
 
         state.activeActivityTab = 'tabPerformance';
         saveToLocalStorage();
@@ -1019,3 +1009,12 @@ initTabs((ctx) => {
 });
 
 
+
+// Listen for Net Load requests from Database Explorer
+window.addEventListener('petri-net-loaded', (e) => {
+    if (window.openPetriNetInEditor) {
+        window.openPetriNetInEditor(e.detail);
+    } else {
+        console.error("openPetriNetInEditor not found");
+    }
+});
