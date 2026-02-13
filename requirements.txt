@@ -12,6 +12,7 @@ Flask-Limiter>=3.5.0
 
 # HTTP Requests (for Turnstile verification)
 requests>=2.31.0
+python-dotenv>=1.0.0
 
 # Graph Library
 networkx>=3.1
