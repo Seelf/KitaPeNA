@@ -14,6 +14,7 @@ import { initPetriInteractions, runAutoLayout } from './petri_interactions.js';
 import { initTabs, triggerAutoSave } from './tabs.js';
 import { initBenchmarking } from './benchmarking.js';
 import { initAlgoManager } from './algo_manager.js';
+import { initDatabaseExplorer, openDatabaseExplorer, closeExplorer } from './database_explorer.js';
 
 console.log("App Initializing (Direct execution)...");
 
@@ -62,8 +63,7 @@ const tabEditor = document.getElementById('tabEditor');
 const viewResults = document.getElementById('viewResults');
 const tabDb = document.getElementById('tabDb');
 const tabPerformance = document.getElementById('tabPerformance');
-const dbContentPetri = document.getElementById('dbContentPetri');
-const dbContentGraphs = document.getElementById('dbContentGraphs');
+// dbContentPetri and dbContentGraphs removed (now handled by database_explorer.js)
 const viewPerformance = document.getElementById('viewPerformance');
 const mainEditorArea = document.getElementById('mainEditorArea');
 
@@ -370,12 +370,14 @@ if (speedSlider) {
 
 // Tabs & DB
 // Tabs & DB (Moved to top)
-const viewDb = document.getElementById('viewDb');
+// Tabs & DB (Updated for Full Screen Explorer)
+// viewDb removed
+// btnDbGraphs, btnDbPetri removed
 
 // Tab Scroll
 const btnTabScrollLeft = document.getElementById('btnTabScrollLeft');
 const btnTabScrollRight = document.getElementById('btnTabScrollRight');
-const editorTabBar = document.getElementById('editorTabBar'); // Re-select if needed or use existing reference if consistent
+const editorTabBar = document.getElementById('editorTabBar');
 
 if (editorTabBar) {
     if (btnTabScrollLeft) {
@@ -390,293 +392,132 @@ if (editorTabBar) {
     }
 }
 
-// DB Module Elements
-const btnDbGraphs = document.getElementById('btnDbGraphs');
-const btnDbPetri = document.getElementById('btnDbPetri');
-// DB Content (Moved to top)
-
-const savedGraphsList = document.getElementById('savedGraphsList');
-const savedPetriList = document.getElementById('savedPetriList');
-
-const btnSaveGraph = document.getElementById('btnSaveGraph');
-const btnSavePetri = document.getElementById('btnSavePetri');
-const btnImportBatch = document.getElementById('btnImportBatch');
-const fileInputBatch = document.getElementById('fileInputBatch');
-
 // 3. Init Tabs (Pass switchContext callback)
 initBenchmarking();
 initAlgoManager();
+initDatabaseExplorer(); // Init DB Explorer Elements
 
-if (tabEditor && tabDb && viewResults && viewDb && tabPerformance && viewPerformance && mainEditorArea) {
+const viewDatabaseExplorer = document.getElementById('viewDatabaseExplorer');
+
+if (tabEditor && tabDb && tabPerformance && mainEditorArea && viewPerformance) {
+
+    // EDITOR TAB
     tabEditor.addEventListener('click', () => {
         tabEditor.classList.add('active');
         tabDb.classList.remove('active');
         tabPerformance.classList.remove('active');
 
+        // Show Editor, Hide Others
         mainEditorArea.style.display = 'flex';
         viewPerformance.style.display = 'none';
-        viewDb.style.display = 'none';
+        if (viewDatabaseExplorer) viewDatabaseExplorer.style.display = 'none';
 
-        // Show Results only if MIS context
-        if (state.appContext === 'MIS') {
-            viewResults.style.display = 'flex';
-        } else if (state.appContext === 'PETRI') {
-            // Petri View Logic for Results
-            viewResults.style.display = 'flex';
-        } else if (state.appContext === 'CONCURRENCY') {
-            viewResults.style.display = 'flex';
+        // Show Sidebar & Resizer
+        const resizer = document.getElementById('resizer');
+        const sidebar = document.querySelector('.sidebar-panel');
+        if (resizer) resizer.style.display = '';
+        if (sidebar) sidebar.style.display = '';
+
+        // Restore Sidebar Results if needed
+        if (state.appContext === 'MIS' || state.appContext === 'PETRI' || state.appContext === 'CONCURRENCY') {
+            if (viewResults) viewResults.style.display = 'flex';
         } else {
-            viewResults.style.display = 'none';
+            if (viewResults) viewResults.style.display = 'none';
         }
+
         state.activeActivityTab = 'tabEditor';
         saveToLocalStorage();
+
+        // Canvas Resize
+        setTimeout(() => {
+            window.dispatchEvent(new Event('resize'));
+            resizeCanvas();
+        }, 50);
     });
 
+    // DATABASE EXPLORER TAB (Full Screen)
     tabDb.addEventListener('click', () => {
         tabDb.classList.add('active');
         tabEditor.classList.remove('active');
         tabPerformance.classList.remove('active');
 
-        // Let's check HTML again.
-        // <div class="main-split">
-        //    <div class="activity-bar">...</div>
-        //    <div class="editor-area">...</div>
-        //    <div id="viewPerformance">...</div>
-        //    <div class="sidebar-panel">...</div>
+        // Show DB, Hide Others
+        if (viewDatabaseExplorer) {
+            viewDatabaseExplorer.style.display = 'flex';
+            openDatabaseExplorer(); // Trigger fetch
+        }
+        mainEditorArea.style.display = 'none';
+        viewPerformance.style.display = 'none';
 
-        // So 'editor-area' and 'viewPerformance' are siblings.
-        // We should toggle them.
-
-        viewDb.style.display = 'flex';
+        // Hide Sidebar & Resizer
+        const resizer = document.getElementById('resizer');
+        const sidebar = document.querySelector('.sidebar-panel');
+        if (resizer) resizer.style.display = 'none';
+        if (sidebar) sidebar.style.display = 'none';
 
         state.activeActivityTab = 'tabDb';
         saveToLocalStorage();
-
-        // Initial Load based on active tab
-        if (btnDbGraphs && btnDbGraphs.classList.contains('active')) {
-            if (savedGraphsList) {
-                loadSavedGraphs(savedGraphsList, (id) => {
-                    loadGraphFromDb(id).then(success => { if (success) { tabEditor.click(); switchContext('MIS'); } });
-                });
-            }
-        } else {
-            if (savedPetriList) {
-                loadSavedPetriNets(savedPetriList, (id) => {
-                    loadPetriNetFromDb(id).then(data => {
-                        if (data && data.content) {
-                            const net = data.content;
-                            const name = data.name;
-
-                            // 1. Sanitize Data (Ensure x,y exist)
-                            if (net.places) net.places.forEach(p => {
-                                if (p.x === undefined || p.x === null) p.x = 0;
-                                if (p.y === undefined || p.y === null) p.y = 0;
-                            });
-                            if (net.transitions) net.transitions.forEach(t => {
-                                if (t.x === undefined || t.x === null) t.x = 0;
-                                if (t.y === undefined || t.y === null) t.y = 0;
-                            });
-
-                            // 2. Open New Tab
-                            import('./tabs.js').then(tabs => {
-                                tabs.createNewTab('PETRI', name, net);
-
-                                // 3. Check for Layout *after* tab activation
-                                setTimeout(() => {
-                                    const allZero = [...places, ...transitions].every(n => (n.x === 0 && n.y === 0));
-                                    if (allZero && (places.length > 0 || transitions.length > 0)) {
-                                        // runAutoLayout(); // Make sure this function exists and works!
-                                        // Only run if actually available, otherwise just draw
-                                        if (typeof runAutoLayout === 'function') runAutoLayout();
-                                        else {
-                                            console.warn("runAutoLayout not found");
-                                            drawPetri();
-                                        }
-                                    } else {
-                                        // Reset camera if possibly far away?
-                                        if (state.petriCamera) { state.petriCamera.x = 0; state.petriCamera.y = 0; state.petriCamera.zoom = 1; }
-                                        drawPetri();
-                                    }
-                                    updateStats();
-                                    tabEditor.click();
-                                    switchContext('PETRI');
-
-                                    // AUTO-GENERATE REACHABILITY GRAPH (User Request)
-                                    generateReachabilityGraph();
-
-                                }, 100); // Increased timeout slightly to ensure DOM/Canvas ready
-                            });
-                        }
-                    });
-                });
-            }
-        }
-    });
-}
-
-// DB Tabs Toggle
-if (btnDbGraphs && btnDbPetri) {
-    btnDbGraphs.addEventListener('click', () => {
-        btnDbGraphs.classList.add('active');
-        btnDbPetri.classList.remove('active');
-        dbContentGraphs.style.display = 'flex';
-        dbContentPetri.style.display = 'none';
-
-        state.activeDbTab = 'btnDbGraphs';
-        saveToLocalStorage();
-        loadSavedGraphs(savedGraphsList, (id) => {
-            loadGraphFromDb(id).then(success => { if (success) { tabEditor.click(); switchContext('MIS'); } });
-        });
     });
 
-    btnDbPetri.addEventListener('click', () => {
-        btnDbPetri.classList.add('active');
-        btnDbGraphs.classList.remove('active');
-        dbContentPetri.style.display = 'flex';
-        dbContentGraphs.style.display = 'none';
-
-        state.activeDbTab = 'btnDbPetri';
-        saveToLocalStorage();
-        loadSavedPetriNets(savedPetriList, (id) => {
-            loadPetriNetFromDb(id).then(data => {
-                if (data && data.content) {
-                    const net = data.content;
-                    const name = data.name;
-
-                    // 1. Sanitize Data (Ensure x,y exist)
-                    if (net.places) net.places.forEach(p => {
-                        if (p.x === undefined || p.x === null) p.x = 0;
-                        if (p.y === undefined || p.y === null) p.y = 0;
-                    });
-                    if (net.transitions) net.transitions.forEach(t => {
-                        if (t.x === undefined || t.x === null) t.x = 0;
-                        if (t.y === undefined || t.y === null) t.y = 0;
-                    });
-
-                    // 2. Open New Tab
-                    import('./tabs.js').then(tabs => {
-                        tabs.createNewTab('PETRI', name, net);
-
-                        // 3. Check for Layout *after* tab activation (which sets globals)
-                        setTimeout(() => {
-                            const allZero = [...places, ...transitions].every(n => (n.x === 0 && n.y === 0));
-                            console.log(`New Tab Load: allZero=${allZero}, Places=${places.length}`);
-
-                            if (allZero && (places.length > 0 || transitions.length > 0)) {
-                                console.log("Auto Layout Triggered for New Tab");
-                                runAutoLayout();
-                            } else {
-                                drawPetri();
-                            }
-
-                            updateStats();
-                            tabEditor.click();
-                            switchContext('PETRI');
-                        }, 50);
-                    });
-                }
-            });
-        });
-    });
-
+    // PERFORMANCE TAB
     tabPerformance.addEventListener('click', () => {
-        console.log("Performance Tab Clicked");
         tabPerformance.classList.add('active');
         tabEditor.classList.remove('active');
         tabDb.classList.remove('active');
 
-        // Toggle Views
-        if (mainEditorArea) mainEditorArea.style.display = 'none';
-        if (viewDb) viewDb.style.display = 'none';
-        if (viewResults) viewResults.style.display = 'none';
-        if (viewPerformance) viewPerformance.style.display = 'flex';
+        // Show Performance, Hide Others
+        viewPerformance.style.display = 'flex';
+        mainEditorArea.style.display = 'none';
+        if (viewDatabaseExplorer) viewDatabaseExplorer.style.display = 'none';
+
+        // Hide Sidebar & Resizer
+        const resizer = document.getElementById('resizer');
+        const sidebar = document.querySelector('.sidebar-panel');
+        if (resizer) resizer.style.display = 'none';
+        if (sidebar) sidebar.style.display = 'none';
 
         state.activeActivityTab = 'tabPerformance';
         saveToLocalStorage();
     });
 }
 
-// Save Graph
-if (btnSaveGraph) {
-    btnSaveGraph.addEventListener('click', async () => {
-        const name = prompt("Enter name for this graph:");
-        if (name) {
-            const success = await saveGraph(name);
-            if (success) { // Check for success here
-                // Ensure we are in Reachability Graph mode to see results
-                switchContext('MIS');
-                if (tabDb.classList.contains('active') && btnDbGraphs.classList.contains('active')) {
-                    loadSavedGraphs(savedGraphsList, null);
-                }
+// (Old DB Tabs Toggle, Save Graph/Petri, Search/Filtering code removed — now handled by database_explorer.js)
+
+// --- OPEN NET FROM DATABASE EXPLORER ---
+window.openPetriNetInEditor = function (netData) {
+    const net = netData.content || netData;
+    const name = netData.name || 'Untitled';
+
+    // Sanitize coordinates
+    if (net.places) net.places.forEach(p => {
+        if (p.x === undefined || p.x === null) p.x = 0;
+        if (p.y === undefined || p.y === null) p.y = 0;
+    });
+    if (net.transitions) net.transitions.forEach(t => {
+        if (t.x === undefined || t.x === null) t.x = 0;
+        if (t.y === undefined || t.y === null) t.y = 0;
+    });
+
+    // Open in a new tab
+    import('./tabs.js').then(tabs => {
+        tabs.createNewTab('PETRI', name, net);
+
+        setTimeout(() => {
+            const allZero = [...places, ...transitions].every(n => (n.x === 0 && n.y === 0));
+            if (allZero && (places.length > 0 || transitions.length > 0)) {
+                runAutoLayout();
+            } else {
+                drawPetri();
             }
-        }
+            updateStats();
+
+            // Switch to editor
+            tabEditor.click();
+            switchContext('PETRI');
+        }, 100);
     });
-}
+};
 
-// Save Petri Net
-if (btnSavePetri) {
-    btnSavePetri.addEventListener('click', async () => {
-        const name = prompt("Enter name for this Petri Net:");
-        if (name) {
-            const content = { places, transitions, arcs };
-            const success = await savePetriNetDb(name, content);
-            if (success && tabDb.classList.contains('active') && btnDbPetri.classList.contains('active')) {
-                loadSavedPetriNets(savedPetriList, null);
-            }
-        }
-    });
-}
-
-// --- SEARCH / FILTERING ---
-const inputSearchGraph = document.getElementById('inputSearchGraph');
-const inputSearchPetri = document.getElementById('inputSearchPetri');
-
-function filterList(listElement, query) {
-    if (!listElement) return;
-    const items = listElement.querySelectorAll('.saved-item');
-    const lowerQuery = query.toLowerCase();
-
-    items.forEach(item => {
-        const nameSpan = item.querySelector('.name');
-        const nameText = nameSpan ? nameSpan.textContent.toLowerCase() : '';
-        if (nameText.includes(lowerQuery)) {
-            item.style.display = 'flex';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-}
-
-if (inputSearchGraph) {
-    inputSearchGraph.addEventListener('input', (e) => {
-        filterList(savedGraphsList, e.target.value);
-    });
-}
-
-if (inputSearchPetri) {
-    inputSearchPetri.addEventListener('input', (e) => {
-        filterList(savedPetriList, e.target.value);
-    });
-}
-
-// Batch Import
-if (btnImportBatch && fileInputBatch) {
-    btnImportBatch.addEventListener('click', () => fileInputBatch.click());
-    fileInputBatch.addEventListener('change', async (e) => {
-        if (e.target.files.length > 0) {
-            const res = await importPetriBatch(e.target.files);
-            let msg = `Imported: ${res.imported_count}, Errors: ${res.errors.length}`;
-            if (res.errors.length > 0) {
-                msg += `\nSample Error: ${res.errors[0]}`;
-            }
-            alert(msg);
-            if (tabDb.classList.contains('active') && btnDbPetri.classList.contains('active')) {
-                loadSavedPetriNets(savedPetriList, null);
-            }
-            fileInputBatch.value = '';
-        }
-    });
-}
 
 // Resize Handler Patch
 window.addEventListener('resize', () => {
@@ -685,16 +526,19 @@ window.addEventListener('resize', () => {
     if (canvas && container) {
         canvas.width = container.clientWidth;
         canvas.height = container.clientHeight;
-        window.requestDraw();
+        window.requestAnimationFrame(draw);
     }
 });
 
-// --- REACHABILITY BUTTON ---
+// --- REACHABILITY GEN BUTTON ---
 const btnPetriReachability = document.getElementById('btnPetriReachability');
 if (btnPetriReachability) {
     btnPetriReachability.addEventListener('click', async () => {
         const success = await generateReachabilityGraph(false);
-        if (success) switchContext('MIS');
+        if (success) {
+            tabEditor.click();
+            switchContext('MIS');
+        }
     });
 }
 
@@ -704,10 +548,14 @@ if (btnPetriSave) {
     btnPetriSave.addEventListener('click', async () => {
         const name = prompt("Enter name for this Petri Net:");
         if (name) {
+            // Ensure we have current nodes
             const content = { places, transitions, arcs };
             const success = await savePetriNetDb(name, content);
-            if (success && tabDb.classList.contains('active') && btnDbPetri.classList.contains('active')) {
-                loadSavedPetriNets(savedPetriList, null);
+            if (success) {
+                // If DB tab is active, refresh it
+                if (tabDb && tabDb.classList.contains('active')) {
+                    openDatabaseExplorer();
+                }
             }
         }
     });

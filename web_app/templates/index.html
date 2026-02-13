@@ -488,7 +488,133 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Database Explorer View (Full Screen - sibling to mainEditorArea and viewPerformance) -->
+            <div id="viewDatabaseExplorer" class="performance-view" style="display: none;">
+                <div class="performance-header">
+                    <div class="icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                            </path>
+                        </svg>
+                    </div>
+                    Petri Net Database Explorer
+                </div>
+
+                <div class="perf-container" style="display: flex; overflow: hidden;">
+                    <!-- Left Sidebar: Controls & List -->
+                    <div class="perf-sidebar"
+                        style="width: 300px; min-width: 300px; display: flex; flex-direction: column;">
+
+                        <!-- Actions & Import -->
+                        <div class="config-section">
+                            <div class="section-header">
+                                <h4>Actions</h4>
+                            </div>
+                            <label for="importNetInput" class="btn-run-bench"
+                                style="text-align:center; display:block; cursor:pointer; margin-bottom: 5px;">
+                                📂 Import Net (PNH/JSON)
+                            </label>
+                            <input type="file" id="importNetInput" accept=".pnh,.json,.pnml,.xml"
+                                style="display: none;">
+                            <button id="btnRefreshDb" class="btn-xs" style="width: 100%; text-align: center;">
+                                🔄 Refresh List
+                            </button>
+                        </div>
+
+                        <!-- Search & Sort -->
+                        <div class="config-section"
+                            style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                            <div class="section-header">
+                                <h4>Saved Nets</h4>
+                                <span id="dbStats" style="font-size: 10px; color: #888;">0 nets</span>
+                            </div>
+
+                            <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                                <input type="text" id="dbSearchInput" placeholder="Search..." style="flex: 1;">
+                                <select id="dbSortSelect" style="width: 80px;">
+                                    <option value="date_desc">Newest</option>
+                                    <option value="date_asc">Oldest</option>
+                                    <option value="name_asc">A-Z</option>
+                                </select>
+                            </div>
+
+                            <!-- List Container -->
+                            <div id="dbGrid" class="db-list-container"
+                                style="flex: 1; overflow-y: auto; border: 1px solid var(--border-color); background: var(--bg-dark);">
+                                <div class="empty-state">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Main: Details Panel -->
+                    <div class="perf-main"
+                        style="flex: 1; display: flex; flex-direction: column; padding: 0; background: var(--bg-darker);">
+
+                        <!-- Header with Title -->
+                        <div id="dbDetailHeader"
+                            style="padding: 15px; border-bottom: 1px solid var(--border-color); background: var(--bg-light); display: none;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <h2 id="dbDetailName" style="margin: 0; color: var(--text-color);">Select a Net</h2>
+                                    <div id="dbDetailMeta" style="font-size: 12px; color: #888; margin-top: 5px;">ID: -
+                                        | Date: -</div>
+                                </div>
+                                <div class="actions">
+                                    <button id="btnDbOpen" class="btn primary">OPEN IN EDITOR</button>
+                                    <button id="btnDbDelete" class="btn danger">DELETE</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Content Area -->
+                        <div id="dbDetailContent" class="db-detail-content"
+                            style="padding: 20px; flex: 1; overflow-y: auto; display: none;">
+
+                            <!-- Info Section -->
+                            <div class="detail-section">
+                                <h3>Properties</h3>
+                                <div class="properties-grid" id="dbDetailProps"
+                                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px;">
+                                </div>
+                            </div>
+
+                            <!-- Export Section -->
+                            <div class="detail-section">
+                                <h3>Export / Download</h3>
+                                <div class="download-tabs" style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button class="btn-card" id="btnDownloadPnh">Download PNH (Dense)</button>
+                                    <button class="btn-card" id="btnDownloadPnml">Download PNML (XML)</button>
+                                    <button class="btn-card" id="btnDownloadJson">Download JSON</button>
+                                </div>
+                                <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                                    PNH format is strictly dense matrix based. PNML is standard XML interchange format.
+                                </p>
+                            </div>
+
+                            <!-- Preview -->
+                            <div class="detail-section" style="flex: 1; display: flex; flex-direction: column;">
+                                <h3>Structure Preview</h3>
+                                <div id="dbPreviewContainer"
+                                    style="flex: 1; background: #000; border: 1px solid #444; min-height: 200px; display: flex; align-items: center; justify-content: center; color: #555;">
+                                    (Preview not available)
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Empty State for Details -->
+                        <div id="dbDetailEmpty"
+                            style="flex: 1; display: flex; align-items: center; justify-content: center; color: #666; flex-direction: column;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">📂</div>
+                            <div>Select a Petri Net from the list to view details</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="resizer" class="resizer"></div>
+
 
             <!-- Right: Results Panel -->
             <div class="sidebar-panel">
@@ -499,66 +625,31 @@
                         <div class="empty-state">No MIS found yet. Draw graph and click Start.</div>
                     </div>
                 </div>
-
-                <!-- DATABASE VIEW -->
-                <div id="viewDb" style="display: none; flex-direction: column; height: 100%;">
-                    <div class="panel-header">DATABASE</div>
-
-                    <!-- Database Module Tabs -->
-                    <div class="db-tabs">
-                        <button id="btnDbPetri" class="db-tab active">Petri Nets</button>
-                        <button id="btnDbGraphs" class="db-tab">Rea Graphs</button>
-                    </div>
-
-                    <!-- MIS GRAPHS CONTENT (Hidden) -->
-                    <div id="dbContentGraphs" class="db-content" style="display: none;">
-                        <div class="sidebar-actions">
-                            <button id="btnSaveGraph" class="action-btn">Save Current Graph</button>
-                            <input type="text" id="inputSearchGraph" placeholder="Search graphs..."
-                                style="width: 100%; margin-top: 5px; padding: 5px; background: #333; color: #fff; border: 1px solid #555; border-radius: 3px;">
-                        </div>
-                        <div id="savedGraphsList" class="saved-list">
-                            <!-- Items populated by JS -->
-                        </div>
-                    </div>
-
-                    <!-- PETRI NETS CONTENT (Active) -->
-                    <div id="dbContentPetri" class="db-content">
-                        <div class="sidebar-actions">
-                            <button id="btnSavePetri" class="action-btn">Save Model</button>
-                            <button id="btnImportBatch" class="action-btn secondary">Import Folder</button>
-                            <input type="file" id="fileInputBatch" webkitdirectory directory multiple
-                                style="display: none;">
-                            <input type="text" id="inputSearchPetri" placeholder="Search models..."
-                                style="width: 100%; margin-top: 5px; padding: 5px; background: #333; color: #fff; border: 1px solid #555; border-radius: 3px;">
-                        </div>
-                        <div id="savedPetriList" class="saved-list">
-                            <!-- Items populated by JS -->
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
-        <!-- Footer / Status Bar with Controls -->
-        <footer class="status-bar">
-            <!-- Simulation Controls Only -->
-            <div class="controls-group" style="width: 100%; justify-content: center;">
-                <button id="btnStart" class="btn primary">Start / Solve</button>
-                <div class="separator"></div>
+    </div>
 
-                <button id="btnPrev" class="btn" disabled>Prev</button>
-                <button id="btnNext" class="btn" disabled>Next</button>
-                <button id="btnAuto" class="btn" disabled>Auto</button>
 
-                <div class="separator"></div>
+    <!-- Footer / Status Bar with Controls -->
+    <footer class="status-bar">
+        <!-- Simulation Controls Only -->
+        <div class="controls-group" style="width: 100%; justify-content: center;">
+            <button id="btnStart" class="btn primary">Start / Solve</button>
+            <div class="separator"></div>
 
-                <div class="slider-container" title="Simulation Speed">
-                    <span style="font-size: 10px; opacity: 0.7;">Speed</span>
-                    <input type="range" id="speedSlider" min="1" max="100" value="50">
-                </div>
+            <button id="btnPrev" class="btn" disabled>Prev</button>
+            <button id="btnNext" class="btn" disabled>Next</button>
+            <button id="btnAuto" class="btn" disabled>Auto</button>
+
+            <div class="separator"></div>
+
+            <div class="slider-container" title="Simulation Speed">
+                <span style="font-size: 10px; opacity: 0.7;">Speed</span>
+                <input type="range" id="speedSlider" min="1" max="100" value="50">
             </div>
-        </footer>
+        </div>
+    </footer>
     </div>
 
     <!-- Large Console Modal -->
