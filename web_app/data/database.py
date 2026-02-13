@@ -125,67 +125,103 @@ def delete_graph(graph_id):
 
 # --- Petri Nets ---
 
-def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created_at', order='DESC'):
+def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created_at', order='DESC', 
+                        min_places=None, min_transitions=None, min_arcs=None, min_tokens=None):
     conn = get_db_connection()
     
-    # Base query
+    # Determine if we need to filter or sort in Python
+    stat_sort = sort_by in ['places', 'transitions', 'arcs', 'tokens']
+    has_advanced_filters = any(v is not None for v in [min_places, min_transitions, min_arcs, min_tokens])
+    use_python_logic = has_advanced_filters or stat_sort
+    
     query = 'SELECT id, name, content_json, created_at FROM petri_nets'
     params = []
     
-    # Filtering
     if search_query:
         query += ' WHERE name LIKE ?'
         params.append(f'%{search_query}%')
         
-    # Sorting
-    if sort_by not in ['created_at', 'name']:
-        sort_by = 'created_at'
-    if order.upper() not in ['ASC', 'DESC']:
-        order = 'DESC'
-        
-    query += f' ORDER BY {sort_by} {order}'
+    # SQL-side sorting only if it's a native DB column
+    if not stat_sort:
+        if sort_by not in ['created_at', 'name']:
+            sort_by = 'created_at'
+        if order.upper() not in ['ASC', 'DESC']:
+            order = 'DESC'
+        query += f' ORDER BY {sort_by} {order}'
+    else:
+        # Default SQL sort when stat-sorting in Python later
+        query += ' ORDER BY created_at DESC'
     
-    # Pagination
-    if limit is not None:
+    # If no advanced filters/sorts, we keep SQL-side limit for performance
+    if not use_python_logic and limit is not None:
         query += ' LIMIT ? OFFSET ?'
         params.extend([limit, offset])
         
     rows = conn.execute(query, params).fetchall()
-    
-    # Get total count for pagination metadata
-    count_query = 'SELECT COUNT(*) FROM petri_nets'
-    count_params = []
-    if search_query:
-        count_query += ' WHERE name LIKE ?'
-        count_params.append(f'%{search_query}%')
-        
-    total_count = conn.execute(count_query, count_params).fetchone()[0]
-    
     conn.close()
     
     results = []
+    matches_count = 0
+    
     for row in rows:
         net = dict(row)
         try:
             content = json.loads(net['content_json'])
-            # Extract stats
             places = content.get('places', [])
             transitions = content.get('transitions', [])
             arcs = content.get('arcs', [])
             model_class = content.get('model_class', '')
             
-            net['stats'] = {
+            # Total tokens calculation
+            total_tokens = sum(p.get('tokens', 0) for p in places)
+            
+            stats = {
                 'places': len(places),
                 'transitions': len(transitions),
                 'arcs': len(arcs),
+                'tokens': total_tokens,
                 'class': model_class
             }
-            # Remove content_json from list response to save bandwidth
-            del net['content_json'] 
-        except:
-            net['stats'] = {'places': 0, 'transitions': 0, 'arcs': 0, 'class': ''}
             
-        results.append(net)
+            # Apply advanced filters
+            if min_places is not None and stats['places'] < min_places: continue
+            if min_transitions is not None and stats['transitions'] < min_transitions: continue
+            if min_arcs is not None and stats['arcs'] < min_arcs: continue
+            if min_tokens is not None and stats['tokens'] < min_tokens: continue
+            
+            net['stats'] = stats
+            del net['content_json']
+            results.append(net)
+        except Exception as e:
+            # Skip corrupted rows if filters/sorts are active
+            if not use_python_logic:
+                net['stats'] = {'places': 0, 'transitions': 0, 'arcs': 0, 'tokens': 0, 'class': ''}
+                results.append(net)
+
+    # Apply sorting in Python if requested by stat field
+    if stat_sort:
+        is_reverse = (order.upper() == 'DESC')
+        results.sort(key=lambda x: x['stats'].get(sort_by, 0), reverse=is_reverse)
+
+    total_filtered = len(results) if use_python_logic else None
+    
+    # Manual pagination if filters or stat-sort were applied
+    if use_python_logic and limit is not None:
+        results = results[offset : offset + limit]
+    
+    # Accurate total count for metadata
+    if use_python_logic:
+        total_count = total_filtered
+    else:
+        # If no advanced filters/sorts, SQL count is accurate for search_query
+        conn = get_db_connection()
+        count_query = 'SELECT COUNT(*) FROM petri_nets'
+        count_params = []
+        if search_query:
+            count_query += ' WHERE name LIKE ?'
+            count_params.append(f'%{search_query}%')
+        total_count = conn.execute(count_query, count_params).fetchone()[0]
+        conn.close()
         
     return {'nets': results, 'total': total_count}
 

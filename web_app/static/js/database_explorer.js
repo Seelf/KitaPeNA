@@ -1,10 +1,15 @@
 
 import { state } from './state.js';
+
+function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content;
+}
 import { updateStats } from './ui.js';
 import { savePetriNetDb, loadPetriNetFromDb } from './storage.js';
 
 // DOM Elements
 let viewDatabaseExplorer, dbGrid, dbSearchInput, dbSortSelect, btnRefreshDb;
+let dbMinP, dbMinT, dbMinA, dbMinK;
 let importNetInput;
 let dbStats;
 
@@ -25,6 +30,11 @@ export function initDatabaseExplorer() {
     btnRefreshDb = document.getElementById('btnRefreshDb');
     importNetInput = document.getElementById('importNetInput');
     dbStats = document.getElementById('dbStats');
+
+    dbMinP = document.getElementById('dbMinP');
+    dbMinT = document.getElementById('dbMinT');
+    dbMinA = document.getElementById('dbMinA');
+    dbMinK = document.getElementById('dbMinK');
 
     if (!viewDatabaseExplorer || !dbGrid) return;
 
@@ -48,6 +58,11 @@ export function initDatabaseExplorer() {
     if (dbSortSelect) {
         dbSortSelect.addEventListener('change', () => loadDatabaseItems(true));
     }
+
+    // Advanced filters listeners
+    [dbMinP, dbMinT, dbMinA, dbMinK].forEach(el => {
+        if (el) el.addEventListener('change', () => loadDatabaseItems(true));
+    });
 
     if (importNetInput) {
         importNetInput.addEventListener('change', handleImport);
@@ -105,6 +120,11 @@ async function loadDatabaseItems(reset = false) {
             q: query,
             sort: sort
         });
+
+        if (dbMinP && dbMinP.value) params.append('min_p', dbMinP.value);
+        if (dbMinT && dbMinT.value) params.append('min_t', dbMinT.value);
+        if (dbMinA && dbMinA.value) params.append('min_a', dbMinA.value);
+        if (dbMinK && dbMinK.value) params.append('min_k', dbMinK.value);
 
         const response = await fetch(`/api/petri/saved?${params.toString()}`);
         if (!response.ok) throw new Error('Failed to fetch nets');
@@ -183,13 +203,16 @@ function createNetCard(net) {
 
         <div class="net-stats-row">
             <div class="stat-badge" title="Places">
-                <span>⚪</span> <span>${stats.places}</span>
+                <span class="stat-label">Places:</span> <span>${stats.places}</span>
             </div>
             <div class="stat-badge" title="Transitions">
-                <span>⬛</span> <span>${stats.transitions}</span>
+                <span class="stat-label">Transitions:</span> <span>${stats.transitions}</span>
             </div>
             <div class="stat-badge" title="Arcs">
-                <span>fw</span> <span>${stats.arcs}</span>
+                <span class="stat-label">Arcs:</span> <span>${stats.arcs}</span>
+            </div>
+            <div class="stat-badge" title="Tokens">
+                <span class="stat-label">Tokens:</span> <span>${stats.tokens || 0}</span>
             </div>
         </div>
 
@@ -266,7 +289,7 @@ async function updateNetClass(netMetadata, newClass) {
         // PUT update
         const updateRes = await fetch(`/api/petri/saved/${netMetadata.id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({
                 name: fullNet.name,
                 content: contentObj
@@ -294,7 +317,7 @@ async function handleAction(netMetadata, action) {
     if (action === 'delete') {
         if (confirm(`Delete "${netMetadata.name}"?`)) {
             try {
-                const res = await fetch(`/api/petri/saved/${netMetadata.id}`, { method: 'DELETE' });
+                const res = await fetch(`/api/petri/saved/${netMetadata.id}`, { method: 'DELETE', headers: { 'X-CSRFToken': getCsrfToken() } });
                 if (res.ok) {
                     // Refresh completely to ensure pagination consistency
                     loadDatabaseItems(true);

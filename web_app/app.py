@@ -39,12 +39,15 @@ base_dir = os.path.abspath(os.path.dirname(__file__))
 # db_path moved to database.py
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # Change this to a fixed key in production!
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
+if not os.environ.get('SECRET_KEY'):
+    print("⚠️  WARNING: No SECRET_KEY env var set. Sessions will not persist across restarts.")
 
 # Security Config
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-# app.config['SESSION_COOKIE_SECURE'] = True # Uncomment in production (HTTPS)
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload
 
 # Cloudflare Turnstile Config (Placeholders - Replace with Env Vars)
 TURNSTILE_SITE_KEY = os.environ.get('TURNSTILE_SITE_KEY', '1x00000000000000000000AA')
@@ -82,6 +85,16 @@ login_manager.login_view = 'login'
 def ratelimit_handler(e):
     return render_template('429.html', description=e.description), 429
 
+@app.after_request
+def set_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    if os.environ.get('FLASK_ENV') == 'production':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
 # --- User Model ---
 class User(UserMixin):
     def __init__(self, id, username, role, is_blocked):
@@ -116,6 +129,7 @@ if not os.path.exists(CUSTOM_ALGOS_DIR):
     os.makedirs(CUSTOM_ALGOS_DIR)
 
 @app.route('/api/algorithms', methods=['GET'])
+@login_required
 def list_algorithms():
     """List all custom C++ algorithms."""
     algos = []
@@ -128,6 +142,7 @@ def list_algorithms():
     return jsonify(algos)
 
 @app.route('/api/algorithms/<name>', methods=['GET'])
+@login_required
 def get_algorithm_source(name):
     """Get the source code of a specific algorithm."""
     path = os.path.join(CUSTOM_ALGOS_DIR, f"{name}.cpp")
@@ -141,7 +156,7 @@ def get_algorithm_source(name):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/algorithms', methods=['POST'])
-@csrf.exempt
+@login_required
 def save_algorithm():
     """Save and Compile a C++ algorithm."""
     data = request.json
@@ -188,7 +203,7 @@ def save_algorithm():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/algorithms/<name>', methods=['DELETE'])
-@csrf.exempt
+@login_required
 def delete_algorithm(name):
     """Delete a custom algorithm."""
     if not re.match(r'^\w+$', name):
@@ -267,6 +282,8 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/api/solve', methods=['POST'])
+@login_required
+@limiter.limit("30 per minute")
 def solve_mis():
     """
     Solves the Maximum Independent Set problem for the provided graph.
@@ -372,6 +389,8 @@ def add_user():
     
     if not username or not password:
         return jsonify({'error': 'Missing fields'}), 400
+    if len(password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
         
     pwhash = generate_password_hash(password)
     
@@ -418,6 +437,8 @@ def change_password():
     
     if not new_password:
         return jsonify({'error': 'Missing password'}), 400
+    if len(new_password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
         
     pwhash = generate_password_hash(new_password)
     
@@ -428,12 +449,14 @@ def change_password():
 # --- Graph Management API ---
 
 @app.route('/api/graphs', methods=['GET'])
+@login_required
 def get_graphs():
     """Retrieves all saved graphs metadata."""
     graphs = db.get_all_graphs()
     return jsonify(graphs)
 
 @app.route('/api/graphs/<int:graph_id>', methods=['GET'])
+@login_required
 def get_graph(graph_id):
     """Retrieves a specific graph by ID."""
     graph = db.get_graph(graph_id)
@@ -442,7 +465,7 @@ def get_graph(graph_id):
     return jsonify(graph)
 
 @app.route('/api/graphs', methods=['POST'])
-@csrf.exempt
+@login_required
 def save_graph():
     """Saves a new graph to the database."""
     data = request.json
@@ -457,6 +480,7 @@ def save_graph():
     return jsonify({'status': 'success'})
 
 @app.route('/api/graphs/<int:graph_id>', methods=['DELETE'])
+@login_required
 def delete_graph(graph_id):
     """Deletes a graph by ID."""
     db.delete_graph(graph_id)
@@ -569,7 +593,7 @@ def parse_pnh(content):
     return {'places': places, 'transitions': transitions, 'arcs': arcs}
 
 @app.route('/api/petri/import', methods=['POST'])
-@csrf.exempt
+@login_required
 def import_petri():
     if 'file' not in request.files:
         return jsonify({'status': 'error', 'message': 'No file part'}), 400
@@ -588,6 +612,7 @@ def import_petri():
     return jsonify({'status': 'error', 'message': 'Unknown error'}), 500
 
 @app.route('/api/pnh', methods=['GET'])
+@login_required
 def list_pnh_files():
     """Lists .pnh files in the web_app/pnh_files/ directory."""
     pnh_dir = os.path.join(base_dir, 'pnh_files')
@@ -611,6 +636,7 @@ def list_pnh_files():
 # --- Petri Net Database API ---
 
 @app.route('/api/petri/saved', methods=['GET'])
+@login_required
 def get_saved_petri_nets():
     """Retrieves saved Petri nets metadata with pagination."""
     try:
@@ -622,31 +648,45 @@ def get_saved_petri_nets():
         search_query = request.args.get('q', '')
         sort_param = request.args.get('sort', 'date_desc')
         
-        # Parse sort param
-        if sort_param == 'date_asc':
-            sort_by = 'created_at'
-            order = 'ASC'
-        elif sort_param == 'date_desc':
-            sort_by = 'created_at'
-            order = 'DESC'
-        elif sort_param == 'name_asc':
-            sort_by = 'name'
-            order = 'ASC'
-        elif sort_param == 'name_desc':
-            sort_by = 'name'
-            order = 'DESC'
+        sort_key = 'created_at'
+        order = 'DESC'
+        
+        if '_' in sort_param:
+            parts = sort_param.split('_')
+            order = parts[-1].upper()
+            base_key = '_'.join(parts[:-1])
+            
+            if base_key == 'date': sort_key = 'created_at'
+            elif base_key == 'name': sort_key = 'name'
+            elif base_key in ['places', 'transitions', 'arcs', 'tokens']: sort_key = base_key
+            else: sort_key = 'created_at'
         else:
-            sort_by = 'created_at'
+            sort_key = 'created_at'
             order = 'DESC'
             
         offset = (page - 1) * per_page
+        
+        # Advanced filters
+        def get_int_param(name):
+            val = request.args.get(name)
+            try: return int(val) if val is not None else None
+            except: return None
+
+        min_p = get_int_param('min_p')
+        min_t = get_int_param('min_t')
+        min_a = get_int_param('min_a')
+        min_k = get_int_param('min_k')
         
         data = db.get_all_petri_nets(
             limit=per_page, 
             offset=offset, 
             search_query=search_query, 
-            sort_by=sort_by, 
-            order=order
+            sort_by=sort_key, 
+            order=order,
+            min_places=min_p,
+            min_transitions=min_t,
+            min_arcs=min_a,
+            min_tokens=min_k
         )
         
         return jsonify({
@@ -660,6 +700,7 @@ def get_saved_petri_nets():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/petri/saved/<int:net_id>', methods=['GET'])
+@login_required
 def get_saved_petri_net(net_id):
     """Retrieves a specific Petri net by ID."""
     net = db.get_petri_net(net_id)
@@ -668,12 +709,13 @@ def get_saved_petri_net(net_id):
     return jsonify(net)
 
 @app.route('/api/petri', methods=['GET'])
+@login_required
 def get_petri_nets():
     """Retrieves saved Petri nets metadata (Alias for /saved)."""
     return get_saved_petri_nets()
 
 @app.route('/api/petri/saved', methods=['POST'])
-@csrf.exempt
+@login_required
 def save_petri_net():
     """Saves a new Petri net to the database."""
     data = request.json
@@ -687,13 +729,14 @@ def save_petri_net():
     return jsonify({'status': 'success'})
 
 @app.route('/api/petri/saved/<int:net_id>', methods=['DELETE'])
+@login_required
 def delete_petri_net(net_id):
     """Deletes a Petri net by ID."""
     db.delete_petri_net(net_id)
     return jsonify({'status': 'deleted'})
 
 @app.route('/api/petri/saved/<int:net_id>', methods=['PUT'])
-@csrf.exempt
+@login_required
 def update_petri_net(net_id):
     """Updates an existing Petri net (name and content)."""
     data = request.json
@@ -763,7 +806,7 @@ def export_pnh(data):
     return "\n".join(lines)
 
 @app.route('/api/petri/import_batch', methods=['POST'])
-@csrf.exempt
+@login_required
 def import_petri_batch():
     if 'files' not in request.files:
         return jsonify({'status': 'error', 'message': 'No files part'}), 400
@@ -774,7 +817,7 @@ def import_petri_batch():
     imported_count = 0
     errors = []
 
-    conn = get_db_connection()
+    conn = db.get_db_connection()
     for file in files:
         if file and file.filename.lower().endswith('.pnh'):
              try:
@@ -797,7 +840,8 @@ def import_petri_batch():
     return jsonify({'status': 'success', 'imported_count': imported_count, 'errors': errors})
 
 @app.route('/api/petri/reachability', methods=['POST'])
-@csrf.exempt
+@login_required
+@limiter.limit("30 per minute")
 def calculate_reachability():
     """Calculates the Reachability Graph and returns nodes/edges directly."""
     try:
@@ -826,7 +870,7 @@ def calculate_reachability():
 # petri_reachability is already imported at the top
 
 @app.route('/api/petri/concurrency', methods=['POST'])
-@csrf.exempt
+@login_required
 def calculate_concurrency():
     """Calculates the Concurrency Place Relation Graph."""
     try:
@@ -850,7 +894,7 @@ def calculate_concurrency():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/analysis/transitivity', methods=['POST'])
-@csrf.exempt
+@login_required
 def check_transitivity():
     """Checks if the graph is Transitively Orientable."""
     try:
@@ -869,7 +913,7 @@ def check_transitivity():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/analysis/coloring', methods=['POST'])
-@csrf.exempt
+@login_required
 def get_coloring():
     """Computes Optimal Coloring."""
     try:
@@ -888,7 +932,7 @@ def get_coloring():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/benchmark/stop', methods=['POST'])
-@csrf.exempt
+@login_required
 def stop_benchmark():
     global active_benchmark_process
     if active_benchmark_process and active_benchmark_process.is_alive():
@@ -902,7 +946,8 @@ def stop_benchmark():
     return jsonify({'status': 'no_active_benchmark'})
 
 @app.route('/api/benchmark', methods=['POST'])
-@csrf.exempt
+@login_required
+@limiter.limit("10 per minute")
 def run_benchmark():
     global active_benchmark_process
     try:
@@ -934,7 +979,7 @@ def run_benchmark():
                  return jsonify({'error': 'No graphs selected'}), 400
             
             # Fetch from DB
-            conn = get_db_connection()
+            conn = db.get_db_connection()
             # Prepare placeholders securely
             placeholders = ','.join('?' for _ in graph_ids)
             query = f'SELECT id, name, nodes, edges FROM graphs WHERE id IN ({placeholders})'
@@ -973,7 +1018,7 @@ def run_benchmark():
             if not petri_ids:
                 return jsonify({'error': 'No Petri nets selected'}), 400
 
-            conn = get_db_connection()
+            conn = db.get_db_connection()
             placeholders = ','.join('?' for _ in petri_ids)
             query = f'SELECT id, name, content_json FROM petri_nets WHERE id IN ({placeholders})'
             rows = conn.execute(query, petri_ids).fetchall()
@@ -1060,7 +1105,11 @@ def run_benchmark():
             pnh_dir = os.path.join(base_dir, 'pnh_files')
             graphs = []
             for fname in filenames:
+                # Prevent path traversal
+                fname = os.path.basename(fname)
                 p_path = os.path.abspath(os.path.join(pnh_dir, fname))
+                if not p_path.startswith(os.path.abspath(pnh_dir)):
+                    continue
                 if not os.path.exists(p_path): continue
                 
                 graphs.append({
@@ -1134,6 +1183,7 @@ def run_benchmark():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    port = 5002 # Changed to 5002 to avoid conflicts
-    print(f"Server running on http://localhost:{port}")
-    app.run(debug=True, port=port)
+    port = int(os.environ.get('PORT', 5002))
+    debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    print(f"Server running on http://localhost:{port} (debug={debug})")
+    app.run(debug=debug, port=port)

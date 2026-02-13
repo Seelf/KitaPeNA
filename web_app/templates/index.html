@@ -519,10 +519,38 @@
                     <div class="db-actions">
                         <span id="dbStats" style="margin-right: 15px; font-size: 12px; color: #888;"></span>
 
+                        <div class="db-filters-advanced"
+                            style="display: flex; gap: 8px; margin-right: 15px; align-items: center;">
+                            <div class="filter-unit" title="Min Places">
+                                <span style="font-size: 10px; color: #666;">P≥</span>
+                                <input type="number" id="dbMinP" class="db-input-small" min="0" style="width: 40px;">
+                            </div>
+                            <div class="filter-unit" title="Min Transitions">
+                                <span style="font-size: 10px; color: #666;">T≥</span>
+                                <input type="number" id="dbMinT" class="db-input-small" min="0" style="width: 40px;">
+                            </div>
+                            <div class="filter-unit" title="Min Arcs">
+                                <span style="font-size: 10px; color: #666;">A≥</span>
+                                <input type="number" id="dbMinA" class="db-input-small" min="0" style="width: 40px;">
+                            </div>
+                            <div class="filter-unit" title="Min Tokens">
+                                <span style="font-size: 10px; color: #666;">K≥</span>
+                                <input type="number" id="dbMinK" class="db-input-small" min="0" style="width: 40px;">
+                            </div>
+                        </div>
+
                         <select id="dbSortSelect" class="db-select">
                             <option value="date_desc">Newest First</option>
                             <option value="date_asc">Oldest First</option>
                             <option value="name_asc">Name A-Z</option>
+                            <option value="places_desc">Most Places</option>
+                            <option value="places_asc">Least Places</option>
+                            <option value="transitions_desc">Most Transitions</option>
+                            <option value="transitions_asc">Least Transitions</option>
+                            <option value="arcs_desc">Most Arcs</option>
+                            <option value="arcs_asc">Least Arcs</option>
+                            <option value="tokens_desc">Most Tokens</option>
+                            <option value="tokens_asc">Least Tokens</option>
                         </select>
 
                         <label for="importNetInput" class="btn primary">

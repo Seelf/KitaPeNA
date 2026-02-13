@@ -6,6 +6,10 @@ import { resetSimulation } from './simulation.js';
 
 import { triggerAutoSave } from './tabs.js';
 
+function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content;
+}
+
 // --- LOCAL STORAGE ---
 // --- LOCAL STORAGE ---
 export function saveToLocalStorage() {
@@ -159,7 +163,7 @@ export async function saveGraph(name) {
     try {
         const response = await fetch('/api/graphs', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({
                 name: name,
                 nodes: nodes,
@@ -182,7 +186,7 @@ export async function saveGraph(name) {
 
 export async function deleteGraph(id, callback) {
     try {
-        await fetch('/api/graphs/' + id, { method: 'DELETE' });
+        await fetch('/api/graphs/' + id, { method: 'DELETE', headers: { 'X-CSRFToken': getCsrfToken() } });
         if (callback) callback();
     } catch (e) {
         alert('Delete failed');
@@ -257,7 +261,7 @@ export async function savePetriNetDb(name, content) {
     try {
         const response = await fetch('/api/petri/saved', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({
                 name: name,
                 content: content
@@ -279,7 +283,7 @@ export async function savePetriNetDb(name, content) {
 }
 
 async function deletePetriNet(id) {
-    await fetch(`/api/petri/saved/${id}`, { method: 'DELETE' });
+    await fetch(`/api/petri/saved/${id}`, { method: 'DELETE', headers: { 'X-CSRFToken': getCsrfToken() } });
 }
 
 export async function importPetriBatch(files) {
@@ -299,6 +303,7 @@ export async function importPetriBatch(files) {
     try {
         const response = await fetch('/api/petri/import_batch', {
             method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() },
             body: formData
         });
         return await response.json();
