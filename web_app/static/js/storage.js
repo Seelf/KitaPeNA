@@ -197,10 +197,11 @@ export async function loadSavedPetriNets(listElement, loadCallback) {
     listElement.innerHTML = 'Loading...';
     try {
         const response = await fetch('/api/petri/saved');
-        const nets = await response.json();
+        const data = await response.json();
+        const nets = data.nets || data; // Handle both {nets:[]} and [] for backward/forward compat
 
         listElement.innerHTML = '';
-        if (nets.length === 0) {
+        if (!nets || nets.length === 0) {
             listElement.innerHTML = '<div class="empty-msg">No saved models</div>';
             return;
         }

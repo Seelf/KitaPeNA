@@ -923,6 +923,7 @@ input[type=range]::-webkit-slider-runnable-track {
     color: var(--text-bright);
     border-radius: 4px;
     font-size: 13px;
+    margin-bottom: 5px;
 }
 
 .algo-list {
@@ -1345,4 +1346,228 @@ input[type=range]::-webkit-slider-runnable-track {
     flex: 1;
     text-align: center;
     justify-content: center;
+}
+
+/* DATABASE EXPLORER REFACTOR */
+.db-explorer-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-color);
+    overflow: hidden;
+    height: 100%;
+}
+
+.db-toolbar {
+    height: 50px;
+    background-color: var(--panel-bg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 20px;
+}
+
+.db-search {
+    flex: 1;
+    max-width: 400px;
+    display: flex;
+    align-items: center;
+    background: #333;
+    padding: 0 10px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+}
+
+.db-search:focus-within {
+    border-color: var(--accent);
+}
+
+.db-search input {
+    background: transparent;
+    border: none;
+    color: var(--text-bright);
+    padding: 8px 0;
+    width: 100%;
+    outline: none;
+    font-size: 13px;
+}
+
+.db-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.db-select {
+    background: #333;
+    color: var(--text-color);
+    border: 1px solid #444;
+    padding: 5px 10px;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.db-grid {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    align-content: start;
+}
+
+/* NET CARD */
+.net-card {
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    position: relative;
+}
+
+.net-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border-color: #555;
+    background-color: #2a2d2e;
+}
+
+.net-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.net-info-group {
+    flex: 1;
+    overflow: hidden;
+}
+
+.net-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-bright);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.net-id-badge {
+    font-size: 10px;
+    color: #888;
+    font-family: monospace;
+    background: rgba(255,255,255,0.05);
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.net-stats-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    font-size: 12px;
+    color: #bbb;
+}
+
+.stat-badge {
+    background: rgba(0,0,0,0.2);
+    padding: 4px 8px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.stat-label {
+    opacity: 0.7;
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.class-input-group {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.class-label {
+    font-size: 11px;
+    color: #888;
+    width: 40px;
+}
+
+.class-input {
+    flex: 1;
+    background: transparent;
+    border: 1px solid #444;
+    color: var(--accent);
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.class-input:focus {
+    border-color: var(--accent);
+    background: rgba(0, 122, 204, 0.1);
+    outline: none;
+}
+
+.card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: auto;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding-top: 12px;
+}
+
+.action-btn-small {
+    flex: 1;
+    padding: 6px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    text-align: center;
+    transition: background 0.2s;
+    background: #3c3c3c;
+    color: #ccc;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+}
+
+.action-btn-small:hover {
+    background: #4b4b4b;
+    color: #fff;
+}
+
+.action-btn-small.primary {
+    background: var(--accent);
+    color: white;
+}
+.action-btn-small.primary:hover {
+    background: #1177bb;
+}
+
+.action-btn-small.icon-only {
+    flex: 0 0 32px;
+    padding: 0;
+}
+
+.action-btn-small.danger:hover {
+    background: var(--danger);
+    color: white;
 }
