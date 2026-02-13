@@ -1,4 +1,8 @@
 
+function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content;
+}
+
 window.selectListItems = function (containerId, bool) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -30,7 +34,7 @@ export function initBenchmarking() {
                 btnRun.textContent = "Stopping...";
                 btnRun.disabled = true;
                 // Force stop on backend
-                fetch('/api/benchmark/stop', { method: 'POST' }).catch(err => console.error("Stop error:", err));
+                fetch('/api/benchmark/stop', { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() } }).catch(err => console.error("Stop error:", err));
             } else {
                 runBenchmark();
             }
@@ -649,7 +653,7 @@ async function executeBenchmarkStep(payload) {
 
         const response = await fetch(benchmarkUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
             body: JSON.stringify(payload)
         });
 

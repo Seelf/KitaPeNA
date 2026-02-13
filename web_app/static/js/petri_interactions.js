@@ -1,5 +1,9 @@
 // Author: Dawid Konarczak
 import { triggerAutoSave } from './tabs.js';
+
+function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content;
+}
 import { petriState, places, transitions, arcs } from './petri_state.js';
 import { drawPetri } from './petri_render.js';
 import { toWorld, toScreen } from './render.js';
@@ -647,6 +651,7 @@ async function importPnhFile(file) {
     try {
         const res = await fetch('/api/petri/import', {
             method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() },
             body: formData
         });
         const data = await res.json();

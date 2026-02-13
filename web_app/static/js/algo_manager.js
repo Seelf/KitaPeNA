@@ -1,3 +1,7 @@
+function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content;
+}
+
 export function initAlgoManager() {
     const btnManage = document.getElementById('btnManageAlgos');
     const modal = document.getElementById('algoModal');
@@ -197,7 +201,7 @@ export function initAlgoManager() {
 
             const saveRes = await fetch('/api/algorithms', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
                 body: JSON.stringify({ name: newName, code: data.code })
             });
             const saveResult = await saveRes.json();
@@ -212,7 +216,7 @@ export function initAlgoManager() {
     async function deleteAlgo(name) {
         if (!confirm(`Delete algorithm "${name}"? This cannot be undone.`)) return;
         try {
-            await fetch(`/api/algorithms/${name}`, { method: 'DELETE' });
+            await fetch(`/api/algorithms/${name}`, { method: 'DELETE', headers: { 'X-CSRFToken': getCsrfToken() } });
             if (selectedAlgoName === name) {
                 selectedAlgoName = null;
                 nameInput.value = '';
@@ -236,7 +240,7 @@ export function initAlgoManager() {
             try {
                 const res = await fetch('/api/algorithms', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
                     body: JSON.stringify({ name, code })
                 });
 
