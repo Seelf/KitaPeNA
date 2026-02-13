@@ -1264,3 +1264,85 @@ input[type=range]::-webkit-slider-runnable-track {
     max-height: none !important;
     height: 100%;
 }
+/* --- DATABASE EXPLORER REFACTOR --- */
+.db-list-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.db-list-item {
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+
+.db-list-item:hover {
+    background: #333;
+}
+
+.db-list-item.selected {
+    background: #2b3b2b; /* Subtle green highlight */
+    border-left: 3px solid var(--accent);
+}
+
+.db-item-title {
+    font-weight: 500;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.db-item-meta {
+    font-size: 11px;
+    color: #888;
+    margin-top: 3px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.db-detail-content h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 14px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+
+.detail-section {
+    margin-bottom: 30px;
+}
+
+.properties-grid {
+    font-size: 13px;
+    color: #ccc;
+}
+
+.prop-item {
+    background: #333;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #444;
+}
+
+.prop-label {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 2px;
+}
+
+.prop-value {
+    font-weight: 600;
+}
+
+.download-tabs button {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+}
