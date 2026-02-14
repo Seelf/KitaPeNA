@@ -224,7 +224,7 @@ function createNetCard(net) {
         <div class="card-actions">
             <button class="action-btn-small primary btn-open">Open</button>
             <button class="action-btn-small icon-only btn-download-pnh" title="Download PNH">PNH</button>
-            <button class="action-btn-small icon-only btn-download-pnml" title="Download PNML">XML</button>
+            <button class="action-btn-small icon-only btn-download-pnml" title="Download PNML">PNML</button>
             <button class="action-btn-small icon-only btn-download-json" title="Download JSON">JSON</button>
             <button class="action-btn-small icon-only danger btn-delete" title="Delete">🗑</button>
         </div>
@@ -312,14 +312,12 @@ async function updateNetClass(netMetadata, newClass) {
 }
 
 async function handleAction(netMetadata, action) {
-    // For downloads/delete, we might need full content if not present
-    // But for Delete we only need ID.
+    // For downloads/delete operations
     if (action === 'delete') {
         if (confirm(`Delete "${netMetadata.name}"?`)) {
             try {
                 const res = await fetch(`/api/petri/saved/${netMetadata.id}`, { method: 'DELETE', headers: { 'X-CSRFToken': getCsrfToken() } });
                 if (res.ok) {
-                    // Refresh completely to ensure pagination consistency
                     loadDatabaseItems(true);
                 } else {
                     alert("Failed to delete.");
@@ -329,28 +327,18 @@ async function handleAction(netMetadata, action) {
         return;
     }
 
-    // For downloads, we need content.
-    try {
-        const res = await fetch(`/api/petri/saved/${netMetadata.id}`);
-        if (!res.ok) throw new Error("Fetch failed");
-        const fullNet = await res.json();
-        let content = fullNet.content_json ? JSON.parse(fullNet.content_json) : null;
-        if (!content) throw new Error("No content");
-
-        switch (action) {
-            case 'download-pnh':
-                downloadFile(fullNet.name + '.pnh', convertToPnh(content));
-                break;
-            case 'download-pnml':
-                downloadFile(fullNet.name + '.pnml', convertToPnml(content, fullNet.name));
-                break;
-            case 'download-json':
-                downloadFile(fullNet.name + '.json', JSON.stringify(content, null, 2));
-                break;
-        }
-    } catch (e) {
-        console.error(e);
-        alert("Action failed: " + e.message);
+    // New Download Logic - Redirect to backend endpoints
+    const netId = netMetadata.id;
+    switch (action) {
+        case 'download-pnh':
+            window.location.href = `/download/pnh/${netId}`;
+            break;
+        case 'download-pnml':
+            window.location.href = `/download/pnml/${netId}`;
+            break;
+        case 'download-json':
+            window.location.href = `/download/json/${netId}`;
+            break;
     }
 }
 
@@ -467,8 +455,8 @@ function parsePnh(content) {
         }
 
         vals.forEach((val, pIdx) => {
-            if (val === -1) arcs.push({ source: places[pIdx].id, target: transitions[t].id, weight: 1 });
-            else if (val === 1) arcs.push({ source: transitions[t].id, target: places[pIdx].id, weight: 1 });
+            if (val === -1) arcs.push({ sourceId: places[pIdx].id, targetId: transitions[t].id, type: 'place_to_transition', weight: 1 });
+            else if (val === 1) arcs.push({ sourceId: transitions[t].id, targetId: places[pIdx].id, type: 'transition_to_place', weight: 1 });
         });
     }
 
