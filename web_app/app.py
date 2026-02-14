@@ -753,61 +753,216 @@ def update_petri_net(net_id):
     db.update_petri_net(net_id, name, content)
     return jsonify({'status': 'success'})
 
+def _normalize_arcs(arcs, place_ids, transition_ids):
+    """Normalize arcs to always have sourceId, targetId, type fields.
+    Handles both formats:
+      - New: {sourceId, targetId, type: 'place_to_transition'|'transition_to_place'}
+      - Old: {source, target} where direction is inferred from IDs
+    """
+    normalized = []
+    for arc in arcs:
+        if 'type' in arc and 'sourceId' in arc:
+            # Already in new format
+            normalized.append(arc)
+        else:
+            src = arc.get('source', arc.get('sourceId'))
+            tgt = arc.get('target', arc.get('targetId'))
+            weight = arc.get('weight', 1)
+            
+            if src in place_ids and tgt in transition_ids:
+                normalized.append({'sourceId': src, 'targetId': tgt, 'type': 'place_to_transition', 'weight': weight})
+            elif src in transition_ids and tgt in place_ids:
+                normalized.append({'sourceId': src, 'targetId': tgt, 'type': 'transition_to_place', 'weight': weight})
+    return normalized
+
 def export_pnh(data):
     """
     Converts a dictionary (places, transitions, arcs) to PNH string format.
+    Format:
+    NumPlaces
+    NumRows (Transitions + 1 for marking)
+    MatrixRows (Dense string of x, 1, 0)
+    Marking (Dense string of tokens)
+    ;Places=...
+    ;Transitions=...
     """
     places = data.get('places', [])
     transitions = data.get('transitions', [])
-    arcs = data.get('arcs', [])
+    raw_arcs = data.get('arcs', [])
     
     num_places = len(places)
     num_transitions = len(transitions)
     
-    lines = []
-    
-    # Header
-    lines.append(f"{num_places} places")
-    lines.append(f"{num_transitions + 1} rows") # +1 for marking
-    
-    # Sort places and transitions by ID to ensure consistency
+    # Sort by ID
     places.sort(key=lambda x: x['id'])
     transitions.sort(key=lambda x: x['id'])
     
-    p_map = {p['id']: i for i, p in enumerate(places)}
-    t_map = {t['id']: i for i, t in enumerate(transitions)}
+    p_ids = {p['id'] for p in places}
+    t_ids = {t['id'] for t in transitions}
+    arcs = _normalize_arcs(raw_arcs, p_ids, t_ids)
     
+    p_map = {p['id']: i for i, p in enumerate(places)}
+    
+    lines = []
+    
+    # Header
+    lines.append(f"{num_places}")
+    lines.append(f"{num_transitions + 1}") # +1 for marking
+    lines.append("")  # Blank line before incidence matrix
+
     # Build Matrix for each transition
     for t in transitions:
-        row = [0] * num_places
+        row_chars = ['0'] * num_places
         
-        # Incoming arcs (Place -> Transition): -1
+        # Incoming arcs (Place -> Transition): -1 -> 'x'
         for arc in arcs:
             if arc['type'] == 'place_to_transition' and arc['targetId'] == t['id']:
                 pid = arc['sourceId']
                 if pid in p_map:
-                    row[p_map[pid]] = -1
+                    row_chars[p_map[pid]] = 'x'
                     
-        # Outgoing arcs (Transition -> Place): +1
+        # Outgoing arcs (Transition -> Place): +1 -> '1'
         for arc in arcs:
             if arc['type'] == 'transition_to_place' and arc['sourceId'] == t['id']:
                 pid = arc['targetId']
                 if pid in p_map:
-                    row[p_map[pid]] = 1
+                    row_chars[p_map[pid]] = '1'
         
-        # Format row (dense or space separated? PNH examples used space)
-        # 1 -1 0 0 ...
-        lines.append(" ".join(map(str, row)))
+        lines.append("".join(row_chars))
         
     # Initial Marking (Last row)
-    marking_row = [0] * num_places
+    marking_chars = []
     for p in places:
-        if p['id'] in p_map:
-            marking_row[p_map[p['id']]] = p.get('tokens', 0)
+        tokens = p.get('tokens', 0)
+        marking_chars.append(str(tokens) if tokens < 10 else '9') 
             
-    lines.append(" ".join(map(str, marking_row)))
+    lines.append("".join(marking_chars))
+    
+    # Metadata
+    lines.append("")  # Blank line before metadata
+    p_names = [p.get('label', f"p{p['id']}") for p in places]
+    lines.append(f";Places={';'.join(p_names)}")
+    
+    t_names = [t.get('label', f"t{t['id']}") for t in transitions]
+    lines.append(f";Transitions={';'.join(t_names)}")
     
     return "\n".join(lines)
+
+def export_pnml(data, net_name="petrinet"):
+    import xml.etree.ElementTree as ET
+    
+    places = data.get('places', [])
+    transitions = data.get('transitions', [])
+    raw_arcs = data.get('arcs', [])
+    
+    p_ids = {p['id'] for p in places}
+    t_ids = {t['id'] for t in transitions}
+    arcs = _normalize_arcs(raw_arcs, p_ids, t_ids)
+    
+    pnml = ET.Element('pnml')
+    net = ET.SubElement(pnml, 'net', id=net_name, type="http://www.pnml.org/version-2009/grammar/ptnet")
+    
+    # Places
+    for p in places:
+        place_el = ET.SubElement(net, 'place', id=f"p{p['id']}")
+        name = ET.SubElement(place_el, 'name')
+        ET.SubElement(name, 'text').text = p.get('label', f"p{p['id']}")
+        init_mark = ET.SubElement(place_el, 'initialMarking')
+        ET.SubElement(init_mark, 'text').text = str(p.get('tokens', 0))
+        
+        if 'x' in p and 'y' in p:
+            graphics = ET.SubElement(place_el, 'graphics')
+            ET.SubElement(graphics, 'position', x=str(p['x']), y=str(p['y']))
+
+    # Transitions
+    for t in transitions:
+        trans_el = ET.SubElement(net, 'transition', id=f"t{t['id']}")
+        name = ET.SubElement(trans_el, 'name')
+        ET.SubElement(name, 'text').text = t.get('label', f"t{t['id']}")
+        
+        if 'x' in t and 'y' in t:
+            graphics = ET.SubElement(trans_el, 'graphics')
+            ET.SubElement(graphics, 'position', x=str(t['x']), y=str(t['y']))
+
+    # Arcs
+    for i, arc in enumerate(arcs):
+        if arc['type'] == 'place_to_transition':
+            src = f"p{arc['sourceId']}"
+            tgt = f"t{arc['targetId']}"
+        else:
+            src = f"t{arc['sourceId']}"
+            tgt = f"p{arc['targetId']}"
+            
+        arc_el = ET.SubElement(net, 'arc', id=f"a{i}", source=src, target=tgt)
+        inscription = ET.SubElement(arc_el, 'inscription')
+        ET.SubElement(inscription, 'text').text = str(arc.get('weight', 1))
+
+    # Generate String
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(pnml, encoding='unicode')
+
+@app.route('/download/pnh/<int:net_id>')
+@login_required
+def download_pnh(net_id):
+    net = db.get_petri_net(net_id)
+    if not net:
+        return "Net not found", 404
+        
+    if 'content' in net and net['content']:
+        content = net['content']
+    elif 'content_json' in net:
+         content = json.loads(net['content_json'])
+    else:
+        return "Net content not found", 404
+         
+    pnh_data = export_pnh(content)
+    
+    return Response(
+        pnh_data,
+        mimetype="text/plain",
+        headers={"Content-disposition": f"attachment; filename={net['name']}.pnh"}
+    )
+
+@app.route('/download/pnml/<int:net_id>')
+@login_required
+def download_pnml(net_id):
+    net = db.get_petri_net(net_id)
+    if not net:
+        return "Net not found", 404
+        
+    if 'content' in net and net['content']:
+        content = net['content']
+    elif 'content_json' in net:
+         content = json.loads(net['content_json'])
+    else:
+        return "Net content not found", 404
+         
+    pnml_data = export_pnml(content, net['name'])
+    
+    return Response(
+        pnml_data,
+        mimetype="application/xml",
+        headers={"Content-disposition": f"attachment; filename={net['name']}.pnml"}
+    )
+
+@app.route('/download/json/<int:net_id>')
+@login_required
+def download_json(net_id):
+    net = db.get_petri_net(net_id)
+    if not net:
+        return "Net not found", 404
+        
+    if 'content' in net and net['content']:
+        content = net['content']
+    elif 'content_json' in net:
+         content = json.loads(net['content_json'])
+    else:
+        return "Net content not found", 404
+         
+    return Response(
+        json.dumps(content, indent=2),
+        mimetype="application/json",
+        headers={"Content-disposition": f"attachment; filename={net['name']}.json"}
+    )
 
 @app.route('/api/petri/import_batch', methods=['POST'])
 @login_required
