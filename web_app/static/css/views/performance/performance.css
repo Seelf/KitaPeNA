@@ -1,0 +1,186 @@
+.performance-view {
+    flex: 1;
+    display: none;
+    /* Toggled via JS */
+    flex-direction: column;
+    height: 100%;
+    padding: 20px;
+    overflow-y: auto;
+    background-color: var(--bg-color);
+}
+
+.performance-header {
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-bright);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.perf-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    min-height: 100%;
+}
+
+.perf-sidebar {
+    width: 100%;
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 15px;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.perf-main {
+    flex: 1;
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    min-height: 500px;
+    min-width: 0;
+}
+
+.config-section {
+    flex: 1;
+    min-width: 250px;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+    border-right: 1px solid var(--border-color);
+    padding-right: 20px;
+}
+
+.config-section:last-of-type {
+    border-right: none;
+    padding-right: 0;
+}
+
+.config-section:last-child {
+    border-bottom: none;
+}
+
+.config-section h4 {
+    margin-bottom: 15px;
+    color: #999;
+    font-size: 12px;
+    text-transform: uppercase;
+    font-weight: 600;
+    /* Use 600 instead of bold */
+    letter-spacing: 0.5px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.section-header h4 {
+    margin-bottom: 0;
+}
+
+.run-section {
+    max-width: 250px;
+    display: flex;
+    flex-direction: column;
+}
+
+.perf-sidebar select,
+.perf-sidebar input[type="text"] {
+    width: 100%;
+    padding: 6px;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-bright);
+    border-radius: 4px;
+    font-size: 13px;
+    margin-bottom: 5px;
+}
+
+.algo-list {
+    flex: 1;
+    min-height: 150px;
+    overflow-y: auto;
+    background-color: var(--input-bg);
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+#benchSavedList,
+#benchPetriList {
+    flex: 1;
+    min-height: 120px;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: var(--input-bg);
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.perf-status {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #888;
+    text-align: center;
+    min-height: 20px;
+}
+
+/* Algo Manager Specifics */
+.algo-manager-modal {
+    width: 1000px;
+    height: 80vh;
+    max-height: 90vh;
+}
+
+.algo-manager-body {
+    flex: 1;
+}
+
+.editor-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-header-input {
+    display: flex;
+    align-items: center;
+    background: #252526;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.editor-panel input[type="text"] {
+    padding: 10px 15px;
+    background: transparent;
+    color: #fff;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    flex: 1;
+}
+
+#monacoEditorContainer {
+    flex: 1;
+    width: 100%;
+}
+
+#btnRunBenchmark {
+    transition: background-color 0.2s, color 0.2s;
+    min-width: 120px;
+}
