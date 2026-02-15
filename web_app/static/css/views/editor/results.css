@@ -1,0 +1,77 @@
+.sidebar-panel {
+    width: 250px;
+    /* Default width */
+    min-width: 150px;
+    max-width: 600px;
+    background-color: var(--panel-bg);
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-header {
+    padding: 10px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #bbb;
+    text-transform: uppercase;
+}
+
+.results-list {
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+}
+
+.result-item {
+    padding: 4px 10px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    color: #d4d4d4;
+    /* Neutral color, not red */
+    position: relative;
+    padding-right: 25px;
+    /* Space for copy button */
+}
+
+.btn-copy-result {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background: transparent;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.2s;
+    padding: 2px;
+    line-height: 1;
+}
+
+.result-item:hover .btn-copy-result {
+    opacity: 1;
+}
+
+.btn-copy-result:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.result-item:hover {
+    background-color: var(--hover-bg);
+}
+
+.result-item.active {
+    background-color: var(--selection-bg);
+    color: var(--text-bright);
+    border-left-color: var(--accent);
+}
+
+.empty-state {
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+    text-align: center;
+}

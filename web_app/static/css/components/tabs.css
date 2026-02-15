@@ -1,0 +1,144 @@
+.editor-tabs-bar {
+    display: flex;
+    display: flex;
+    background: #252526;
+    height: 35px;
+    align-items: center;
+    border-bottom: 1px solid #1e1e1e;
+    overflow-x: auto;
+    width: 100%;
+}
+
+.tabs-wrapper {
+    display: flex;
+    background: #252526;
+    height: 35px;
+    align-items: center;
+    border-bottom: 1px solid #1e1e1e;
+    position: relative;
+    width: 100%;
+}
+
+.editor-tabs-bar {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    flex: 1;
+    overflow-x: auto;
+    /* Enable scrolling */
+    white-space: nowrap;
+    scrollbar-width: none;
+    /* Hide Scrollbar (Firefox) */
+    mask-image: linear-gradient(to right, black 95%, transparent 100%);
+    /* Fade out effect */
+}
+
+.editor-tabs-bar::-webkit-scrollbar {
+    display: none;
+    /* Hide Scrollbar (WebKit) */
+}
+
+.tab-scroll-btn {
+    width: 24px;
+    height: 100%;
+    background: #252526;
+    border: none;
+    color: #ccc;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: all 0.2s;
+}
+
+#btnTabScrollLeft {
+    border-right: 1px solid #1e1e1e;
+}
+
+#btnTabScrollRight {
+    border-left: 1px solid #1e1e1e;
+}
+
+.tab-scroll-btn:hover {
+    background: #3e3e42;
+    color: #fff;
+}
+
+.editor-tab {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 10px;
+    background: #2d2d2d;
+    color: #969696;
+    font-size: 13px;
+    border-right: 1px solid #1e1e1e;
+    cursor: pointer;
+    min-width: 120px;
+    user-select: none;
+}
+
+.editor-tab:hover {
+    background: #3e3e42;
+}
+
+.editor-tab.active {
+    background: #1e1e1e;
+    color: #fff;
+    border-top: 2px solid #0e639c;
+}
+
+.editor-tab .icon {
+    margin-right: 8px;
+    font-size: 14px;
+}
+
+.editor-tab .title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 8px;
+}
+
+.editor-tab .close {
+    opacity: 0;
+    font-size: 14px;
+    width: 18px;
+    height: 18px;
+    text-align: center;
+    border-radius: 3px;
+    line-height: 16px;
+}
+
+.editor-tab:hover .close {
+    opacity: 1;
+}
+
+.editor-tab .close:hover {
+    background: #4e4e4e;
+    color: #fff;
+}
+
+.editor-tab-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    min-width: 30px;
+    /* Prevent shrinking */
+    flex-shrink: 0;
+    /* Prevent shrinking */
+    height: 100%;
+    color: #969696;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.editor-tab-add:hover {
+    background: #3e3e42;
+    color: #fff;
+}

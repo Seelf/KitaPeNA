@@ -1,0 +1,48 @@
+.title-bar {
+    height: 30px;
+    background-color: #3c3c3c;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 13px;
+    color: #999;
+}
+
+.title-bar .title {
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+.db-tabs {
+    display: flex;
+    background: #252526;
+    border-bottom: 1px solid #3c3c3c;
+}
+
+.db-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #969696;
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.db-tab:hover {
+    color: #fff;
+    background: #2a2d2e;
+}
+
+.db-tab.active {
+    color: #fff;
+    border-bottom: 2px solid #0e639c;
+}
+
+.db-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}

@@ -1,0 +1,38 @@
+.canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background-color: #1e1e1e;
+    cursor: crosshair;
+}
+
+.graph-stats {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.floating-toolbar {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background-color: rgba(37, 37, 38, 0.9);
+    padding: 5px;
+    border-radius: 6px;
+    display: flex;
+    gap: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    border: 1px solid var(--border-color);
+}
+
+.tool-separator {
+    width: 1px;
+    background-color: var(--border-color);
+    margin: 0 2px;
+}

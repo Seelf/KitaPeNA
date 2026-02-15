@@ -1,0 +1,87 @@
+.console-wrapper {
+    margin-top: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+}
+
+.console-header {
+    background: #2d2d2d;
+    padding: 4px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: #999;
+    text-transform: uppercase;
+    border-bottom: 1px solid #333;
+}
+
+.bench-console {
+    padding: 10px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: #0f0;
+    /* Terminal Green */
+    overflow-y: auto;
+    height: 300px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #000;
+    user-select: text;
+    /* Allow copying logs */
+}
+
+.console-line {
+    margin-bottom: 2px;
+}
+
+.console-line.system {
+    color: #00bcd4;
+    /* Cyan for system messages */
+}
+
+.console-line.error {
+    color: #f44336;
+    /* Red for errors */
+}
+
+.console-line.success {
+    color: #4caf50;
+    /* Green for success */
+}
+
+.console-line.info {
+    color: #ffeb3b;
+    /* Yellow for info */
+}
+
+.header-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.large-console-content {
+    width: 90vw !important;
+    max-width: 1400px !important;
+    background: #1e1e1e !important;
+}
+
+.large-console-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #000;
+    overflow: hidden;
+    height: 80vh;
+}
+
+.bench-console.large {
+    max-height: none !important;
+    height: 100%;
+}

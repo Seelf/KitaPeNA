@@ -23,3 +23,6 @@ env/
 
 # Web app
 web_app/temp_pnh
+
+# Misc
+*.so
