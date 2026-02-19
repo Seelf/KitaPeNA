@@ -21,7 +21,7 @@ base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 def benchmark_worker(mode, algo_names, iterations, args_dict, q):
     """
-    Worker function to run benchmarks in a separate process.
+    Worker process for benchmarking algorithms.
     """
     try:
         from web_app.analysis.benchmarking.runner import BenchmarkRunner
@@ -29,7 +29,7 @@ def benchmark_worker(mode, algo_names, iterations, args_dict, q):
         if mode == 'random':
             res = runner.run_suite(algo_names, **args_dict, iterations=iterations)
         else:
-            # args_dict already has 'graphs'
+            # args_dict has 'graphs'
             res = runner.run_specific(algo_names, **args_dict, iterations=iterations)
         q.put(res)
     except Exception as e:
@@ -39,13 +39,14 @@ def benchmark_worker(mode, algo_names, iterations, args_dict, q):
 @benchmark_bp.route('/stop', methods=['POST'])
 @login_required
 def stop_benchmark():
+    """Forces the active benchmark process to terminate."""
     global active_benchmark_process
     if active_benchmark_process and active_benchmark_process.is_alive():
-        print(f"[Server] Force stopping benchmark process (PID: {active_benchmark_process.pid})...")
+        print(f"[Server] Force stopping benchmark (PID: {active_benchmark_process.pid})...")
         active_benchmark_process.terminate()
         active_benchmark_process.join(timeout=2)
         if active_benchmark_process.is_alive():
-            active_benchmark_process.kill() # Harder kill if terminate failed
+            active_benchmark_process.kill() 
         active_benchmark_process = None
         return jsonify({'status': 'stopped'})
     return jsonify({'status': 'no_active_benchmark'})
@@ -53,10 +54,11 @@ def stop_benchmark():
 @benchmark_bp.route('', methods=['POST'])
 @login_required
 def run_benchmark():
+    """Starts a benchmark for selected algorithms and graphs."""
     global active_benchmark_process
     try:
         data = request.json
-        mode = data.get('mode', 'random') # 'random' or 'saved'
+        mode = data.get('mode', 'random') # 'random', 'saved', 'petri', 'pnh_files'
         iterations = int(data.get('iterations', 5))
         
         # Algorithm Selection
@@ -78,7 +80,6 @@ def run_benchmark():
             
             # Fetch from DB
             conn = db.get_db_connection()
-            # Prepare placeholders securely
             placeholders = ','.join('?' for _ in graph_ids)
             query = f'SELECT id, name, nodes, edges FROM graphs WHERE id IN ({placeholders})'
             rows = conn.execute(query, graph_ids).fetchall()
@@ -90,7 +91,7 @@ def run_benchmark():
                     g_nodes = json.loads(r['nodes'])
                     g_edges = json.loads(r['edges'])
                     
-                    # NORMALIZE EDGES
+                    # Normalize Edges
                     norm_edges = []
                     for e in g_edges:
                         if isinstance(e, dict):
@@ -105,7 +106,7 @@ def run_benchmark():
                     print(f"Error parsing graph {r['id']}: {e}")
 
             if not graphs:
-                return jsonify({'error': 'No valid graphs found or parsing failed.'}), 404
+                return jsonify({'error': 'No valid graphs found.'}), 404
                 
         elif mode == 'petri':
             petri_ids = data.get('petri_ids', [])
@@ -127,7 +128,7 @@ def run_benchmark():
                     
                     # Generate Temp PNH File
                     pnh_str = export_pnh(content)
-                    temp_dir = os.path.join(base_dir, 'web_app', 'temp_pnh') # Need correct path
+                    temp_dir = os.path.join(base_dir, 'web_app', 'temp_pnh') 
                     if not os.path.exists(temp_dir):
                         os.makedirs(temp_dir)
                     
@@ -195,7 +196,7 @@ def run_benchmark():
             if not filenames:
                  return jsonify({'error': 'No PNH files selected'}), 400
             
-            pnh_dir = os.path.join(base_dir, 'web_app', 'pnh_files') # Need correct path
+            pnh_dir = os.path.join(base_dir, 'web_app', 'pnh_files') 
             graphs = []
             for fname in filenames:
                 # Prevent path traversal
@@ -217,13 +218,11 @@ def run_benchmark():
                  return jsonify({'error': 'No valid PNH files found.'}), 404
             
         elif mode == 'random':
-            # Nothing special here, just data gathering for worker
             pass
 
-        # --- Common Multi-processing Execution Logic ---
+        # --- Multiprocessing Execution ---
         q = multiprocessing.Queue()
         
-        # Prepare execution args
         exec_args = {}
         if mode == 'random':
             exec_args = {
@@ -233,7 +232,6 @@ def run_benchmark():
                 'density': float(data.get('density', 0.5))
             }
         else:
-            # saved, petri, pnh_files use graphs list
             exec_args = {'graphs': graphs}
 
         p = multiprocessing.Process(target=benchmark_worker, args=(mode, algo_names, iterations, exec_args, q))
@@ -244,17 +242,16 @@ def run_benchmark():
         start_time = time.time()
         while p.is_alive():
             try:
-                # Poll queue while process is running
+                # Poll queue
                 result = q.get(timeout=0.2)
                 break
             except Exception:
-                # Check if we should abort (if active_benchmark_process was set to None by the stop endpoint)
+                # Check if aborted
                 if active_benchmark_process is None:
-                    # The stop endpoint already killed the process, just return error to FE
                     return jsonify({'error': 'Benchmark stopped by user.'}), 400
                 continue
         
-        # Final check if result was missed
+        # Check if result missed
         if result is None:
             try:
                 result = q.get(timeout=0.5)

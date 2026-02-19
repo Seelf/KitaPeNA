@@ -47,7 +47,7 @@ def import_petri_batch():
                  content = file.read().decode('utf-8')
                  data = parse_pnh(content)
                  
-                 # Construct name from filename
+                 # Strip extension for name
                  name = file.filename
                  if name.lower().endswith('.pnh'): name = name[:-4]
                  
@@ -65,7 +65,7 @@ def import_petri_batch():
 @petri_bp.route('/pnh', methods=['GET'])
 @login_required
 def list_pnh_files():
-    """Lists .pnh files in the web_app/pnh_files/ directory."""
+    """Lists .pnh files in the server's pnh_files directory."""
     pnh_dir = os.path.join(base_dir, 'pnh_files')
     if not os.path.exists(pnh_dir):
         os.makedirs(pnh_dir)
@@ -80,20 +80,20 @@ def list_pnh_files():
                 'size': os.path.getsize(f_path)
             })
     
-    # Sort by mtime descending
+    # Sort by modification time (newest first)
     files.sort(key=lambda x: x['mtime'], reverse=True)
     return jsonify(files)
 
 @petri_bp.route('/saved', methods=['GET'])
 @login_required
 def get_saved_petri_nets():
-    """Retrieves saved Petri nets metadata with pagination."""
+    """Retrieves paginated saved Petri nets with filtering and sorting."""
     try:
-        # Pagination params
+        # 1. Pagination
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 20))
         
-        # Filter/Sort params
+        # 2. Sorting
         search_query = request.args.get('q', '')
         sort_param = request.args.get('sort', 'date_desc')
         
@@ -115,7 +115,7 @@ def get_saved_petri_nets():
             
         offset = (page - 1) * per_page
         
-        # Advanced filters
+        # 3. Advanced Filters
         def get_int_param(name):
             val = request.args.get(name)
             try: return int(val) if val is not None else None
@@ -165,7 +165,7 @@ def get_petri_nets():
 @petri_bp.route('/saved', methods=['POST'])
 @login_required
 def save_petri_net():
-    """Saves a new Petri net to the database."""
+    """Saves a new Petri net."""
     data = request.json
     name = data.get('name')
     content = data.get('content') # places, transitions, arcs
@@ -186,10 +186,10 @@ def delete_petri_net(net_id):
 @petri_bp.route('/saved/<int:net_id>', methods=['PUT'])
 @login_required
 def update_petri_net(net_id):
-    """Updates an existing Petri net (name and content)."""
+    """Updates an existing Petri net."""
     data = request.json
     name = data.get('name')
-    content = data.get('content') # Full content object
+    content = data.get('content') 
 
     if not name or not content:
         return jsonify({'error': 'Name and content are required'}), 400
@@ -200,6 +200,7 @@ def update_petri_net(net_id):
 @petri_bp.route('/download/pnh/<int:net_id>')
 @login_required
 def download_pnh(net_id):
+    """Downloads Petri net in PNH format."""
     net = db.get_petri_net(net_id)
     if not net:
         return "Net not found", 404
@@ -222,6 +223,7 @@ def download_pnh(net_id):
 @petri_bp.route('/download/pnml/<int:net_id>')
 @login_required
 def download_pnml(net_id):
+    """Downloads Petri net in PNML format."""
     net = db.get_petri_net(net_id)
     if not net:
         return "Net not found", 404
@@ -244,6 +246,7 @@ def download_pnml(net_id):
 @petri_bp.route('/download/json/<int:net_id>')
 @login_required
 def download_json(net_id):
+    """Downloads Petri net in JSON format."""
     net = db.get_petri_net(net_id)
     if not net:
         return "Net not found", 404

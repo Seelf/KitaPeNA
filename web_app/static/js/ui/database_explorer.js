@@ -59,7 +59,6 @@ export function initDatabaseExplorer() {
         dbSortSelect.addEventListener('change', () => loadDatabaseItems(true));
     }
 
-    // Advanced filters listeners
     [dbMinP, dbMinT, dbMinA, dbMinK].forEach(el => {
         if (el) el.addEventListener('change', () => loadDatabaseItems(true));
     });
@@ -68,7 +67,7 @@ export function initDatabaseExplorer() {
         importNetInput.addEventListener('change', handleImport);
     }
 
-    // Use dbGrid itself as scroll root since it's the scrollable container
+    // Use dbGrid itself as scroll root
     observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting && !isLoading && hasMore) {
@@ -133,35 +132,28 @@ async function loadDatabaseItems(reset = false) {
         const newNets = data.nets || [];
         const total = data.total || 0;
 
-        // On first load / reset, clear the grid
         if (reset && dbGrid) dbGrid.innerHTML = '';
 
-        // Remove sentinel before appending cards
         if (sentinel && sentinel.parentNode) sentinel.remove();
         if (observer && sentinel) observer.unobserve(sentinel);
 
-        // Append new cards
         currentNets = reset ? newNets : [...currentNets, ...newNets];
         renderNewItems(newNets);
 
-        // Update stats
         if (dbStats) {
             dbStats.textContent = `${currentNets.length} / ${total} nets`;
         }
 
-        // Determine if more pages exist
         if (currentNets.length >= total || newNets.length < itemsPerPage) {
             hasMore = false;
         } else {
             currentPage++;
-            // Append sentinel and start observing
             if (dbGrid && sentinel && observer) {
                 dbGrid.appendChild(sentinel);
                 observer.observe(sentinel);
             }
         }
 
-        // Empty state
         if (currentNets.length === 0 && dbGrid) {
             dbGrid.innerHTML = '<div class="empty-state">No matching nets found.</div>';
         }
@@ -189,7 +181,6 @@ function createNetCard(net) {
     const card = document.createElement('div');
     card.className = 'net-card';
 
-    // Stats extraction
     const stats = net.stats || { places: 0, transitions: 0, arcs: 0, class: '' };
     const dateStr = net.created_at ? new Date(net.created_at).toLocaleDateString() : 'Unknown';
 
@@ -253,24 +244,10 @@ function createNetCard(net) {
 }
 
 async function updateNetClass(netMetadata, newClass) {
-    // We need to fetch full content, update class, and save back.
-    // Or we should have a PATCH endpoint, but we only made PUT.
-    // Ideally we fetch content -> update -> PUT.
-
     try {
-        // Fetch full content
         const res = await fetch(`/api/petri/saved/${netMetadata.id}`);
         if (!res.ok) throw new Error("Failed to fetch net details");
         const fullNet = await res.json();
-
-        // Update content
-        const content = fullNet.content || (fullNet.content_json ? JSON.parse(fullNet.content_json) : fullNet);
-        // Note: API returns dict(net). content_json is string there? 
-        // In app.py get_saved_petri_net returns dict(net). 
-        // If row_factory is sqlite3.Row, it returns columns. 'content_json' is a column.
-        // Wait, get_saved_petri_net in app.py logic...
-        // Let's check get_petri_net in database.py. It returns * from petri_nets.
-        // So it has content_json string.
 
         let contentObj;
         if (typeof fullNet.content_json === 'string') {
@@ -278,15 +255,11 @@ async function updateNetClass(netMetadata, newClass) {
         } else if (fullNet.content) {
             contentObj = fullNet.content;
         } else {
-            // Maybe it was already parsed? No, sqlite returns string.
-            // If we used the `stats` logic in get_all, that was get_all.
-            // get_petri_net just returns row dict.
-            contentObj = typeof fullNet.content_json === 'string' ? JSON.parse(fullNet.content_json) : {};
+            contentObj = {};
         }
 
         contentObj.model_class = newClass;
 
-        // PUT update
         const updateRes = await fetch(`/api/petri/saved/${netMetadata.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
@@ -297,11 +270,8 @@ async function updateNetClass(netMetadata, newClass) {
         });
 
         if (updateRes.ok) {
-            // Update local cache stats
             if (!netMetadata.stats) netMetadata.stats = {};
             netMetadata.stats.class = newClass;
-            // Visual feedback?
-            // Already updated in input.
         } else {
             alert("Failed to update class.");
         }
@@ -312,7 +282,6 @@ async function updateNetClass(netMetadata, newClass) {
 }
 
 async function handleAction(netMetadata, action) {
-    // For downloads/delete operations
     if (action === 'delete') {
         if (confirm(`Delete "${netMetadata.name}"?`)) {
             try {
@@ -327,7 +296,6 @@ async function handleAction(netMetadata, action) {
         return;
     }
 
-    // New Download Logic - Redirect to backend endpoints
     const netId = netMetadata.id;
     switch (action) {
         case 'download-pnh':
@@ -343,18 +311,6 @@ async function handleAction(netMetadata, action) {
 }
 
 function loadNetToEditor(netMetadata) {
-    // We need to fetch full content to load it
-    // Or dispatch event and let main handle?
-    // main handles 'open-petri-net' by calling `loadPetriNetFromDb`? 
-    // No, main.js has no listener for 'open-petri-net' yet.
-    // I should strictly implement loading here or dispatch event.
-    // Given I can fetch here, I will fetch and then use global function if available or dispatch.
-
-    // Actually, `loadPetriNetFromDb` is imported from storage.js.
-    // But `loadPetriNetFromDb` in storage.js usually just returns data or updates state?
-    // storage.js `loadPetriNetFromDb` fetches and returns.
-
-    // I will fetch here.
     async function doLoad() {
         try {
             const res = await fetch(`/api/petri/saved/${netMetadata.id}`);
@@ -362,8 +318,6 @@ function loadNetToEditor(netMetadata) {
             const fullNet = await res.json();
             const content = typeof fullNet.content_json === 'string' ? JSON.parse(fullNet.content_json) : fullNet.content_json;
 
-            // Dispatch event to Main to load this into Editor
-            // We can use a custom event on window
             const event = new CustomEvent('petri-net-loaded', {
                 detail: {
                     id: fullNet.id,
@@ -416,7 +370,7 @@ async function handleImport(e) {
     e.target.value = '';
 }
 
-// Converters (Keep existing logic)
+// Converters
 function parsePnh(content) {
     const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0 && !l.trim().startsWith('#'));
     if (lines.length < 3) throw new Error("Invalid PNH format");

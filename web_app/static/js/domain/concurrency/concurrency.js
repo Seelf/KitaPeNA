@@ -1,11 +1,9 @@
-
 import { places, transitions, arcs } from '../petri/petri_state.js';
 import { state, nodes, edges, elements, camera } from '../../core/state.js';
 import { draw } from '../../engine/rendering/render.js';
 
 import { runForceDirectedLayout } from '../../engine/layout/layout_engine.js';
 
-// Simple force-directed layout (now using shared engine)
 export function runSimpleLayout() {
     if (nodes.length === 0) return;
 
@@ -125,8 +123,6 @@ export async function fetchColoring() {
     }
 }
 
-
-
 export async function updateConcurrencyGraph() {
     console.log("Updating Concurrency Graph (using existing MIS infrastructure)...");
 
@@ -171,7 +167,6 @@ export async function updateConcurrencyGraph() {
 
             // CACHE PREVIOUS POSITIONS (From Graphs Storage)
             const prevPositions = new Map();
-            // Use existing stored nodes from GRAPH storage
             state.graphs.CONCURRENCY.nodes.forEach(n => {
                 if (n.id !== undefined) {
                     prevPositions.set(n.id, { x: n.x, y: n.y });

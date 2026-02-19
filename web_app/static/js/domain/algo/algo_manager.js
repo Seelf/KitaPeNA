@@ -51,7 +51,6 @@ export function initAlgoManager() {
             else if (val.endsWith('.js')) langSelect.value = 'javascript';
             else if (val.endsWith('.cpp') || val.endsWith('.h') || val.endsWith('.hpp')) langSelect.value = 'cpp';
 
-            // Trigger change event to update editor
             langSelect.dispatchEvent(new Event('change'));
         });
     });
@@ -60,7 +59,7 @@ export function initAlgoManager() {
     btnManage.addEventListener('click', () => {
         modal.style.display = 'flex';
         loadAlgoList();
-        if (editor) editor.layout(); // Re-layout in case container size changed
+        if (editor) editor.layout();
     });
 
     // External Open Request
@@ -97,7 +96,6 @@ export function initAlgoManager() {
         });
     }
 
-    // ... (loadAlgoList stays same, referencing it for context)
     async function loadAlgoList() {
         listContainer.innerHTML = '<div style="padding:10px; color:#aaa;">Loading...</div>';
         try {

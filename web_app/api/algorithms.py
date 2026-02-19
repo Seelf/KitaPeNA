@@ -62,7 +62,6 @@ def save_algorithm():
             f.write(code)
             
         # 2. Compile
-        # clang++ -shared -fPIC -O3 -undefined dynamic_lookup -o output.so input.cpp
         cmd = [
             'clang++', 
             '-shared', '-fPIC', '-O3', 

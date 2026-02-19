@@ -14,21 +14,20 @@ petri_analysis_bp = Blueprint('petri_analysis', __name__)
 @login_required
 @limiter.limit("30 per minute")
 def calculate_reachability():
-    """Calculates the Reachability Graph and returns nodes/edges directly."""
+    """Calculates the Reachability Graph (State Space)."""
     try:
         data = request.json
         places = data.get('places', [])
         transitions = data.get('transitions', [])
         arcs = data.get('arcs', [])
-        max_states = int(data.get('max_states', 100)) # Default 100, ensure int
+        max_states = int(data.get('max_states', 100))
         
-        # Calculate Reachability Graph
-        nodes_out, edges_out, truncated = petri_reachability.calculate_reachability_graph(places, transitions, arcs, max_states)
+        nodes, edges, truncated = petri_reachability.calculate_reachability_graph(places, transitions, arcs, max_states)
         
         return jsonify({
             'status': 'success',
-            'nodes': nodes_out,
-            'edges': edges_out,
+            'nodes': nodes,
+            'edges': edges,
             'truncated': truncated
         })
     except Exception as e:
@@ -46,7 +45,7 @@ def calculate_concurrency():
         arcs = data.get('arcs', [])
         
         if petri_analysis is None:
-            return jsonify({'status': 'error', 'message': 'Petri Analysis module not available (Import Error). Check server logs.'}), 500
+            return jsonify({'status': 'error', 'message': 'Petri Analysis module not available'}), 500
 
         nodes, edges = petri_analysis.build_concurrency_graph(places, transitions, arcs)
         

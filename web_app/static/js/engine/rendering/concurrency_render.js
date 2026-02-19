@@ -5,7 +5,6 @@ import { elements, state } from '../../core/state.js';
 export const concurrencyState = {
     nodes: [],
     edges: [], // [id1, id2] - undirected
-    // Camera is managed by state.concurrencyCamera for consistency with context switching
     isDragging: false,
     lastX: 0,
     lastY: 0,
@@ -59,7 +58,6 @@ export function drawConcurrency() {
     ctx.translate(state.concurrencyCamera.x, state.concurrencyCamera.y);
     ctx.scale(state.concurrencyCamera.zoom, state.concurrencyCamera.zoom);
 
-    // Draw grid
     drawGrid(ctx, canvas, state.concurrencyCamera);
 
     // Draw Edges (Undirected)
@@ -84,7 +82,6 @@ export function drawConcurrency() {
 
     // Draw Nodes (Places)
     concurrencyState.nodes.forEach(node => {
-        // Body
         ctx.beginPath();
         ctx.arc(node.x, node.y, 20, 0, Math.PI * 2);
         ctx.fillStyle = '#2196f3'; // Blue
@@ -93,7 +90,6 @@ export function drawConcurrency() {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Label (below node, with offset support)
         ctx.fillStyle = '#fff';
         ctx.font = '12px Inter, sans-serif';
         ctx.textAlign = 'center';
@@ -105,6 +101,3 @@ export function drawConcurrency() {
 
     ctx.restore();
 }
-
-// --- INTERACTIONS ---
-// We can mostly reuse interaction patterns, but need to route them in `interactions.js`

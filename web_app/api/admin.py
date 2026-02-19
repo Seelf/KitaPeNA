@@ -8,6 +8,7 @@ admin_bp = Blueprint('admin', __name__)
 @admin_bp.route('/users', methods=['GET'])
 @login_required
 def list_users():
+    """Admin: List all users."""
     if not current_user.can_manage():
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -17,6 +18,7 @@ def list_users():
 @admin_bp.route('/users', methods=['POST'])
 @login_required
 def add_user():
+    """Admin: Add a new user."""
     if not current_user.can_manage():
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -41,6 +43,7 @@ def add_user():
 @admin_bp.route('/users/<int:user_id>/block', methods=['POST'])
 @login_required
 def block_user(user_id):
+    """Admin: Block/Unblock a user."""
     if not current_user.can_manage():
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -57,6 +60,7 @@ def block_user(user_id):
 @admin_bp.route('/users/<int:user_id>', methods=['DELETE'])
 @login_required
 def delete_user(user_id):
+    """Admin: Delete a user."""
     if not current_user.can_manage():
         return jsonify({'error': 'Unauthorized'}), 403
 
@@ -70,6 +74,7 @@ def delete_user(user_id):
 @admin_bp.route('/password', methods=['POST'])
 @login_required
 def change_password():
+    """User: Change own password."""
     data = request.json
     new_password = data.get('password')
     

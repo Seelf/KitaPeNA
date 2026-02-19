@@ -1,35 +1,27 @@
 """
 Core logic for the Maximal Independent Sets (MIS) generation algorithm.
 Based on Johnson, Yannakakis, Papadimitriou (1988).
-
-This module contains pure algorithmic logic with NO dependency on visualization libraries.
-It uses a generator pattern to yield results step-by-step.
+Pure algorithmic logic without visualization dependencies.
 """
 
 import networkx as nx
 import heapq
 
 def get_lex_first_mis(G, nodes, prefix=None):
-    """
-    Finds the lexicographically first maximal independent set (MIS) 
-    containing the given prefix.
-    """
+    """Finds the lexicographically first MIS containing the prefix."""
     if prefix is None:
         prefix = set()
     mis = set(prefix)
     
-    # Greedily search vertices in ascending (lexicographical) order.
+    # Greedy search in ascending order
     for v in nodes:
         if v not in mis:
-            # Add v if none of its neighbors are in mis
             if all(neighbor not in mis for neighbor in G.neighbors(v)):
                 mis.add(v)
     return sorted(list(mis))
 
 def is_maximal_in_subset(G, mis_subset, nodes_subset):
-    """
-    Checks if a given set is a maximal independent set with respect to a subset of vertices.
-    """
+    """Checks if a set is maximal within a subset of vertices."""
     for v in nodes_subset:
         if v not in mis_subset:
             # Must have a neighbor in the set to be maximal
@@ -40,12 +32,7 @@ def is_maximal_in_subset(G, mis_subset, nodes_subset):
 def mis_algorithm_generator(G):
     """
     Generator yielding maximal independent sets step-by-step.
-    
-    Args:
-        G (nx.Graph): Input graph.
-        
-    Yields:
-        tuple: (current_mis_list, status_message)
+    Yields: (current_mis_list, status_message)
     """
     nodes = sorted(list(G.nodes()))
     
@@ -62,12 +49,11 @@ def mis_algorithm_generator(G):
         S_tuple = heapq.heappop(Q)
         S = set(S_tuple)
         
-        # Yield the result to the caller
         yield sorted(list(S)), f"Found MIS: {sorted(list(S))}"
 
         # STEP 3: Generate candidates
         for j in nodes:
-            # Check reversibility condition
+            # Reversibility condition
             if any(neighbor in S and neighbor < j for neighbor in G.neighbors(j)):
                 
                 nodes_upto_j = [v for v in nodes if v <= j]

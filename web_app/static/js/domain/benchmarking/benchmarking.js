@@ -1,4 +1,3 @@
-
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content;
 }
@@ -8,7 +7,7 @@ window.selectListItems = function (containerId, bool) {
     if (!container) return;
     const items = container.querySelectorAll('.saved-item, .algo-item');
     items.forEach(item => {
-        if (item.style.display === 'none') return; // Skip filtered items
+        if (item.style.display === 'none') return;
         const cb = item.querySelector('input[type="checkbox"]');
         if (cb && !cb.disabled) {
             cb.checked = bool;
@@ -473,7 +472,6 @@ async function runBenchmark() {
     const algos = [];
     const container = document.getElementById('algoListContainer');
     if (container) {
-        // Updated: Use .selected class on .algo-item
         const items = container.querySelectorAll('.algo-item.selected');
         items.forEach(el => {
             let val = el.dataset.id;

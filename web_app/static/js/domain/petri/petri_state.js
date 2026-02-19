@@ -1,17 +1,11 @@
 
 // Petri Net State
 
-export const places = [
-    // { id: 1, x: 0, y: 0, tokens: 0, label: 'p1' }
-];
+export const places = [];
 
-export const transitions = [
-    // { id: 1, x: 100, y: 0, label: 't1' }
-];
+export const transitions = [];
 
-export const arcs = [
-    // { sourceId: 'p1', targetId: 't1', type: 'place_to_transition', weight: 1 }
-];
+export const arcs = [];
 
 export const petriState = {
     selectedElement: null, // place, transition, or arc
@@ -20,10 +14,9 @@ export const petriState = {
     nextTransitionId: 0,
     mouseX: 0,
     mouseY: 0,
-    snapToGrid: true, // Snap elements to grid
+    snapToGrid: true,
     gridSize: 50,
 
-    // Auto-Layout
     simulationRunning: false
 };
 

@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 
 def parse_pnh(content):
+    """Parses PNH (Petri Net Hypergraph logic) file content."""
     # Handle BOM
     if content.startswith('\ufeff'):
         content = content[1:]
@@ -8,54 +9,50 @@ def parse_pnh(content):
     lines = []
     for l in content.splitlines():
         clean = l.strip()
-        # Skip empty lines and comments
-        if not clean or clean.startswith('#') or clean.startswith('//') or clean.startswith(';'):
+        # Skip empty lines, comments (#, //, ;)
+        if not clean or clean.startswith(('#', '//', ';')):
             continue
         lines.append(clean)
         
     if len(lines) < 3:
         raise ValueError("Invalid PNH file format")
     
-    # Line 1: Number of places
+    # Header: |P|, |Rows|
     try:
-        num_places_line = lines[0]
-        num_places = int(num_places_line.split()[0]) # distinct split in case of comments
+        num_places = int(lines[0].split()[0])
     except Exception as e:
         raise ValueError(f"Line 1 (Places Count): '{lines[0]}' - {str(e)}")
 
-    # Line 2: Number of rows
     try:
-        num_rows_line = lines[1]
-        num_rows = int(num_rows_line.split()[0])
+        num_rows = int(lines[1].split()[0])
     except Exception as e:
          raise ValueError(f"Line 2 (Rows Count): '{lines[1]}' - {str(e)}")
     
-    # Determine number of transitions. 
-    # Spec implies last row is marking.
+    # PNH logic: |T| = |Rows| - 1 (Last row is Marking)
     num_transitions = num_rows - 1
     
     places = [{'id': i, 'tokens': 0, 'label': f'p{i}'} for i in range(num_places)]
     transitions = [{'id': i, 'label': f't{i}'} for i in range(num_transitions)]
     arcs = []
     
-    # Parse Matrix
+    # Parse Incidence Matrix
     for t_idx in range(num_transitions):
         line_idx = 2 + t_idx
         if line_idx >= len(lines): break
         
         current_line = lines[line_idx]
         try:
-            # Check if space separated or dense
+            # Check format: Space-separated or Dense
             if ' ' in current_line:
                  row_vals = list(map(int, current_line.split()))
             else:
-                 # Dense format: '1', '0', 'x' -> 1, 0, -1
+                 # Dense: '1', '0', 'x' -> 1, 0, -1
                  row_vals = []
                  for char in current_line:
                      if char == '1': row_vals.append(1)
                      elif char == '0': row_vals.append(0)
-                     elif char == 'x' or char == 'X': row_vals.append(-1)
-                     else: row_vals.append(0) # Treat unknowns as 0
+                     elif char.lower() == 'x': row_vals.append(-1)
+                     else: row_vals.append(0)
             
             for p_idx, val in enumerate(row_vals):
                 if p_idx >= num_places: break
@@ -79,7 +76,7 @@ def parse_pnh(content):
         except Exception as e:
              raise ValueError(f"Line {line_idx+1} (Matrix Row {t_idx}): '{current_line}' - {str(e)}")
     
-    # Parse Marking (Last row logic)
+    # Parse Initial Marking (Last row)
     marking_row_idx = 2 + num_transitions
     if marking_row_idx < len(lines):
         try:
@@ -87,10 +84,7 @@ def parse_pnh(content):
             if ' ' in line_content:
                 marking_vals = list(map(int, line_content.split()))
             else:
-                # Dense marking? Usually marking is just numbers 0/1, but could be tokens > 1
-                # If dense, assume 1 char = 1 digit token count? 
-                # Or maybe it is just 0/1 marking? 
-                # For safety, let's assume single digit tokens if dense.
+                # Dense marking: Assume single digit tokens
                 marking_vals = []
                 for char in line_content:
                     if char.isdigit(): marking_vals.append(int(char))
@@ -105,11 +99,10 @@ def parse_pnh(content):
     return {'places': places, 'transitions': transitions, 'arcs': arcs}
 
 def normalize_arcs(arcs, place_ids, transition_ids):
-    """Normalize arcs to always have sourceId, targetId, type fields."""
+    """Normalize arcs to ensure sourceId, targetId, type fields exist."""
     normalized = []
     for arc in arcs:
         if 'type' in arc and 'sourceId' in arc:
-            # Already in new format
             normalized.append(arc)
         else:
             src = arc.get('source', arc.get('sourceId'))
@@ -123,9 +116,7 @@ def normalize_arcs(arcs, place_ids, transition_ids):
     return normalized
 
 def export_pnh(data):
-    """
-    Converts a dictionary (places, transitions, arcs) to PNH string format.
-    """
+    """Converts a Petri net dict to PNH string format."""
     places = data.get('places', [])
     transitions = data.get('transitions', [])
     raw_arcs = data.get('arcs', [])
@@ -133,7 +124,7 @@ def export_pnh(data):
     num_places = len(places)
     num_transitions = len(transitions)
     
-    # Sort by ID
+    # Sort for consistency
     places.sort(key=lambda x: x['id'])
     transitions.sort(key=lambda x: x['id'])
     
@@ -147,21 +138,21 @@ def export_pnh(data):
     
     # Header
     lines.append(f"{num_places}")
-    lines.append(f"{num_transitions + 1}") # +1 for marking
-    lines.append("")  # Blank line before incidence matrix
+    lines.append(f"{num_transitions + 1}")
+    lines.append("")
 
-    # Build Matrix for each transition
+    # Matrix Rows
     for t in transitions:
         row_chars = ['0'] * num_places
         
-        # Incoming arcs (Place -> Transition): -1 -> 'x'
+        # Incoming: -1 -> 'x'
         for arc in arcs:
             if arc['type'] == 'place_to_transition' and arc['targetId'] == t['id']:
                 pid = arc['sourceId']
                 if pid in p_map:
                     row_chars[p_map[pid]] = 'x'
                     
-        # Outgoing arcs (Transition -> Place): +1 -> '1'
+        # Outgoing: +1 -> '1'
         for arc in arcs:
             if arc['type'] == 'transition_to_place' and arc['sourceId'] == t['id']:
                 pid = arc['targetId']
@@ -170,7 +161,7 @@ def export_pnh(data):
         
         lines.append("".join(row_chars))
         
-    # Initial Marking (Last row)
+    # Initial Marking
     marking_chars = []
     for p in places:
         tokens = p.get('tokens', 0)
@@ -178,8 +169,8 @@ def export_pnh(data):
             
     lines.append("".join(marking_chars))
     
-    # Metadata
-    lines.append("")  # Blank line before metadata
+    # Metadata (Extended PNH)
+    lines.append("")
     p_names = [p.get('label', f"p{p['id']}") for p in places]
     lines.append(f";Places={';'.join(p_names)}")
     
@@ -189,6 +180,7 @@ def export_pnh(data):
     return "\n".join(lines)
 
 def export_pnml(data, net_name="petrinet"):
+    """Exports Petri net to standard PNML format."""
     places = data.get('places', [])
     transitions = data.get('transitions', [])
     raw_arcs = data.get('arcs', [])
@@ -235,5 +227,4 @@ def export_pnml(data, net_name="petrinet"):
         inscription = ET.SubElement(arc_el, 'inscription')
         ET.SubElement(inscription, 'text').text = str(arc.get('weight', 1))
 
-    # Generate String
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(pnml, encoding='unicode')

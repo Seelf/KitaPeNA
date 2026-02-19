@@ -73,8 +73,6 @@ export function runForceDirectedLayout(nodes, edges, options = {}) {
                 v = nodes.find(n => n.id === edge[1]);
             } else if (edge.sourceId !== undefined) {
                 // Petri style or hybrid
-                // We need to know which list the sourceId refers to if it's Petri
-                // This general engine assumes nodes is the combined list if isPetri is true
                 u = nodes.find(n => n.id === edge.sourceId && (isPetri ? (edge.type === 'place_to_transition' ? 'tokens' in n : !('tokens' in n)) : true));
                 v = nodes.find(n => n.id === edge.targetId && (isPetri ? (edge.type === 'transition_to_place' ? 'tokens' in n : !('tokens' in n)) : true));
             } else {

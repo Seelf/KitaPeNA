@@ -1,34 +1,28 @@
-
 import { state, nodes, edges, camera } from './state.js';
 import { draw } from '../engine/rendering/render.js';
 import { updateStats } from '../ui/ui.js';
 import { resetSimulation } from '../domain/petri/simulation.js';
-
 import { triggerAutoSave } from './tabs.js';
 
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content;
 }
 
-// --- LOCAL STORAGE ---
-// --- LOCAL STORAGE ---
+// --- Local Storage ---
+
 export function saveToLocalStorage() {
     const data = {
         nodes: nodes,
         edges: edges,
         camera: camera,
-        // Extended State for Persistence
         appContext: state.appContext,
         troResult: state.troResult,
         misSteps: state.misSteps,
-        // NEW: Save the entire graphs container
         graphs: state.graphs,
         activeActivityTab: state.activeActivityTab,
         activeDbTab: state.activeDbTab
     };
     localStorage.setItem('mis_autosave', JSON.stringify(data));
-
-    // Also trigger full session save (Tabs)
     triggerAutoSave();
 }
 
@@ -51,12 +45,12 @@ export function loadFromLocalStorage() {
             if (data.graphs) {
                 state.graphs = data.graphs;
             } else {
-                // Migration path: Try to recover from old keys if graphs not present
+                // Migration: Recover from old keys
                 if (data.misNodes) state.graphs.MIS = { nodes: data.misNodes || [], edges: data.misEdges || [] };
                 if (data.concurrencyNodes) state.graphs.CONCURRENCY = { nodes: data.concurrencyNodes || [], edges: data.concurrencyEdges || [] };
             }
 
-            // Restore Active Buffer (visuals)
+            // Restore Active Buffer
             if (Array.isArray(data.nodes) && Array.isArray(data.edges)) {
                 nodes.length = 0;
                 nodes.push(...data.nodes);
@@ -72,11 +66,7 @@ export function loadFromLocalStorage() {
                 updateStats();
                 console.log("Graph restored from localStorage. Context:", state.appContext);
 
-                // If in concurrency mode, ensure UI updates
                 if (state.appContext === 'CONCURRENCY') {
-                    // We need to trigger the UI update in main.js or here
-                    // But updateResultsList needs elements to be ready.
-                    // It is safe to call it if elements are init.
                     if (elements.resultsList) {
                         import('../ui/ui.js').then(ui => ui.updateResultsList());
                     }
@@ -88,7 +78,7 @@ export function loadFromLocalStorage() {
     }
 }
 
-// --- GRAAFF (MIS) API ---
+// --- Graph API (MIS) ---
 
 export async function loadSavedGraphs(listElement, loadCallback) {
     try {
@@ -104,25 +94,22 @@ export async function loadSavedGraphs(listElement, loadCallback) {
         graphs.forEach(g => {
             const item = document.createElement('div');
             item.className = 'saved-item';
-            item.title = g.name; // Tooltip with full name
-            // Simple row with name and delete button
+            item.title = g.name;
             item.innerHTML = `
                 <span class="name">${g.name}</span>
                 <span class="date">${new Date(g.created_at).toLocaleString()}</span>
                 <button class="btn-delete" title="Delete">×</button>
             `;
 
-            // Click on name to load
             item.querySelector('.name').addEventListener('click', () => {
                 if (loadCallback) loadCallback(g.id);
             });
 
-            // Click on delete
             item.querySelector('.btn-delete').addEventListener('click', async (e) => {
                 e.stopPropagation();
                 if (confirm(`Delete graph "${g.name}"?`)) {
                     await deleteGraph(g.id);
-                    loadSavedGraphs(listElement, loadCallback); // refresh
+                    loadSavedGraphs(listElement, loadCallback);
                 }
             });
 
@@ -144,7 +131,6 @@ export async function loadGraphFromDb(id) {
         const nodesData = JSON.parse(data.nodes);
         const edgesData = JSON.parse(data.edges);
 
-        // Update State
         nodes.length = 0;
         edges.length = 0;
         nodesData.forEach(n => nodes.push(n));
@@ -194,7 +180,7 @@ export async function deleteGraph(id, callback) {
 }
 
 
-// --- PETRI NET API ---
+// --- Petri Net API ---
 
 export async function loadSavedPetriNets(listElement, loadCallback) {
     if (!listElement) return;
@@ -202,7 +188,7 @@ export async function loadSavedPetriNets(listElement, loadCallback) {
     try {
         const response = await fetch('/api/petri/saved');
         const data = await response.json();
-        const nets = data.nets || data; // Handle both {nets:[]} and [] for backward/forward compat
+        const nets = data.nets || data;
 
         listElement.innerHTML = '';
         if (!nets || nets.length === 0) {
@@ -213,7 +199,7 @@ export async function loadSavedPetriNets(listElement, loadCallback) {
         nets.forEach(n => {
             const item = document.createElement('div');
             item.className = 'saved-item';
-            item.title = n.name; // Tooltip with full name
+            item.title = n.name;
             item.innerHTML = `
                 <span class="name">${n.name}</span>
                 <span class="date">${new Date(n.created_at).toLocaleString()}</span>
@@ -253,7 +239,7 @@ export async function loadPetriNetFromDb(id) {
     } catch (e) {
         console.error("Error loading Petri net:", e);
         alert("Failed to load model.");
-        return null; // Return null on failure
+        return null;
     }
 }
 
