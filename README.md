@@ -14,7 +14,7 @@ The project is used for:
 
 ---
 
-## 🚀 Running the Project
+## Running the Project
 
 ### Requirements
 *   Python 3.8+
@@ -45,7 +45,7 @@ The project is used for:
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
 ### 1. Interactive Petri Net Editor
 *   "Drag & Drop" network creation.
@@ -76,7 +76,7 @@ The project is used for:
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 The project is divided into backend logic (Flask) and modular frontend (Vanilla JS + ES6 Modules).
 
@@ -111,18 +111,22 @@ The project is divided into backend logic (Flask) and modular frontend (Vanilla 
 
 ---
 
-## 🔮 Roadmap
+## Roadmap
 
 The project is actively developed. Upcoming plans include:
 
-1.  **GSPN Wrapper (Generalized Stochastic Petri Nets)**:
-    *   Embedding support for stochastic Petri nets directly into the application.
-    *   Ability to define firing time/probability for transitions.
+1.  **Tool wrappers like i.e. GSPN Wrapper (Generalized Stochastic Petri Nets)**:
+    *   Embedding support for GSPN to access analysis time (for comparing purposes) and challenge it against other software.
+    *   Embedding support for HippoCPS.
+    *   Embedding support for PIPE (cmd version).
+    *   Embedding support for MS algorithm (but now can be implemented in C manually by user - so this is a maybe).
+    *   Add universal embeddings for other tools (or create tool specific embeddings).
+    *   Main goal is to have a "Big Laboratory" in one single browser page to evaluate analysis times of as many tools as possible.
 
 2.  **Wrapper Extension**:
-    *   Adding support for other programming languages in the computation layer.
-    *   Integration with external solvers.
+    *   Adding support for other programming languages in the computation layer (Currently C/C++ is confirmed working but in future Rust, Python, Java etc. support is planned to be added).
+    *   Integration with external solvers (API for other online tools and API FROM them).
 
 3.  **Advanced Results Export**:
-    *   Ability to export research, simulation, and benchmark results to analytical formats (CSV, Excel).
-    *   Generating automatic reports with charts and summary tables.
+    *   Ability to export research, simulation, and benchmark results to analytical formats (CSV, Excel etc.).
+    *   Generating automatic reports with charts and summary tables (latex, docx etc.).
