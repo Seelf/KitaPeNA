@@ -121,7 +121,7 @@ The project is actively developed. Upcoming plans include:
     *   Embedding support for PIPE (cmd version).
     *   Embedding support for MS algorithm (but now can be implemented in C manually by user - so this is a maybe).
     *   Add universal embeddings for other tools (or create tool specific embeddings).
-    *   Main goal is to have a "Big Laboratory" in one single browser page to evaluate analysis times of as many tools as possible.
+    *   Main goal is to have a "Big Laboratory" in one single browser page to evaluate analysis times of as many tools as possible and to create reports of evaluation times of different algorithms/tools in one single place without need to access every tool one by one. Bulk evaluation and verification of answers (future works include adding visual comparing tool of i.e. outputs of each particular algorithm so that scientist can see which algorithm failed for example to evaluate liveness of the Petri net).
 
 2.  **Wrapper Extension**:
     *   Adding support for other programming languages in the computation layer (Currently C/C++ is confirmed working but in future Rust, Python, Java etc. support is planned to be added).
