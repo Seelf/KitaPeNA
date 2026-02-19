@@ -130,3 +130,5 @@ The project is actively developed. Upcoming plans include:
 3.  **Advanced Results Export**:
     *   Ability to export research, simulation, and benchmark results to analytical formats (CSV, Excel etc.).
     *   Generating automatic reports with charts and summary tables (latex, docx etc.).
+
+4.  **More Import and Export file extensions for Petri nets**.
