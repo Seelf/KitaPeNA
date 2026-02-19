@@ -9,7 +9,7 @@ let tabs = [];
 let activeTabId = null;
 let nextTabId = 1;
 
-let contextSwitcher = null; // Callback
+let contextSwitcher = null;
 
 const tabBar = document.getElementById('editorTabBar');
 let autoSaveTimer = null;
@@ -19,14 +19,13 @@ export function initTabs(switchContextCallback) {
 
     // Try to restore session
     if (!restoreSession()) {
-        // Create initial default tab only if restore failed
         createNewTab('PETRI');
     } else {
-        // If restored, ensure UI is updated for the active tab
+        // If restored, ensure active tab is set
         if (activeTabId) {
             const tab = tabs.find(t => t.id === activeTabId);
             if (tab) {
-                activateTab(tab.id); // This will trigger restoreStateFromTab and switchContext
+                activateTab(tab.id);
             }
         }
     }
@@ -55,49 +54,43 @@ export function createNewTab(type = 'PETRI', name = null, content = null) {
     tabs.push(tab);
     renderTabBar();
     activateTab(id);
-    saveSession(); // Save after creating
+    saveSession();
     return id;
 }
 
 export function activateTab(id) {
     if (activeTabId === id) return;
 
-    // Stop any pending auto-saves from previous tab context
     cancelAutoSave();
 
-    // 1. Save current state to the active tab (if it exists)
+    // 1. Save current state
     if (activeTabId) {
         saveCurrentStateToTab(activeTabId);
     }
 
     // 2. Set new active
     activeTabId = id;
-    state.activeTabId = id; // Set global guard
+    state.activeTabId = id;
     const tab = tabs.find(t => t.id === id);
     if (!tab) return;
 
-    // 3. Restore state from new tab
+    // 3. Restore state
     restoreStateFromTab(tab);
 
     // 4. Update UI
     renderTabBar();
 
-    // Switch context (Mode)
+    // Switch context
     if (contextSwitcher) {
-        // Prefer saved context (e.g. if we were viewing Reachability Graph in a Petri tab)
-        // Fallback to tab.type (e.g. Petri for Petri tab)
         const targetContext = tab.data.activeContext || tab.type;
-        // Pass TRUE to skip saving the old buffer (which belongs to the PREVIOUS file)
         contextSwitcher(targetContext, true);
     }
 
-    saveSession(); // Save after activation
+    saveSession();
 }
 
 export function closeTab(id, event) {
     if (event) event.stopPropagation();
-
-    // Confirm if dirty? (Skip for now for simplicity)
 
     const index = tabs.findIndex(t => t.id === id);
     if (index === -1) return;
@@ -105,17 +98,15 @@ export function closeTab(id, event) {
     tabs.splice(index, 1);
 
     if (activeTabId === id) {
-        // Switch to another tab
         if (tabs.length > 0) {
             activateTab(tabs[tabs.length - 1].id);
         } else {
-            // No tabs left? Create default
-            activeTabId = null; // reset so createNewTab doesn't try to save
+            activeTabId = null;
             createNewTab('PETRI');
         }
     } else {
         renderTabBar();
-        saveSession(); // Save after closing (if not switched, needed here)
+        saveSession();
     }
 }
 
@@ -123,20 +114,18 @@ function saveCurrentStateToTab(tabId) {
     const tab = tabs.find(t => t.id === tabId);
     if (!tab) return;
 
-    // Use JSON parse/stringify for Deep Copy to ensure total isolation of tab states
+    // Use JSON parse/stringify for Deep Copy
     if (tab.type === 'MIS') {
         const stateDump = {
-            // NEW: Save entire graphs container
             graphs: state.graphs,
             camera: misCamera,
             activeContext: state.appContext,
-            // Results
             troResult: state.troResult,
             coloringResult: state.coloringResult
         };
         tab.data = JSON.parse(JSON.stringify(stateDump));
     } else {
-        // Sync main camera to the appropriate context camera before saving
+        // Sync cameras
         if (state.appContext === 'PETRI') {
             state.petriCamera.x = misCamera.x;
             state.petriCamera.y = misCamera.y;
@@ -151,13 +140,11 @@ function saveCurrentStateToTab(tabId) {
             state.concurrencyCamera.zoom = misCamera.zoom;
         }
 
-        // Before saving, ensure global nodes BUFFER is synced to specific storage if dirty/active
+        // Sync buffer to storage
         if (state.appContext === 'MIS') {
-            console.log(`[TABS] Saving MIS Buffer to Storage. Nodes: ${nodes.length}`);
             state.graphs.MIS.nodes = JSON.parse(JSON.stringify(nodes));
             state.graphs.MIS.edges = JSON.parse(JSON.stringify(edges));
         } else if (state.appContext === 'CONCURRENCY') {
-            console.log(`[TABS] Saving Concurrency Buffer to Storage. Nodes: ${nodes.length}`);
             state.graphs.CONCURRENCY.nodes = JSON.parse(JSON.stringify(nodes));
             state.graphs.CONCURRENCY.edges = JSON.parse(JSON.stringify(edges));
         }
@@ -171,8 +158,6 @@ function saveCurrentStateToTab(tabId) {
             camera: state.petriCamera,
             activeContext: state.appContext,
 
-            // START REACHABILITY PERSISTENCE (ISOLATED)
-            // NEW: Save entire graphs container
             graphs: state.graphs,
 
             misSteps: state.misSteps,
@@ -182,26 +167,23 @@ function saveCurrentStateToTab(tabId) {
             misCamera: state.misCamera,
             concurrencyCamera: state.concurrencyCamera,
 
-            // Results persistence
             troResult: state.troResult,
             coloringResult: state.coloringResult
-            // END REACHABILITY PERSISTENCE
         };
         tab.data = JSON.parse(JSON.stringify(stateDump));
     }
 }
 
 function restoreStateFromTab(tab) {
-    // CRITICAL: WIPE GLOBAL BUFFERS IMMEDIATELY
-    // This prevents any stale data from previous tab from lingering
+    // Clear global buffers
     nodes.length = 0;
     edges.length = 0;
 
-    // Reset Global State Defaults first
+    // Reset Defaults
     state.troResult = null;
     state.coloringResult = null;
 
-    // Explicitly reset graphs to avoid leaking if tab data is missing
+    // Reset graphs container
     state.graphs = {
         MIS: { nodes: [], edges: [] },
         CONCURRENCY: { nodes: [], edges: [] }
@@ -223,7 +205,6 @@ function restoreStateFromTab(tab) {
             misCamera.zoom = tab.data.camera.zoom;
         }
 
-        // Restore Results
         if (tab.data.troResult) state.troResult = tab.data.troResult;
         if (tab.data.coloringResult) state.coloringResult = tab.data.coloringResult;
 
@@ -235,22 +216,17 @@ function restoreStateFromTab(tab) {
         if (tab.data.transitions) tab.data.transitions.forEach(t => transitions.push(t));
         if (tab.data.arcs) tab.data.arcs.forEach(a => arcs.push(a));
 
-        // Dynamically calculate next IDs
         const maxPlaceId = places.reduce((max, p) => Math.max(max, p.id), -1);
         const maxTransId = transitions.reduce((max, t) => Math.max(max, t.id), -1);
 
         petriState.nextPlaceId = (tab.data.nextPlaceId !== undefined) ? tab.data.nextPlaceId : (maxPlaceId + 1);
         petriState.nextTransitionId = (tab.data.nextTransitionId !== undefined) ? tab.data.nextTransitionId : (maxTransId + 1);
 
-        // RESTORE ISOLATED DATA
-        // DEEP COPY to ensure working state does not reference tab storage directly
+        // Restore Graphs
         if (tab.data.graphs) {
-            console.log(`[TABS] Restoring Graphs from Data. MIS Nodes: ${tab.data.graphs.MIS?.nodes?.length}, CONCURRENCY Nodes: ${tab.data.graphs.CONCURRENCY?.nodes?.length}`);
             state.graphs = JSON.parse(JSON.stringify(tab.data.graphs));
-            console.log(`[TABS] State.graphs restored. MIS Nodes: ${state.graphs.MIS.nodes.length}`);
         } else {
-            console.log("[TABS] No graphs in tab data. creating fresh structure.");
-            // Legacy Migration (create fresh structure)
+            // Legacy Migration
             state.graphs = {
                 MIS: { nodes: [], edges: [] },
                 CONCURRENCY: { nodes: [], edges: [] }
@@ -271,15 +247,12 @@ function restoreStateFromTab(tab) {
         state.graphTruncated = tab.data.graphTruncated || false;
         state.maxReachabilityStates = tab.data.maxReachabilityStates || 1000;
 
-        // Restore Results
         if (tab.data.troResult) state.troResult = tab.data.troResult;
         if (tab.data.coloringResult) state.coloringResult = tab.data.coloringResult;
 
-        // Update input if exists
         const inputMax = document.getElementById('inputMaxStates');
         if (inputMax) inputMax.value = state.maxReachabilityStates;
 
-        // Restore all context cameras
         if (tab.data.camera) {
             state.petriCamera.x = tab.data.camera.x || 0;
             state.petriCamera.y = tab.data.camera.y || 0;
@@ -299,11 +272,8 @@ function restoreStateFromTab(tab) {
         }
     }
 
-    // Force stop simulation on reload
     state.isPlaying = false;
     state.currentStepIndex = -1;
-
-    // Trigger results update (needs to happen after we return, handled by activateTab -> switchContext -> updateResultsList)
 }
 
 function renderTabBar() {
@@ -325,14 +295,11 @@ function renderTabBar() {
         tabBar.appendChild(el);
     });
 
-    // Add "+" Button
     const addBtn = document.createElement('div');
     addBtn.className = 'editor-tab-add';
     addBtn.innerHTML = '+';
     addBtn.title = 'New Tab';
     addBtn.addEventListener('click', () => {
-        // Simple heuristic: if last was MIS, create MIS, else Petri
-        // Or just prompt/default. Let's default to PETRI as this is the focus.
         createNewTab('PETRI');
     });
     tabBar.appendChild(addBtn);
@@ -348,15 +315,13 @@ export function renameActiveTab(newName) {
     }
 }
 
-// --- PERSISTENCE ---
+// --- Persistence ---
 
 function saveSession() {
-    // 1. Sync current global state to the active tab object
     if (activeTabId) {
         saveCurrentStateToTab(activeTabId);
     }
 
-    // 2. Serialize
     const sessionData = {
         tabs: tabs,
         activeTabId: activeTabId,
@@ -365,7 +330,6 @@ function saveSession() {
 
     try {
         localStorage.setItem('editor_session', JSON.stringify(sessionData));
-        // Also save text timestamps or other metadata if needed
     } catch (e) {
         console.error("Failed to save session:", e);
     }
@@ -382,7 +346,6 @@ function restoreSession() {
         tabs = sessionData.tabs;
         nextTabId = sessionData.nextTabId || (tabs.length + 1);
 
-        // Restore Active Tab
         const targetId = sessionData.activeTabId;
 
         if (targetId && tabs.find(t => t.id === targetId)) {
@@ -409,8 +372,6 @@ function restoreSession() {
     }
 }
 
-// Hook saveSession into state modifiers
-// We need to export a way to force save when content changes (autosave)
 export function cancelAutoSave() {
     if (autoSaveTimer) {
         clearTimeout(autoSaveTimer);

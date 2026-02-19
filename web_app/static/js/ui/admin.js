@@ -6,7 +6,7 @@ export function initAdminConsole() {
     const btnClose = document.getElementById('btnCloseAdmin');
     const tableBody = document.getElementById('userTableBody');
 
-    if (!btnAdmin) return; // Not an admin
+    if (!btnAdmin) return;
 
     btnAdmin.addEventListener('click', () => {
         modal.style.display = 'flex';
@@ -134,11 +134,6 @@ export function initAdminConsole() {
         fetchUsers();
     }
 
-    // Helper to get CSRF from generic meta tag or cookies if we had one, 
-    // but Flask-WTF usually puts it in a hidden form input OR we need to expose it.
-    // For now, let's inject it into a global or meta tag in index.html, or fetch it.
-    // Actually, Flask-WTF requires X-CSRFToken header for AJAX.
-    // We need to put the token in the HTML template.
     function getCsrfToken() {
         return document.querySelector('meta[name="csrf-token"]')?.content;
     }

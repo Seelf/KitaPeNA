@@ -20,8 +20,6 @@ export async function generateReachabilityGraph(background = false) {
         return false;
     }
 
-    // 1. Prepare Payload
-    // SAVE INITIAL MARKING (M0)
     state.initialMarking = {};
     places.forEach(p => {
         state.initialMarking[p.id] = parseInt(p.tokens) || 0;
@@ -53,7 +51,7 @@ export async function generateReachabilityGraph(background = false) {
 
         const data = await response.json();
 
-        // GUARD: Check if we are still in the same tab
+        // Check if we are still in the same tab
         if (state.activeTabId !== requestingTabId) {
             console.warn(`[REACHABILITY] Ignoring stale update.`);
             return false;
@@ -77,7 +75,7 @@ function processReachabilityData(data, background) {
     const newNodes = [];
     const newEdges = [];
 
-    // CACHE PREVIOUS POSITIONS
+    // Cache previous positions
     const prevPositions = new Map();
     state.graphs.MIS.nodes.forEach(n => {
         if (n.id !== undefined) prevPositions.set(n.id, { x: n.x, y: n.y });
@@ -103,7 +101,6 @@ function processReachabilityData(data, background) {
         newEdges.push(...data.edges);
     }
 
-    // UPDATE STORAGE
     state.graphs.MIS.nodes = newNodes;
     state.graphs.MIS.edges = newEdges;
 
@@ -118,7 +115,6 @@ function processReachabilityData(data, background) {
 
     triggerAutoSave();
 
-    // SYNC TO VIEW ONLY IF ACTIVE
     if (state.appContext === 'MIS') {
         nodes.length = 0;
         edges.length = 0;

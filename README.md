@@ -1,133 +1,128 @@
 # MC MIS Research Web App
 
-Aplikacja webowa do edycji, analizy i symulacji Sieci Petriego (Petri Nets) oraz wyznaczania Maksymalnych Zbiorów Niezależnych (MIS) na Grafach Osiągalności.
+A web application supporting research on **Concurrent Systems** modeled using **Petri Nets**.
 
-## Instrukcja Uruchomienia / How to Run
-
-### Wymagania
-- Python 3.8+
-- Przeglądarka internetowa (zalecany Chrome/Edge/Firefox)
-
-### Krok 1: Przygotowanie środowiska (tylko za pierwszym razem)
-W terminalu (w głównym folderze projektu):
-
-```bash
-# 1. Utwórz wirtualne środowisko
-python3 -m venv .venv
-
-# 2. Aktywuj środowisko
-# macOS / Linux:
-source .venv/bin/activate
-# Windows:
-# .venv\Scripts\activate
-
-# 3. Zainstaluj zależności
-pip install flask networkx matplotlib
-# (Możesz też użyć pip install -r requirements.txt jeśli istnieje)
-```
-
-### Krok 2: Uruchomienie aplikacji
-```bash
-# Upewnij się, że jesteś w głównym folderze i masz aktywne venv
-python web_app/app.py
-```
-
-Aplikacja powninna wystartować pod adresem: [http://127.0.0.1:5002](http://127.0.0.1:5002)
+The project is used for:
+1.  **Edytion and Visualization** of Petri Nets (Places, Transitions, Arcs).
+2.  **Generating Reachability Graphs** - the state space of the system.
+3.  **Generating Concurrency Graphs** based on event independence relations.
+4.  **Structural Graph Analysis**:
+    *   Determining MIS (Maximum Independent Sets).
+    *   Graph Coloring (Exact and Heuristic Algorithms).
+    *   Verification of Transitive Orientability (TRO).
+5.  **Benchmarking** performance of graph algorithms.
 
 ---
 
-## Opis Projektu
+## 🚀 Running the Project
 
-Celem projektu jest badanie i wizualizacja problemu wyznaczania **Maksymalnych Zbiorów Niezależnych (Maximum Independent Sets - MIS)** w kontekście systemów współbieżnych modelowanych za pomocą Sieci Petriego.
+### Requirements
+*   Python 3.8+
+*   Web Browser (Chrome / Firefox / Edge)
 
-Proces badawczy w aplikacji wygląda następująco:
-1.  **Edytor Sieci Petriego**: Użytkownik tworzy model sieci (Miejsca, Tranzycje, Łuki, Tokeny).
-2.  **Analiza Osiągalności**: Aplikacja generuje Graf Osiągalności (Reachability Graph) na podstawie modelu. Każdy węzeł grafu to unikalny stan (znakowanie) sieci.
-3.  **MIS Solver**: Algorytm wyznacza zbiory stanów, które są niezależne (niepołączone krawędziami w grafie osiągalności), co ma zastosowanie w analizie współbieżności i redukcji przestrzeni stanów.
+### Installation and Start
+
+1.  **Environment Preparation (One-time):**
+    ```bash
+    # Create virtual environment
+    python3 -m venv .venv
+    
+    # Activate environment
+    # macOS/Linux:
+    source .venv/bin/activate
+    # Windows:
+    # .venv\Scripts\activate
+    
+    # Install dependencies
+    pip install -r requirements.txt
+    ```
+
+2.  **Starting the Server:**
+    ```bash
+    python web_app/app.py
+    ```
+    The application will be available at: [http://127.0.0.1:5002](http://127.0.0.1:5002)
 
 ---
 
-## Struktura Plików i Folderów
+## 🌟 Key Features
 
-Projekt został zrefaktoryzowany, aby oddzielić logikę backendu od frontendu oraz przenieść starsze narzędzia desktopowe do dedykowanego folderu.
+### 1. Interactive Petri Net Editor
+*   "Drag & Drop" network creation.
+*   Support for places, transitions, arcs (weights), and initial marking (tokens).
+*   Import and export of nets in the following formats:
+    *   **PNH**.
+    *   **PNML** (Petri Net Markup Language - XML standard).
+    *   **JSON**.
 
-```
+### 2. Database Explorer
+*   Browsing saved nets with **Infinite Scroll**.
+*   Advanced filtering (by number of places, transitions, arcs, tokens).
+*   Sorting by name, creation date, or network parameters.
+*   Management of saved models (opening, deleting, downloading).
+
+### 3. Graph Analysis
+*   **Reachability Graph**: Automatic generation of the full state space with node and edge visualization.
+*   **Concurrency Graph**: Analysis of concurrency relations, checking if the graph is a cograph or permutation graph.
+*   **Coloring**: Visualization of independence classes (DSatur + Backtracking algorithm).
+
+### 4. Benchmarking Module
+*   Performance testing of algorithms (Python / C++) on graph sets.
+*   Testing modes:
+    *   Random Graphs.
+    *   Saved Graphs from DB.
+    *   Graphs generated from saved Petri Nets.
+*   Multiprocessing support.
+
+---
+
+## 📂 Project Structure
+
+The project is divided into backend logic (Flask) and modular frontend (Vanilla JS + ES6 Modules).
+
+```text
 /
-├── web_app/               # Główna aplikacja webowa (Flask + JS)
-│   ├── app.py             # Serwer aplikacji, routing API
-│   ├── analysis/          # Moduły analityczne (logika biznesowa)
-│   │   ├── reachability.py # Generowanie Grafu Osiągalności (BFS)
-│   │   ├── concurrency.py  # Generowanie Grafu Współbieżności
-│   │   ├── coloring.py     # Algorytmy kolorowania grafów (DSatur, Backtracking)
-│   │   ├── transitivity.py # Sprawdzanie przechodniej orientowalności (TRO)
-│   │   └── mis.py          # Algorytmy wyznaczania MIS (Maksymalnych Zbiorów Niezależnych)
-│   ├── templates/
-│   │   └── index.html     # Single Page Application (SPA)
-│   └── static/
-│       ├── css/           # Style (Dark Mode, Layout)
-│       └── js/            # Logika Frontendowa (opis poniżej)
+├── web_app/
+│   ├── app.py                 # Main entry point (Flask server)
+│   ├── api/                   # REST API Endpoints (Blueprints)
+│   │   ├── admin.py           # Admin tools
+│   │   ├── algorithms.py      # Algorithm access
+│   │   ├── benchmark.py       # Benchmark module API
+│   │   ├── graphs.py          # Graph operations
+│   │   └── petri/             # Petri Net operations (import/export/save)
+│   │
+│   ├── analysis/              # Business logic and algorithms
+│   │   ├── reachability.py    # Reachability graph generation
+│   │   ├── concurrency.py     # Concurrency analysis
+│   │   └── benchmarking/      # Performance test runner
+│   │
+│   ├── data/                  # Data access layer (SQLite)
+│   ├── static/js/             # Modular JS client
+│   │   ├── core/              # Core mechanisms (Main, State, Storage, Tabs)
+│   │   ├── domain/            # Domain logic (Petri, Algo, Concurrency)
+│   │   ├── engine/            # Rendering and interaction engines (Canvas, Layout)
+│   │   └── ui/                # UI Handling (DatabaseExplorer, UI Manager)
+│   │
+│   └── templates/             # HTML Templates (SPA)
 │
-├── tools/                 # Narzędzia pomocnicze
-│   └── desktop_editor/    # (Legacy) Poprzednia wersja desktopowa (PyQt/Tkinter)
-│       ├── MIS.py
-│       ├── main.py
-│       └── ...
-│
-├── tests/                 # Testy jednostkowe
-│   └── test_mis_logic.py
-└── .gitignore             # Konfiguracja Git
+├── tools/                     # Helper tools and legacy code
+└── tests/                     # Unit tests
 ```
 
-### Moduły Frontendowe (`web_app/static/js/`)
-
-Frontend został podzielony na wyspecjalizowane moduły ES6, komunikujące się przez centralny stan (`state.js`) i system zdarzeń.
-
-| Moduł | Opis Funkcjonalności |
-|-------|----------------------|
-| **`main.js`** | **Core**. Inicjalizacja aplikacji, obsługa głównego paska narzędzi, router kontekstów (Petri / MIS / Concurrency). |
-| **`tabs.js`** | **Zarządzanie sesją**. Obsługa wielu kart (plików), zapis/odczyt `localStorage`, izolacja stanu między kartami. |
-| **`state.js`** | **Single Source of Truth**. Przechowuje globalny stan widoku, dane grafów (`graphs.MIS`, `graphs.CONCURRENCY`) oraz wyniki analiz. |
-| **`petri_state.js`** | Model danych Sieci Petriego (Miejsca, Tranzycje, Łuki). |
-| **`petri_render.js`** | Silnik renderujący Sieci Petriego (Canvas API). |
-| **`petri_interactions.js`** | Obsługa edycji Sieci Petriego (Drag&Drop, łączenie). |
-| **`concurrency.js`** | Obsługa Grafu Współbieżności. Komunikacja z API, pobieranie wyników kolorowania i przechodniości. |
-| **`render.js`** | Silnik renderujący Grafy Osiągalności i Współbieżności. Obsługa layou-u siłowego (Force-Directed). |
-| **`interactions.js`** | Obsługa interakcji na grafach (przesuwanie, zaznaczanie węzłów). |
-| **`ui.js`** | Zarządzanie panelem bocznym (Sidebar), listą wyników, statystykami i legendą kolorowania. |
-| **`storage.js`** | Logika zapisu do bazy danych (SQLite) i obsługi plików `.pnh`. |
-
 ---
 
-## Nowe Funkcje (v2.0)
+## 🔮 Roadmap
 
-### 1. Izolacja Kontekstów i Karty
-Aplikacja obsługuje teraz pracę z wieloma plikami jednocześnie. Każda karta posiada własny, **całkowicie odseparowany** stan:
--   Sieć Petriego
--   Wygenerowany Graf Osiągalności
--   Wygenerowany Graf Współbieżności
--   Wyniki analizy
+The project is actively developed. Upcoming plans include:
 
-Przełączanie kart automatycznie zapisuje i odtwarza stan, zapobiegając "wyciekom" danych między projektami.
+1.  **GSPN Wrapper (Generalized Stochastic Petri Nets)**:
+    *   Embedding support for stochastic Petri nets directly into the application.
+    *   Ability to define firing time/probability for transitions.
 
-### 2. Graf Współbieżności (Concurrency Graph)
-Nowy moduł pozwalający na analizę relacji współbieżności w sieci:
--   Automatyczne generowanie krawędzi współbieżności na podstawie Grafu Osiągalności.
--   **Analiza TRO (Transitively Orientable)**: Sprawdzanie, czy graf jest grafem porównywalności porządku częściowego.
--   **Optymalne Kolorowanie**: Wyznaczanie liczby chromatycznej i wizualizacja podziału na klasy niezależne (użycie algorytmu DSatur + Backtracking).
+2.  **Wrapper Extension**:
+    *   Adding support for other programming languages in the computation layer.
+    *   Integration with external solvers.
 
-### 3. Zaawansowana Wizualizacja
--   Nowy silnik renderujący obsługujący zakrzywione krawędzie (Bézier curves) dla lepszej czytelności.
--   Interaktywna legenda kolorowania z możliwością podświetlania grup węzłów.
--   Ulepszony tryb ciemny (Dark Mode) spójny z nowoczesnymi IDE.
-
----
-
-## API Endpoints
-
-Aplikacja udostępnia REST API do obliczeń nieliniowych:
-
--   `POST /api/petri/reachability` - Generuje graf osiągalności.
--   `POST /api/petri/concurrency` - Generuje graf współbieżności.
--   `POST /api/analysis/coloring` - Wyznacza optymalne kolorowanie grafu.
--   `POST /api/analysis/transitivity` - Sprawdza orientowalność przechodnią (TRO).
--   `POST /api/solve` - (Legacy) Rozwiązuje problem MIS.
+3.  **Advanced Results Export**:
+    *   Ability to export research, simulation, and benchmark results to analytical formats (CSV, Excel).
+    *   Generating automatic reports with charts and summary tables.

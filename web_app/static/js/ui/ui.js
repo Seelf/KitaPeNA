@@ -11,7 +11,6 @@ export function updateStats() {
             const totalTokens = places.reduce((sum, p) => sum + (p.tokens || 0), 0);
             stats.textContent = `Places: ${places.length} | Transitions: ${transitions.length} | Arcs: ${arcs.length} | Tokens: ${totalTokens}`;
         } else if (state.appContext === 'CONCURRENCY') {
-            // Concurrency now uses global nodes/edges (same as MIS)
             stats.textContent = `Concurrency Graph | Places: ${nodes.length} | Concurrent Pairs: ${edges.length}`;
         } else {
             // MIS / Reachability Graph
@@ -29,10 +28,8 @@ export function updateStats() {
     const iconNum = document.getElementById('iconNodeNum');
     if (iconNum) {
         if (state.appContext === 'PETRI') {
-            // For Petri, maybe show places? Or total count? Let's show places + transitions
             iconNum.textContent = places.length + transitions.length;
         } else if (state.appContext === 'CONCURRENCY') {
-            // CONCURRENCY now uses global nodes (shared with MIS)
             iconNum.textContent = nodes.length;
         } else {
             const nextId = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
@@ -71,7 +68,6 @@ export function updateResultsList() {
             state.misSteps.forEach((step, index) => {
                 const el = document.createElement('div');
                 el.className = 'result-item';
-                // Handle both raw array (old?) or object {mis: []} (new)
                 const misArray = Array.isArray(step) ? step : (step.mis || []);
                 el.textContent = `${index + 1}. { ${misArray.join(', ')} }`;
                 el.onclick = () => {
@@ -90,12 +86,11 @@ export function updateResultsList() {
         }
     } else if (state.appContext === 'PETRI') {
         // --- PETRI REACHABILITY STATES ---
-        // Check if we have reachability graph nodes
-        const reachabilityNodes = nodes.filter(n => n.marking); // Only nodes with marking data
+        const reachabilityNodes = nodes.filter(n => n.marking);
 
         if (reachabilityNodes.length > 0) {
             const header = document.createElement('div');
-            header.className = 'result-header'; // You might need to add CSS for this, or reuse existing
+            header.className = 'result-header';
             header.style.padding = '5px 10px';
             header.style.fontWeight = 'bold';
             header.style.color = '#ccc';
@@ -105,9 +100,9 @@ export function updateResultsList() {
             reachabilityNodes.sort((a, b) => a.id - b.id).forEach((node, index) => {
                 const el = document.createElement('div');
                 el.className = 'result-item';
-                if (index === state.selectedReachabilityIndex) el.classList.add('active'); // Highlight
+                if (index === state.selectedReachabilityIndex) el.classList.add('active');
 
-                // Dynamic Label Generation (Client-Side) from current Place labels
+                // Dynamic Label Generation
                 let labelText = node.label || 'Unknown';
 
                 if (state.appContext === 'PETRI' && node.marking) {
@@ -124,7 +119,6 @@ export function updateResultsList() {
                         }
                     });
 
-                    // Sort Alphabetically
                     items.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
                     items.forEach(item => {
@@ -136,17 +130,16 @@ export function updateResultsList() {
                     });
 
                     if (parts.length > 0) labelText = parts.join(', ');
-                    else labelText = 'ø'; // Empty
+                    else labelText = 'ø';
                 }
 
                 el.textContent = `State ${node.id}: ${labelText}`;
                 el.title = JSON.stringify(node.marking);
 
                 el.onclick = () => {
-                    state.selectedReachabilityIndex = index; // Update index on click
+                    state.selectedReachabilityIndex = index;
+
                     // Restore State Logic
-                    console.log(`Restoring Petri State ${node.id} from list`, node.marking);
-                    // Update places tokens
                     let restoredCount = 0;
                     for (const p of places) {
                         if (node.marking[p.id] !== undefined) {
@@ -158,8 +151,7 @@ export function updateResultsList() {
                         import('../engine/rendering/petri_render.js').then(pr => pr.drawPetri());
                         updateStats();
                         saveToLocalStorage();
-                        // Highlight selected item
-                        updateResultsList(); // Re-render to show highlight
+                        updateResultsList();
                     }
                 };
                 elements.resultsList.appendChild(el);
@@ -174,13 +166,10 @@ export function updateResultsList() {
             elements.resultsList.innerHTML = '<div class="empty-state">No reachable states found. Run "Generate Graph" first.</div>';
         }
     } else if (state.appContext === 'CONCURRENCY') {
-        // Concurrency now uses global nodes (same as MIS)
         if (nodes.length > 0) {
-            // Fetch and Render Concurrency Analysis
             import('../domain/concurrency/concurrency.js').then(async m => {
 
                 // 1. Transitive Orientability
-                // Use cached result if available, otherwise fetch
                 let troResult = state.troResult;
                 if (!troResult) {
                     try {
@@ -216,21 +205,18 @@ export function updateResultsList() {
                 }
 
                 if (coloringResult) {
-                    // Convert stored object back to Map if necessary (JSON stringify converts Map to Object)
                     let colors = coloringResult.coloring;
                     if (!(colors instanceof Map)) {
-                        // Check if it's an object (from JSON) or array of pairs
                         if (typeof colors === 'object' && !Array.isArray(colors)) {
                             colors = new Map(Object.entries(colors).map(([k, v]) => [parseInt(k), v]));
                         } else {
-                            // Fallback or re-fetch if format is weird
                             colors = new Map();
                         }
                     }
 
                     const chromaticNum = coloringResult.chromaticNumber;
 
-                    // Apply colors to nodes for rendering (Re-apply in case of reload)
+                    // Apply colors to nodes
                     let colorsChanged = false;
                     nodes.forEach(node => {
                         if (colors.has(node.id)) {
@@ -267,7 +253,6 @@ export function updateResultsList() {
                         if (node) colorGroups.get(color).push(node);
                     });
 
-                    // Render groups
                     const palette = [
                         '#ffadad', '#ffd6a5', '#fdffb6', '#caffbf', '#9bf6ff', '#a0c4ff', '#bdb2ff', '#ffc6ff', '#fffffc'
                     ];
@@ -351,12 +336,6 @@ export function updateReadOnlyUI() {
             btn.style.pointerEvents = 'auto';
         }
     });
-
-    // If currently in creation mode, switch to view
-    // COMMENTED OUT: This might be causing "switch"-like behavior if tools are active
-    // if (isReadOnly && (state.mode === 'nodes' || state.mode === 'edges')) {
-    //    setMode('view');
-    // }
 }
 
 export function initViewSettings() {
@@ -377,7 +356,6 @@ export function initViewSettings() {
 
     const chkSnapConcurrency = document.getElementById('chkSnapConcurrency');
     if (chkSnapConcurrency) {
-        // Load saved preference from localStorage
         const savedSnapConc = localStorage.getItem('kitapena_snapConcurrency');
         if (savedSnapConc !== null) {
             state.snapConcurrency = savedSnapConc === 'true';

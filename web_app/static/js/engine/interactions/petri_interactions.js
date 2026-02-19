@@ -1,4 +1,4 @@
-// Author: Dawid Konarczak
+
 import { triggerAutoSave } from '../../core/tabs.js';
 
 function getCsrfToken() {
@@ -10,64 +10,15 @@ import { toWorld, toScreen } from '../rendering/render.js';
 import { state, camera, elements } from '../../core/state.js';
 import { updateStats, updateResultsList } from '../../ui/ui.js';
 
-// Global listeners already set up in main for interactions.js but we need specific ones for Petri
-// We will attach listeners to canvas in initPetriInteractions
-
 // Wrapper helper
 function updateAndSave() {
     updateStats();
-    // triggerReachabilityUpdate(); // Old placeholder
     triggerAutoSave();
     window.dispatchEvent(new CustomEvent('petri-state-updated'));
 }
 
-// ...
-
-// Replace calls to updateStats/triggerReachabilityUpdate with updateAndSave() or append triggerAutoSave()
-
-// Example Replacement Locations:
-
-// 1. Clear All
-// line 174: updateAndSave(); -> updateAndSave();
-
-// 2. Import
-// line 485: updateAndSave(); -> updateAndSave();
-
-// 3. Delete Place/Trans/Arc
-// line 255: updateAndSave(); -> updateAndSave();
-
-// 4. Place Creation
-// line 272: updateAndSave(); -> updateAndSave();
-
-// 5. Transition Creation
-// line 286: updateAndSave(); -> updateAndSave();
-
-// 6. Token Change
-// line 297: updateAndSave(); -> updateAndSave();
-
-// 7. Arc Delete (Duplicate)
-// line 326: updateAndSave(); -> updateAndSave();
-
-// 8. Arc Create
-// line 338: updateAndSave(); -> updateAndSave();
-
-// 9. Auto Layout
-// line 575: triggerAutoSave(); (added)
-
-// 10. Dragging
-// line 377: drawPetri(); -> drawPetri(); if (!petriState.isPanning) triggerAutoSave(); // Maybe debounce dragging save?
-// For dragging, usually save on mouseup is better.
-
-// 11. MouseUp
-// line 395: if (petriState.mode === 'view') canvas.style.cursor = 'grab';
-// Add: if (petriState.isDragging || petriState.isPanning) triggerAutoSave();
-
-
-// Global listeners already set up in main for interactions.js but we need specific ones for Petri
-// We will attach listeners to canvas in initPetriInteractions
-
 function logToScreen(msg) {
-    const el = document.getElementById('debugLogContainer'); // Changed from debugOverlay
+    const el = document.getElementById('debugLogContainer');
     if (el) {
         try {
             const time = new Date().toLocaleTimeString().split(' ')[0];
@@ -104,8 +55,8 @@ function checkIntegrity() {
 function getClickedLabel(worldX, worldY) {
     const pRadius = 25;
     const tHeight = 50;
-    const labelWidth = 50; // Approximate text width
-    const labelHeight = 14; // Approximate text height
+    const labelWidth = 50;
+    const labelHeight = 14;
 
     // Check place labels
     for (const p of places) {
@@ -291,7 +242,6 @@ export function initPetriInteractions() {
 
     if (btnPetriPan) btnPetriPan.addEventListener('click', () => {
         setActiveTool(btnPetriPan, 'view');
-        // Snap all elements to grid when entering view mode
         snapAllElements();
         drawPetri();
         updateAndSave();
@@ -306,7 +256,6 @@ export function initPetriInteractions() {
     // Snap-to-Grid Toggle with localStorage persistence
     const chkSnapToGrid = document.getElementById('chkSnapToGrid');
     if (chkSnapToGrid) {
-        // Load saved preference from localStorage
         const savedSnap = localStorage.getItem('kitapena_snapToGrid');
         if (savedSnap !== null) {
             petriState.snapToGrid = savedSnap === 'true';
@@ -331,7 +280,6 @@ export function initPetriInteractions() {
             arcs.length = 0;
             petriState.nextPlaceId = 1;
             petriState.nextTransitionId = 1;
-            drawPetri();
             drawPetri();
             updateAndSave();
         }
@@ -375,20 +323,12 @@ export function initPetriInteractions() {
                 const idx = places.indexOf(clicked.element);
                 if (idx > -1) places.splice(idx, 1);
                 // Remove attached arcs
-                logToScreen(`Deleting Place ID=${clicked.element.id}. Checking ${arcs.length} arcs.`);
-                // Dump IDs of ALL arcs to ensure sanity
-                // logToScreen("Arcs: " + arcs.map(a => `${a.type[0]}:${a.sourceId}->${a.targetId}`).join(", "));
-
                 for (let i = arcs.length - 1; i >= 0; i--) {
                     const a = arcs[i];
-                    logToScreen(`Check Arc #${i}: ${a.type} S=${a.sourceId} T=${a.targetId}`);
-
                     if (a.sourceId === clicked.element.id && a.type === 'place_to_transition') {
-                        logToScreen(`MATCH! Removing Arc #${i} (Source P=${a.sourceId})`);
                         arcs.splice(i, 1);
                     }
                     else if (a.targetId === clicked.element.id && a.type === 'transition_to_place') {
-                        logToScreen(`MATCH! Removing Arc #${i} (Target P=${a.targetId})`);
                         arcs.splice(i, 1);
                     }
                 }
@@ -396,15 +336,12 @@ export function initPetriInteractions() {
                 const idx = transitions.indexOf(clicked.element);
                 if (idx > -1) transitions.splice(idx, 1);
                 // Remove attached arcs
-                logToScreen(`Deleting Transition ID=${clicked.element.id}. Checking ${arcs.length} arcs.`);
                 for (let i = arcs.length - 1; i >= 0; i--) {
                     const a = arcs[i];
                     if (a.sourceId === clicked.element.id && a.type === 'transition_to_place') {
-                        logToScreen(`MATCH! Removing Arc #${i} (Source T=${a.sourceId})`);
                         arcs.splice(i, 1);
                     }
                     else if (a.targetId === clicked.element.id && a.type === 'place_to_transition') {
-                        logToScreen(`MATCH! Removing Arc #${i} (Target T=${a.targetId})`);
                         arcs.splice(i, 1);
                     }
                 }
@@ -449,7 +386,6 @@ export function initPetriInteractions() {
                 const el = clicked.element;
                 const type = clicked.type;
 
-                // Prompt user
                 const currentName = el.label || (type === 'place' ? `p${el.id}` : `t${el.id}`);
                 const newName = prompt(`Rename ${type} (ID: ${el.id}):`, currentName);
 
@@ -457,7 +393,7 @@ export function initPetriInteractions() {
                     el.label = newName.trim();
                     drawPetri();
                     updateAndSave();
-                    updateResultsList(); // Immediate UI update for names
+                    updateResultsList();
                 }
             }
         } else if (petriState.mode === 'token') {
@@ -471,18 +407,14 @@ export function initPetriInteractions() {
                 updateAndSave();
             }
         } else if (petriState.mode === 'arc') {
-            // ...
             if (clicked) {
                 if (!petriState.selectedElement) {
                     petriState.selectedElement = clicked; // Start of arc
                 } else {
-                    // Try to connect
                     const start = petriState.selectedElement;
                     const end = clicked;
 
                     if (start.type !== end.type) {
-                        // Valid connection (P->T or T->P)
-                        // Check duplicates
                         const arcType = (start.type === 'place') ? 'place_to_transition' : 'transition_to_place';
 
                         const existsIndex = arcs.findIndex(a =>
@@ -493,13 +425,11 @@ export function initPetriInteractions() {
 
                         if (existsIndex !== -1) {
                             console.log("Arc already exists, skipping duplicate.");
-                            // Delete only if Ctrl/Cmd is pressed (legacy behavior, but we have Eraser now)
                             if (e.ctrlKey || e.metaKey) {
                                 arcs.splice(existsIndex, 1);
                                 updateAndSave();
                             }
                         } else {
-                            // Add new arc
                             console.log(`Creating Arc: ${start.type}(${start.element.id}) -> ${end.type}(${end.element.id})`);
                             arcs.push({
                                 sourceId: start.element.id,
@@ -513,7 +443,7 @@ export function initPetriInteractions() {
                     petriState.selectedElement = null; // Reset
                 }
             } else {
-                petriState.selectedElement = null; // Clicked empty space cancel
+                petriState.selectedElement = null;
             }
             drawPetri();
         } else if (petriState.mode === 'view') {
@@ -552,13 +482,10 @@ export function initPetriInteractions() {
         }
 
         if (petriState.isDraggingLabel && petriState.dragLabelElement) {
-            // Drag label - update offset
             const el = petriState.dragLabelElement;
             const pRadius = 25;
             const tHeight = 50;
 
-            // Calculate new offset based on mouse position
-            // Determine if it's a place or transition by checking if it has 'tokens' property
             const isPlace = 'tokens' in el;
             const baseY = isPlace ? (el.y + pRadius + 15) : (el.y + tHeight / 2 + 15);
 
@@ -583,7 +510,6 @@ export function initPetriInteractions() {
     window.addEventListener('mouseup', () => {
         if (state.appContext !== 'PETRI') return;
 
-        // Snap dragged element to grid before releasing
         if (petriState.snapToGrid && petriState.dragElement) {
             const el = petriState.dragElement.element;
             el.x = snapToGrid(el.x);
@@ -598,7 +524,6 @@ export function initPetriInteractions() {
         petriState.isPanning = false;
         if (petriState.mode === 'view') canvas.style.cursor = 'grab';
 
-        // Save on interaction end
         if (state.appContext === 'PETRI') {
             triggerAutoSave();
         }
@@ -631,7 +556,7 @@ export function initPetriInteractions() {
             camera.y -= e.deltaY;
         }
         drawPetri();
-        triggerAutoSave(); // Save camera position after pan/zoom
+        triggerAutoSave();
     }, { passive: false });
 }
 
@@ -657,7 +582,6 @@ async function importPnhFile(file) {
         const data = await res.json();
 
         if (data.status === 'success') {
-            // Apply data
             places.length = 0;
             transitions.length = 0;
             arcs.length = 0;
@@ -666,11 +590,9 @@ async function importPnhFile(file) {
             data.transitions.forEach(t => transitions.push({ ...t, x: 0, y: 0 }));
             data.arcs.forEach(a => arcs.push(a));
 
-            // Recalculate Next IDs based on MAX(id, name_number)
             let maxP = 0;
             places.forEach(p => {
                 const idVal = parseInt(p.id) || 0;
-                // Parse label like "p123"
                 const labelMatch = (p.label || "").match(/^p(\d+)$/);
                 const labelVal = labelMatch ? parseInt(labelMatch[1]) : 0;
 
@@ -681,7 +603,6 @@ async function importPnhFile(file) {
             let maxT = 0;
             transitions.forEach(t => {
                 const idVal = parseInt(t.id) || 0;
-                // Parse label like "t123"
                 const labelMatch = (t.label || "").match(/^t(\d+)$/);
                 const labelVal = labelMatch ? parseInt(labelMatch[1]) : 0;
 
@@ -689,13 +610,9 @@ async function importPnhFile(file) {
             });
             petriState.nextTransitionId = maxT + 1;
 
-            console.log(`[Import] Places: ${places.length}, MaxID: ${maxP} -> Next: ${petriState.nextPlaceId}`);
-            console.log(`[Import] Trans: ${transitions.length}, MaxID: ${maxT} -> Next: ${petriState.nextTransitionId}`);
-
             checkIntegrity();
             runAutoLayout();
             updateAndSave();
-            await forceReachabilityUpdate();
             alert(`Imported: ${places.length} places, ${transitions.length} transitions.`);
         } else {
             alert('Import failed: ' + data.message);
@@ -706,7 +623,7 @@ async function importPnhFile(file) {
         alert('Upload failed: ' + e.message);
     } finally {
         isImporting = false;
-        drawPetri(); // Ensure draw happens at the end
+        drawPetri();
         triggerAutoSave();
         console.log("Import finished.");
     }
@@ -732,6 +649,3 @@ export function runAutoLayout() {
 
     triggerAutoSave();
 }
-
-
-

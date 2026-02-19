@@ -1,5 +1,3 @@
-
-// Author: Dawid Konarczak
 console.log("Main.js module loading...");
 
 import { initElements, state, nodes, edges, camera } from './state.js';
@@ -22,7 +20,7 @@ import { runForceDirectedLayout } from '../engine/layout/layout_engine.js';
 import { switchContext, initResizer } from './view_manager.js';
 import { generateReachabilityGraph, debouncedUpdateReachability } from '../domain/petri/petri_analyzer.js';
 
-console.log("App Initializing (Direct execution)...");
+console.log("App Initializing...");
 
 // 1. Init DOM Elements & Systems
 initElements();

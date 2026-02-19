@@ -2,14 +2,12 @@
 import { places, transitions, arcs, petriState } from '../../domain/petri/petri_state.js';
 import { elements, camera } from '../../core/state.js';
 
-// Draw grid background
 function drawGrid(ctx, canvas, cam) {
     const gridSize = 50;
     ctx.save();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
 
-    // Calculate visible range in world coordinates
     const startX = Math.floor((-cam.x / cam.zoom) / gridSize) * gridSize;
     const startY = Math.floor((-cam.y / cam.zoom) / gridSize) * gridSize;
     const endX = Math.ceil((canvas.width - cam.x) / cam.zoom / gridSize) * gridSize;
@@ -17,13 +15,11 @@ function drawGrid(ctx, canvas, cam) {
 
     ctx.beginPath();
 
-    // Vertical lines
     for (let x = startX; x <= endX; x += gridSize) {
         ctx.moveTo(x, startY);
         ctx.lineTo(x, endY);
     }
 
-    // Horizontal lines
     for (let y = startY; y <= endY; y += gridSize) {
         ctx.moveTo(startX, y);
         ctx.lineTo(endX, y);
@@ -37,7 +33,6 @@ export function drawPetri() {
     const { ctx, canvas } = elements;
     if (!ctx || !canvas) return;
 
-    // Clear (same background)
     ctx.fillStyle = '#1e1e1e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -45,13 +40,7 @@ export function drawPetri() {
     ctx.translate(camera.x, camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
-    // Draw grid
     drawGrid(ctx, canvas, camera);
-
-    // DEBUG TRACE
-    console.log(`DRAW PETRI: ${places.length} Places, ${transitions.length} Transitions. Camera: ${camera.x.toFixed(1)}, ${camera.y.toFixed(1)}, Z=${camera.zoom}`);
-    if (places.length > 0) console.log(`Place[0] coords: ${places[0].x}, ${places[0].y}`);
-
 
     // 1. Draw Arcs
     ctx.lineWidth = 2;
@@ -73,11 +62,10 @@ export function drawPetri() {
         }
 
         if (source && target) {
-            // Calculate angle from source to target
             const angle = Math.atan2(target.y - source.y, target.x - source.x);
 
             const start = getBorderPoint(source, sourceType, angle);
-            const end = getBorderPoint(target, targetType, angle + Math.PI); // Angle from target back to source
+            const end = getBorderPoint(target, targetType, angle + Math.PI);
 
             drawArrow(ctx, start.x, start.y, end.x, end.y);
         }
@@ -105,8 +93,6 @@ export function drawPetri() {
     const tHeight = 50;
 
     transitions.forEach(t => {
-        // Highlight selection
-        // Highlight selection
         if (petriState.selectedElement === t) {
             if (petriState.mode === 'arc') {
                 ctx.shadowBlur = 10;
@@ -124,7 +110,7 @@ export function drawPetri() {
 
         ctx.fillRect(t.x - tWidth / 2, t.y - tHeight / 2, tWidth, tHeight);
 
-        // Label (with offset support)
+        // Label
         ctx.fillStyle = '#aaa';
         ctx.font = '12px Inter';
         ctx.textAlign = 'center';
@@ -137,7 +123,6 @@ export function drawPetri() {
     const pRadius = 25;
 
     places.forEach(p => {
-        // Highlight
         if (petriState.selectedElement === p) {
             if (petriState.mode === 'arc') {
                 ctx.shadowBlur = 10;
@@ -164,12 +149,10 @@ export function drawPetri() {
         if (p.tokens > 0) {
             ctx.fillStyle = '#fff';
             if (p.tokens < 5) {
-                // Draw dots
                 // Simple pattern for 1-4
                 if (p.tokens === 1) {
                     ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill();
                 } else {
-                    // scatter small dots
                     const offset = 10;
                     for (let i = 0; i < p.tokens; i++) {
                         const angle = (Math.PI * 2 * i) / p.tokens;
@@ -179,7 +162,6 @@ export function drawPetri() {
                     }
                 }
             } else {
-                // Draw number
                 ctx.font = 'bold 16px Inter';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -187,7 +169,7 @@ export function drawPetri() {
             }
         }
 
-        // Label (with offset support)
+        // Label
         ctx.fillStyle = '#aaa';
         ctx.font = '12px Inter';
         ctx.textAlign = 'center';
@@ -196,55 +178,35 @@ export function drawPetri() {
         ctx.fillText(p.label || `p${p.id}`, pLabelX, pLabelY);
     });
 
-    ctx.shadowBlur = 0; // Reset shadow
+    ctx.shadowBlur = 0;
     ctx.restore();
 }
 
-// Helper to find border point based on node type
 function getBorderPoint(element, type, angle) {
-    if (type === 'token') return { x: element.x, y: element.y }; // Should not happen for arcs
+    if (type === 'token') return { x: element.x, y: element.y };
 
     if (type === 'place') {
-        const r = 25; // Keeping hardcoded for now matching render logic
+        const r = 25;
         return {
             x: element.x + Math.cos(angle) * r,
             y: element.y + Math.sin(angle) * r
         };
     } else { // transition
-        // Rectangle intersection
         const w = 30;
         const h = 50;
         const hw = w / 2;
         const hh = h / 2;
 
-        const tan = Math.tan(angle);
-        let dx = 0, dy = 0;
-
-        // Check intersections with vertical or horizontal sides
-        // We want to find the point on the box boundary in direction of angle
-
-        // This is a standard math problem. 
-        // Based on angle sectors.
-        // Aspect ratio of box corners is hh/hw = 25/15 = 5/3.
-
-        // Normalize angle to -PI to PI
-        // Easier: Ray casting against 4 segments.
-        // Or simplified sector check.
-
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
+        let dx = 0, dy = 0;
 
-        // Avoid division by zero
-        // if |tan| < h/w => intersect vertical sides
-        // if |tan| > h/w => intersect horizontal sides
-
-        // Let's use absolute comparison
         if (Math.abs(sin * hw) < Math.abs(cos * hh)) {
-            // Intersects Left or Right (Vertical sides)
+            // Intersects Vertical sides
             dx = (cos > 0) ? hw : -hw;
             dy = dx * (sin / cos);
         } else {
-            // Intersects Top or Bottom (Horizontal sides)
+            // Intersects Horizontal sides
             dy = (sin > 0) ? hh : -hh;
             dx = dy * (cos / sin);
         }
@@ -262,20 +224,12 @@ function drawArrow(ctx, x1, y1, x2, y2, isGhost = false) {
     const dy = y2 - y1;
     const angle = Math.atan2(dy, dx);
 
-    // If Ghost, we don't have a target element structure easily available here, 
-    // so we use simple offset or logic.
-    // If NOT ghost, x1,y1 and x2,y2 are ALREADY computed border points.
-
-    // For ghost: start is center of source (we need border), end is mouse (no border).
-    // But caller 'drawPetri' handles ghost differently. 
-    // Let's assume input coordinates are EXACT points to draw line between.
-
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
 
-    // Arrowhead at (x2, y2)
+    // Arrowhead
     ctx.beginPath();
     ctx.moveTo(x2, y2);
     ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6));
@@ -283,7 +237,7 @@ function drawArrow(ctx, x1, y1, x2, y2, isGhost = false) {
     ctx.closePath();
 
     if (isGhost) {
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.6)'; // Gold with opacity
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.6)';
         ctx.strokeStyle = '#FFD700';
     } else {
         ctx.fillStyle = '#cccccc';

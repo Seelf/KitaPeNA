@@ -11,15 +11,12 @@ function updateAndSave() {
     updateStats();
     resetSimulation();
 
-    console.log(`[INTERACTIONS DEBUG] updateAndSave called. Context: ${state.appContext}`);
-    // Aggressively update specific state storage to prevent data loss on refresh
     if (state.appContext === 'MIS') {
         state.graphs.MIS.nodes = JSON.parse(JSON.stringify(nodes));
         state.graphs.MIS.edges = JSON.parse(JSON.stringify(edges));
     } else if (state.appContext === 'CONCURRENCY') {
         state.graphs.CONCURRENCY.nodes = JSON.parse(JSON.stringify(nodes));
         state.graphs.CONCURRENCY.edges = JSON.parse(JSON.stringify(edges));
-        console.log(`[INTERACTIONS] Synced Concurrency State. Nodes: ${nodes.length}`);
     }
 
     saveToLocalStorage();
@@ -69,7 +66,6 @@ export function initInteractions() {
     if (!canvas) return;
 
     canvas.addEventListener('mousedown', (e) => {
-        // CONCURRENCY now uses same infrastructure as MIS, so handle them together
         if (state.appContext !== 'MIS' && state.appContext !== 'CONCURRENCY') return;
 
         const rect = canvas.getBoundingClientRect();
@@ -80,17 +76,14 @@ export function initInteractions() {
 
         if (clickedNode) {
             if (state.mode === 'nodes' || state.mode === 'view') {
-                // Drag Mode or View Mode -> Select Node
                 state.isDraggingNode = true;
                 state.dragNodeId = clickedNode.id;
                 state.selectedNode = clickedNode;
 
-                // RESTORE STATE FROM REACHABILITY NODE
+                // Restore state from Reachability Node
                 if (clickedNode.marking) {
-                    console.log(`Restoring state from Node ${clickedNode.id}:`, clickedNode.marking);
                     let restoredCount = 0;
 
-                    // Update places tokens
                     for (const p of places) {
                         if (clickedNode.marking[p.id] !== undefined) {
                             p.tokens = clickedNode.marking[p.id];
@@ -99,51 +92,41 @@ export function initInteractions() {
                     }
 
                     if (restoredCount > 0) {
-                        // Update visual feedback
-                        drawPetri(); // Redraw Petri net (in background context)
-                        updateStats(); // Update token counts UI
-                        saveToLocalStorage(); // Persist changes
+                        drawPetri();
+                        updateStats();
+                        saveToLocalStorage();
                     }
 
-                    // SYNC STATE LIST SELECTION
                     const nodeIndex = nodes.findIndex(n => n.id === clickedNode.id);
                     if (nodeIndex >= 0) {
                         state.selectedReachabilityIndex = nodeIndex;
-                        updateResultsList(); // Highlight in list
-                        triggerAutoSave(); // Persist selection
+                        updateResultsList();
+                        triggerAutoSave();
                     }
                 }
 
                 draw();
             } else if (state.mode === 'edges') {
-                // Edge Creation Mode
                 if (!clickedNode) {
-                    // Clicked empty space
                     state.selectedNode = null;
                 } else {
-                    // Clicked a Node
                     state.selectedNode = clickedNode;
 
-                    // SYNC WITH REACHABILITY LIST (if applicable)
                     if (clickedNode.marking) {
-                        // Find index in the sorted list (as displayed in UI)
                         const sorted = nodes.filter(n => n.marking).sort((a, b) => a.id - b.id);
                         const idx = sorted.findIndex(n => n.id === clickedNode.id);
 
                         if (idx !== -1) {
                             state.selectedReachabilityIndex = idx;
 
-                            // Update UI List (Highlight) using ui.js logic
                             import('../../ui/ui.js').then(ui => {
                                 ui.updateResultsList();
-                                // Scroll to it
                                 const list = document.getElementById('resultsList');
                                 if (list && list.children[idx + 1]) {
                                     list.children[idx + 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 }
                             });
 
-                            // Restore Petri State
                             import('../../domain/petri/petri_state.js').then(({ places }) => {
                                 let restoredCount = 0;
                                 for (const p of places) {
@@ -161,43 +144,11 @@ export function initInteractions() {
                         }
                     }
                 }
-                // Edge creation logic only if CTRL is not pressed and we are in edit mode?
-                // Wait, the previous logic allowed creating edges by clicking two nodes.
-                // But now we are in MIS mode which is usually Reachability Graph (Read Only mostly).
-                // However, user might want to edit it manually.
 
-                // Retaining previous logic for Edge Creation / Deletion if needed, 
-                // but usually in Reachability Graph we just view.
-                // Let's keep the selection logic dominant. 
-                // If the user wants to add edges, they usually do it in 'edges' mode or by dragging?
-                // The original code handled edge creation in 'default' mode by sequential clicks.
-                // I should preserve that if it was there?
-                // The snippet I replaced had edge creation logic.
-
-                // Let's restore edge creation logic BUT add the sync logic.
-
-                if (clickedNode) {
-                    if (state.selectedNode !== clickedNode && state.selectedNode !== null) {
-                        // Attempt Edge Logic
-                        const existingEdgeIndex = edges.findIndex(e =>
-                            (e[0] === state.selectedNode.id && e[1] === clickedNode.id) ||
-                            (e[1] === state.selectedNode.id && e[0] === clickedNode.id)
-                        );
-                        // ... (Rest of edge logic) ...
-                        // For now, let's assume we just want to select if we are just clicking one.
-                    }
-                }
-
-                // ACTUALLY, I should preserve the ORIGINAL edge logic structure and INSERT strictly the sync logic.
-                // The previous code had:
-                // if (!state.selectedNode) { state.selectedNode = clickedNode; } else { ... edge logic ... }
-
-                // I will rewrite to inject my sync logic inside the selection block.
 
                 if (!state.selectedNode) {
                     state.selectedNode = clickedNode;
 
-                    // --- SYNC START ---
                     if (clickedNode.marking) {
                         const sorted = nodes.filter(n => n.marking).sort((a, b) => a.id - b.id);
                         const idx = sorted.findIndex(n => n.id === clickedNode.id);
@@ -224,7 +175,6 @@ export function initInteractions() {
                             });
                         }
                     }
-                    // --- SYNC END ---
 
                 } else {
                     if (state.selectedNode !== clickedNode) {
@@ -235,24 +185,21 @@ export function initInteractions() {
                         );
 
                         if (existingEdgeIndex >= 0) {
-                            // Edge exists. 
                             if (e.ctrlKey || e.metaKey) {
-                                // Delete only if Ctrl/Cmd is pressed
                                 edges.splice(existingEdgeIndex, 1);
                                 updateStats();
                                 resetSimulation();
                                 saveToLocalStorage();
                             }
                         } else {
-                            // Edge does not exist -> Create
                             edges.push([state.selectedNode.id, clickedNode.id]);
                             updateStats();
                             resetSimulation();
                             saveToLocalStorage();
                         }
-                        state.selectedNode = null; // Deselect after action
+                        state.selectedNode = null;
                     } else {
-                        state.selectedNode = null; // Deselect if clicking same
+                        state.selectedNode = null;
                     }
                 }
                 draw();
@@ -281,8 +228,6 @@ export function initInteractions() {
     });
 
     canvas.addEventListener('mousemove', (e) => {
-        // CONCURRENCY shares infrastructure with MIS, no special handling needed
-
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -301,7 +246,7 @@ export function initInteractions() {
                 let targetX = world.x;
                 let targetY = world.y;
 
-                // Snapping Logic - matches background grid (50px)
+                // Snapping Logic
                 const gridSize = 50;
                 let shouldSnap = false;
 
@@ -332,24 +277,21 @@ export function initInteractions() {
     });
 
     window.addEventListener('mouseup', () => {
-        // No special CONCURRENCY handling - uses same infrastructure as MIS
-
         if (state.isDraggingNode) {
             state.isDraggingNode = false;
             state.dragNodeId = null;
             saveToLocalStorage();
         }
         if (state.isPanning) {
-            state.isPanning = false; // logic matches logic in mousedown for isPanning vs isDragging
-            state.startPanX = 0; // reset
-            canvas.style.cursor = 'grab'; // back to grab if in view mode
+            state.isPanning = false;
+            state.startPanX = 0;
+            canvas.style.cursor = 'grab';
             saveToLocalStorage();
         }
     });
 
     canvas.addEventListener('wheel', (e) => {
         if (state.appContext !== 'MIS' && state.appContext !== 'CONCURRENCY') return;
-        // CONCURRENCY uses same wheel handling as MIS (shared camera and draw)
 
         e.preventDefault();
         if (e.ctrlKey) {
@@ -375,7 +317,7 @@ export function initInteractions() {
         }
         draw();
         saveToLocalStorage();
-        triggerAutoSave(); // Save camera position after pan/zoom
+        triggerAutoSave();
     }, { passive: false });
 
     window.addEventListener('keydown', (e) => {
@@ -385,7 +327,7 @@ export function initInteractions() {
 
         // List Navigation (Arrow keys)
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            e.preventDefault(); // Prevent page scroll
+            e.preventDefault();
             const isUp = (e.key === 'ArrowUp');
 
             if (state.appContext === 'MIS') {
@@ -406,14 +348,11 @@ export function initInteractions() {
                 });
             } else if (state.appContext === 'PETRI') {
                 import('../../ui/ui.js').then(ui => {
-                    // Determine List (Path or All)
-                    // Must match logic in ui.js and simulation.js
                     let displayList = state.reachabilityPath || nodes.filter(n => n.marking).sort((a, b) => a.id - b.id);
                     const listLength = displayList.length;
 
                     if (listLength === 0) return;
 
-                    // Initialize if -1
                     if (state.selectedReachabilityIndex === -1) {
                         state.selectedReachabilityIndex = 0;
                     } else {
@@ -421,9 +360,9 @@ export function initInteractions() {
                         let newIndex = state.selectedReachabilityIndex + (isUp ? -1 : 1);
 
                         if (newIndex < 0) {
-                            newIndex = listLength - 1; // Wrap to end
+                            newIndex = listLength - 1;
                         } else if (newIndex >= listLength) {
-                            newIndex = 0; // Wrap to start
+                            newIndex = 0;
                         }
                         state.selectedReachabilityIndex = newIndex;
                     }
@@ -443,7 +382,7 @@ export function initInteractions() {
                                 import('../rendering/petri_render.js').then(pr => pr.drawPetri());
                                 ui.updateStats();
                                 import('../../core/storage.js').then(s => s.saveToLocalStorage());
-                                ui.updateResultsList(); // Re-render to show highlight
+                                ui.updateResultsList();
 
                                 // Scroll
                                 const resultsList = document.getElementById('resultsList');

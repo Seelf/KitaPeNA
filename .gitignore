@@ -7,12 +7,23 @@ __pycache__/
 venv/
 env/
 .env
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# C/C++ Extensions (Keep .c/.cpp, ignore binaries)
+*.so
+*.dylib
+*.o
+*.obj
 
 # MacOS
 .DS_Store
 
 # IDE
 .vscode/
+.idea/
 
 # Database
 *.db
@@ -22,7 +33,4 @@ env/
 *.log
 
 # Web app
-web_app/temp_pnh
-
-# Misc
-*.so
+web_app/temp_pnh/

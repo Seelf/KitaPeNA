@@ -1,8 +1,7 @@
+// Application State definitions
 
-// Application State
 export const nodes = [];
 export const edges = [];
-
 export const camera = { x: 0, y: 0, zoom: 1 };
 
 export const state = {
@@ -10,8 +9,9 @@ export const state = {
     appContext: 'PETRI', // 'PETRI', 'MIS', 'CONCURRENCY'
     activeTabId: null, // Guard for async operations across tabs
     selectedNode: null,
+
     // Mode
-    mode: 'select', // 'select', 'node', 'edge's'
+    mode: 'select', // 'select', 'node', 'edge'
     isDraggingNode: false,
     isPanning: false,
     startPanX: 0,
@@ -21,8 +21,8 @@ export const state = {
     dragNodeId: null,
 
     // Petri Simulation Path (Cycle)
-    reachabilityPath: null, // Array of Node IDs or Nodes to display in order
-    initialMarking: null, // { placeId: tokens }
+    reachabilityPath: null,
+    initialMarking: null,
 
     // Simulation State
     misSteps: [],
@@ -34,23 +34,23 @@ export const state = {
 
     // Generated Graph State (Read Only Mode)
     isGenerated: false,
-    graphTruncated: false, // True if reachability graph was cut off due to max_states limit
-    selectedReachabilityIndex: -1, // For keyboard navigation in Petri Reachability list
-    maxReachabilityStates: 1000, // User configurable limit
+    graphTruncated: false,
+    selectedReachabilityIndex: -1,
+    maxReachabilityStates: 1000,
 
     // Independent Cameras
     misCamera: { x: 0, y: 0, zoom: 1 },
     petriCamera: { x: 0, y: 0, zoom: 1 },
     concurrencyCamera: { x: 0, y: 0, zoom: 1 },
 
-    // CONNECTED GRAPHS DATA (Separated by Context)
+    // Connected Graphs Data (Separated by Context)
     graphs: {
         MIS: { nodes: [], edges: [] },
         CONCURRENCY: { nodes: [], edges: [] }
     },
 
-    troResult: null, // Transitive Orientability result { isOrientable, message }
-    coloringResult: null, // Optimal Coloring result { chromaticNumber, coloring: Map/Object }
+    troResult: null, // Transitive Orientability result
+    coloringResult: null, // Optimal Coloring result
 
     // View Settings
     snapReachability: false,
