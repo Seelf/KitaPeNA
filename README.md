@@ -72,16 +72,30 @@ The application will automatically build the environment and be available at: [h
     *   **PNML** (Petri Net Markup Language - XML standard).
     *   **JSON**.
 
+Petri net editor:
+
+<img src="https://github.com/user-attachments/assets/383e9fc1-5020-4783-8e01-16e6b9613bfa" alt="Widok głównego interfejsu aplikacji KitaPeNA - edytor sieci Petriego" width="1509" height="811">
+
 ### 2. Database Explorer
 *   Browsing saved nets with **Infinite Scroll**.
 *   Advanced filtering (by number of places, transitions, arcs, tokens).
 *   Sorting by name, creation date, or network parameters.
 *   Management of saved models (opening, deleting, downloading).
 
+<img width="1510" height="812" alt="Image" src="https://github.com/user-attachments/assets/1857b7a5-de48-4929-bb8c-a9e60a705da2" />
+
 ### 3. Graph Analysis
 *   **Reachability Graph**: Automatic generation of the full state space with node and edge visualization.
 *   **Concurrency Graph**: Analysis of concurrency relations, checking if the graph is a cograph or permutation graph.
 *   **Coloring**: Visualization of independence classes (DSatur + Backtracking algorithm).
+
+Reachability graph:
+
+<img width="1511" height="811" alt="Image" src="https://github.com/user-attachments/assets/e3000e7a-2df8-4676-b692-239320906851" />
+
+Graph coloring & TRO:
+
+<img width="1507" height="810" alt="Image" src="https://github.com/user-attachments/assets/a56d1514-67ee-4217-993e-986557518e9c" />
 
 ### 4. Benchmarking Module
 *   Performance testing of algorithms (Python / C++) on graph sets.
@@ -90,6 +104,12 @@ The application will automatically build the environment and be available at: [h
     *   Saved Graphs from DB.
     *   Graphs generated from saved Petri Nets.
 *   Multiprocessing support.
+
+<img width="1508" height="811" alt="Image" src="https://github.com/user-attachments/assets/4e6300fa-afff-4711-af10-7fef01b3aaef" />
+
+Charts:
+
+<img width="1512" height="848" alt="Image" src="https://github.com/user-attachments/assets/44ec38f2-c0da-4ac5-8eaf-548101a2e360" />
 
 ---
 
