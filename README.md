@@ -1,4 +1,6 @@
-# KitaPeNA
+# KitaPeNA [![DOI](https://zenodo.org/badge/1162573243.svg)](https://doi.org/10.5281/zenodo.18712856)
+
+<img src="https://github.com/user-attachments/assets/383e9fc1-5020-4783-8e01-16e6b9613bfa" alt="Widok głównego interfejsu aplikacji KitaPeNA - edytor sieci Petriego" width="1509" height="811">
 
 A web application supporting research on **Concurrent Systems** modeled using **Petri Nets**.
 
@@ -70,16 +72,32 @@ The application will automatically build the environment and be available at: [h
     *   **PNML** (Petri Net Markup Language - XML standard).
     *   **JSON**.
 
+Petri net editor:
+
+<img src="https://github.com/user-attachments/assets/383e9fc1-5020-4783-8e01-16e6b9613bfa" alt="Widok głównego interfejsu aplikacji KitaPeNA - edytor sieci Petriego" width="1509" height="811">
+
 ### 2. Database Explorer
 *   Browsing saved nets with **Infinite Scroll**.
 *   Advanced filtering (by number of places, transitions, arcs, tokens).
 *   Sorting by name, creation date, or network parameters.
 *   Management of saved models (opening, deleting, downloading).
 
+<img width="1510" height="812" alt="Image" src="https://github.com/user-attachments/assets/1857b7a5-de48-4929-bb8c-a9e60a705da2" />
+
 ### 3. Graph Analysis
 *   **Reachability Graph**: Automatic generation of the full state space with node and edge visualization.
 *   **Concurrency Graph**: Analysis of concurrency relations, checking if the graph is a cograph or permutation graph.
 *   **Coloring**: Visualization of independence classes (DSatur + Backtracking algorithm).
+
+Reachability graph:
+
+<img width="1511" height="811" alt="Image" src="https://github.com/user-attachments/assets/e3000e7a-2df8-4676-b692-239320906851" />
+
+https://github.com/user-attachments/assets/df31a479-f963-488b-8335-6a2f3a1f8000
+
+Graph coloring & TRO:
+
+<img width="1507" height="810" alt="Image" src="https://github.com/user-attachments/assets/a56d1514-67ee-4217-993e-986557518e9c" />
 
 ### 4. Benchmarking Module
 *   Performance testing of algorithms (Python / C++) on graph sets.
@@ -88,6 +106,12 @@ The application will automatically build the environment and be available at: [h
     *   Saved Graphs from DB.
     *   Graphs generated from saved Petri Nets.
 *   Multiprocessing support.
+
+<img width="1508" height="811" alt="Image" src="https://github.com/user-attachments/assets/4e6300fa-afff-4711-af10-7fef01b3aaef" />
+
+Charts:
+
+<img width="1512" height="848" alt="Image" src="https://github.com/user-attachments/assets/44ec38f2-c0da-4ac5-8eaf-548101a2e360" />
 
 ---
 
@@ -169,7 +193,7 @@ The project is implemented as a multi-tier system, decomposing flows into disjoi
 ### 4. The Benchmarking Pipeline
 The logical core of the application manages an asynchronous statistical evaluation pipeline, which can be broken down into the following execution stages during an on-demand execution:
 
-1.  **C++ Code Upload:** The system receives the C++ code payload from the web wrapper in encrypted POST packets into the temporary preprocessor environment (temp virtualization).
+1.  **C++ Code:** The system receives the C++ code payload from the web wrapper in encrypted POST packets into the temporary preprocessor environment (temp virtualization).
 2.  **On-the-fly Compilation:** The context automatically launches the system compiler (e.g., `clang++`). The process is obligatorily equipped with the necessary flags: level 3 optimization (`-O3`), position-independent code generation (`-fPIC`), and targeting the production of shared objects for dynamic linking (`-shared`).
 3.  **Shared Object Initialization:** The created `.so` shells (`.dll` for Windows OS) are loaded directly into the host memory area of the Python virtual machine using descriptors in `ctypes.CDLL()`.
 4.  **Memory Pointer Resolving:** Pointer compatibility is ensured for dynamic casts from Python to C – including the allocation of reference arrays for large graphs using vector casting instructions like `POINTER(c_int)`.
@@ -223,8 +247,8 @@ If you use KitaPeNA in your research, please cite it using the generated Zenodo 
   title        = {KitaPeNA: A Web-based Petri nets suite},
   year         = {2026},
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.XXXXXXX},
-  url          = {https://doi.org/10.5281/zenodo.XXXXXXX}
+  doi          = {10.5281/zenodo.18712856},
+  url          = {https://doi.org/10.5281/zenodo.18712856}
 }
 ```
 
