@@ -1,4 +1,4 @@
-# MC MIS Research Web App
+# KitaPeNA
 
 A web application supporting research on **Concurrent Systems** modeled using **Petri Nets**.
 
@@ -108,6 +108,49 @@ The project is divided into backend logic (Flask) and modular frontend (Vanilla 
 ├── tools/                     # Helper tools and legacy code
 └── tests/                     # Unit tests
 ```
+
+---
+
+## Architecture and Evaluation Pipelining
+
+### 1. System Metadata
+*   **System Name:** KitaPeNA
+*   **Version:** 1.0.0 (Prototype phase)
+*   **License:** MIT / GPL
+*   **Repository:** [Specific research repository / GitHub]
+
+### 2. Functional Overview
+**Problem Statement:** Modern research on algorithms for discrete structures, graph theory, and optimization often encounters a fundamental organizational and technological barrier: the lack of standardized, deterministic evaluation mechanisms independent of hardware platforms and local toolchains. The traditional process of testing algorithms implemented in compiled languages (like C++) requires researchers to build custom shell scripts, instrument source code, and manually manage system metrics. This approach introduces an operational overhead that is difficult to quantify, deviations related to operating system specifics, and most importantly, radically limits the reproducibility of results by independent research groups.
+
+The "KitaPeNA" application mitigates this phenomenon by providing a unified, fully web-based benchmarking wrapper. The system automates rigorous I/O mapping procedures and build processes, relieving researchers from the necessity of writing analytical apparatus and enforcing high methodological rigor around the code itself.
+
+### 3. Core Architecture Diagram Description
+The project is implemented as a multi-tier system, decomposing flows into disjoint domains and reducing the phenomena of overlapping transmission delays.
+
+*   **Presentation Layer:** Based entirely on the *Single Page Application* (SPA) paradigm implemented using Vanilla JS. The reduced dependency on heavy reactive frameworks ensures minimal framework lifecycle overhead. For advanced representation of topological models on the visual side, a hardware-accelerated GUI *Canvas API* is used, allowing smooth processing of thousands of edges without overloading the main browser thread.
+*   **API Layer (Routing Core):** The central server operates on the Flask micro-framework in a *RESTful* convention. Access abstraction is organized in an architecture of isolated sub-resources using the **Flask Blueprints** mechanism. The use of Blueprints strictly decomposes services (e.g., separating disk operations from measurement engine operations), introducing logical code isolation, deterministic extensibility, and simplified authorization supervision of individual router domains.
+*   **Integration Layer (Interoperability Layer):** The most crucial module of the system, acting as a bridge between the Python management environment and C++ execution units. Two bridging libraries interact in a hybrid manner here:
+    *   **`ctypes`**: Provides absolutely the flattest and lowest-overhead interface for native types directly linked to the C-ABI (Application Binary Interface).
+    *   **`pybind11`**: Used for more complex container representations and parsing C++ object structures, masking the need for manual allocation of object pointers for standard libraries (e.g., `std::vector`), which allows integrating higher-order code without sacrificing extreme processor performance.
+
+### 4. The Benchmarking Pipeline
+The logical core of the application manages an asynchronous statistical evaluation pipeline, which can be broken down into the following execution stages during an on-demand execution:
+
+1.  **C++ Code Upload:** The system receives the C++ code payload from the web wrapper in encrypted POST packets into the temporary preprocessor environment (temp virtualization).
+2.  **On-the-fly Compilation:** The context automatically launches the system compiler (e.g., `clang++`). The process is obligatorily equipped with the necessary flags: level 3 optimization (`-O3`), position-independent code generation (`-fPIC`), and targeting the production of shared objects for dynamic linking (`-shared`).
+3.  **Shared Object Initialization:** The created `.so` shells (`.dll` for Windows OS) are loaded directly into the host memory area of the Python virtual machine using descriptors in `ctypes.CDLL()`.
+4.  **Memory Pointer Resolving:** Pointer compatibility is ensured for dynamic casts from Python to C – including the allocation of reference arrays for large graphs using vector casting instructions like `POINTER(c_int)`.
+5.  **Time Measurements & Execution:** The measurement block is executed using deterministic, kernel-resolution timers (`time.perf_counter_ns()` or `time.perf_counter()`) to eliminate errors from CPU time fluctuations at higher OS layers, guaranteeing the sharpest real-time estimate of CPU occupancy for the algorithm itself.
+6.  **Capture Output:** Data sent through traditional descriptors (`std::cout`, stream operations, or C error outputs) is intercepted by a dynamic wrapper (`CaptureOutput` class manipulating system IO streams) and loaded back into test buffers in Python memory, completing the loop.
+
+### 5. Technical Innovations in the Wrapper
+The implementation of the tool introduces rigorous modernizations compared to ad-hoc scripts:
+*   **On-the-fly Compilation Automation:** The researcher modifies the code in the browser-based IDE and runs tests without any interaction with CMake, Makefiles, or the target machine architecture issues, forcing the compilation and linking cycle implicitly on the application server side.
+*   **Overhead Mitigation & Statistical Averaging:** The application preventively applies mechanisms to counteract the influence of OS jitter and context switching. Algorithms are often invoked in an initial warm-up phase to saturate the L1/L2 cache before making the key reading, after which the predefined repetition loop is executed. The final results undergo averaging to publication standards with standard deviation for scientific metrics.
+*   **Low-level File Descriptor Homing:** The problem of extracting output streams from a compiled language without refactoring the source code of the entrusted algorithm. The environment uses POSIX interface tools (`pipe` and stream pointer replacement operations such as `stdout` macros via the C system `dup` and `dup2` commands). The innovation lies in redirecting the streams straight to the safe evaluator layer without losing the stability of the main engine.
+
+### 6. Impact and Reproducibility
+Thanks to the architecture of the "KitaPeNA" application presented above, reproducibility of scientific research in the field of algorithm design gains a drastically lower threshold of difficulty. Standardizing the loading mechanism makes it easier for other digital laboratories to perform rigorous re-verification and counter-offensive comparisons of algorithms (e.g., Maximum Independent Set solutions), as all stakeholders base their estimators on the same operating environment, identified memory buffer, and identical hardware pointer parser. Investing in the web-compilation architecture allows the scientist to completely eliminate research effort spent on building the execution time profiling apparatus, providing a ready-made artifact for scientific reviewers and publications in contemporary computational research.
 
 ---
 
