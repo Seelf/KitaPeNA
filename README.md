@@ -109,7 +109,7 @@ Graph coloring & TRO:
 
 Charts:
 
-<img width="1511" height="811" alt="Image" src="https://github.com/user-attachments/assets/d872e6bd-e968-4d2c-b409-8d772d350939" />
+<img width="1512" height="848" alt="Image" src="https://github.com/user-attachments/assets/44ec38f2-c0da-4ac5-8eaf-548101a2e360" />
 
 ---
 
