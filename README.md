@@ -1,4 +1,4 @@
-# KitaPeNA
+# KitaPeNA [![DOI](https://zenodo.org/badge/1162573243.svg)](https://doi.org/10.5281/zenodo.18712856)
 
 A web application supporting research on **Concurrent Systems** modeled using **Petri Nets**.
 
@@ -223,8 +223,8 @@ If you use KitaPeNA in your research, please cite it using the generated Zenodo 
   title        = {KitaPeNA: A Web-based Petri nets suite},
   year         = {2026},
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.XXXXXXX},
-  url          = {https://doi.org/10.5281/zenodo.XXXXXXX}
+  doi          = {10.5281/zenodo.18712856},
+  url          = {https://doi.org/10.5281/zenodo.18712856}
 }
 ```
 
