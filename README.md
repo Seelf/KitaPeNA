@@ -93,6 +93,8 @@ Reachability graph:
 
 <img width="1511" height="811" alt="Image" src="https://github.com/user-attachments/assets/e3000e7a-2df8-4676-b692-239320906851" />
 
+https://github.com/user-attachments/assets/df31a479-f963-488b-8335-6a2f3a1f8000
+
 Graph coloring & TRO:
 
 <img width="1507" height="810" alt="Image" src="https://github.com/user-attachments/assets/a56d1514-67ee-4217-993e-986557518e9c" />
