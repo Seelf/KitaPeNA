@@ -76,6 +76,24 @@ The project is used for:
 
 ---
 
+## Usage Guide (Benchmarking Pipeline)
+
+To effectively use KitaPeNA for your research and algorithm evaluation, follow this standard workflow:
+
+1.  **Model Creation / Import:** Use the **Petri Net Editor** to draw your concurrent system model or import an existing one using supported formats (PNH).
+2.  **Save to Database:** Save your Petri net to the built-in database to make it available for future tests and analysis.
+3.  **State Space Generation:** Switch to the Analysis tools to generate the Reachability Graph and the Concurrency Graph representing your system.
+4.  **Algorithm Implementation:** If you are testing your own C++ solutions (e.g., for Graph Coloring), navigate to the Algorithm management section to draft your C++ code (see example C++ code in the `custom_algos/` directory).
+5.  **Benchmarking Execution:** Go to the **Benchmarking** module:
+    *   Select your data source (saved graphs from the database or randomly generated ones).
+    *   Select the algorithms to be evaluated (Python methods (not tested) or created C++ scripts).
+    *   Configure test parameters (iteration counts, in future also: warm-up phases, CPU thread limits etc.).
+    *   Compile & Save.
+    *   Execute the benchmark. The system automatically executes your C++ code on-the-fly, isolating and executing the iterations.
+6.  **Results Interpretation:** Review the final compiled statistics, including execution times and accuracy, presented instantly via the user interface (in future also exportable to CSV/JSON and other formats).
+
+---
+
 ## Project Structure
 
 The project is divided into backend logic (Flask) and modular frontend (Vanilla JS + ES6 Modules).
@@ -116,8 +134,8 @@ The project is divided into backend logic (Flask) and modular frontend (Vanilla 
 ### 1. System Metadata
 *   **System Name:** KitaPeNA
 *   **Version:** 1.0.0 (Prototype phase)
-*   **License:** MIT / GPL
-*   **Repository:** [Specific research repository / GitHub]
+*   **License:** MIT
+*   **Repository:** [GitHub]
 
 ### 2. Functional Overview
 **Problem Statement:** Modern research on algorithms for discrete structures, graph theory, and optimization often encounters a fundamental organizational and technological barrier: the lack of standardized, deterministic evaluation mechanisms independent of hardware platforms and local toolchains. The traditional process of testing algorithms implemented in compiled languages (like C++) requires researchers to build custom shell scripts, instrument source code, and manually manage system metrics. This approach introduces an operational overhead that is difficult to quantify, deviations related to operating system specifics, and most importantly, radically limits the reproducibility of results by independent research groups.
