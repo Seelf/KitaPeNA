@@ -197,3 +197,6 @@ If you use KitaPeNA in your research, please cite it using the generated Zenodo 
 
 ## License
 This project is licensed under the [MIT License](LICENSE) - see the `LICENSE` file for details.
+
+## Disclaimer
+Parts of this application and its documentation were generated or assisted by AI models.
