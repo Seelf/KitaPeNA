@@ -1,0 +1,38 @@
+name: kitapena
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: kitapena_postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: kitapena_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  kitapena:
+    build: .
+    container_name: kitapena_app
+    depends_on:
+      - db
+    ports:
+      - "5002:5002"
+    volumes:
+      - data_volume:/app/web_app
+    environment:
+      - FLASK_ENV=development
+      - PORT=5002
+      - SECRET_KEY=super_secret_docker_key_12345
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=secretpassword
+      - POSTGRES_DB=kitapena_db
+      - TURNSTILE_SITE_KEY=1x00000000000000000000AA
+      - TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+
+volumes:
+  data_volume:
+  postgres_data:

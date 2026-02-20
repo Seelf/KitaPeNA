@@ -17,10 +17,25 @@ The project is used for:
 ## Running the Project
 
 ### Requirements
-*   Python 3.8+
+*   Python 3.8+ (for local setup) or **Docker**
 *   Web Browser (Chrome / Firefox / Edge)
 
-### Installation and Start
+### Quick Start (Docker)
+
+The fastest way to run KitaPeNA without configuring C++ compilers and Python environments locally is using Docker.
+
+Just run this single command in the project root directory:
+
+```bash
+docker-compose up -d --build
+```
+The application will automatically build the environment and be available at: [http://127.0.0.1:5002](http://127.0.0.1:5002)
+
+*(Any saved Petri nets or graphs will be persisted automatically using Docker volumes).*
+
+---
+
+### Manual Installation (Local)
 
 1.  **Environment Preparation (One-time):**
     ```bash

@@ -6,16 +6,77 @@ import json
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, 'graphs.db')
 
+# PostgreSQL config
+PG_USER = os.environ.get("POSTGRES_USER")
+PG_PASS = os.environ.get("POSTGRES_PASSWORD")
+PG_HOST = os.environ.get("POSTGRES_HOST")
+PG_DB = os.environ.get("POSTGRES_DB")
+
+IS_POSTGRES = bool(PG_HOST and PG_USER)
+
+if IS_POSTGRES:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    IntegrityError = psycopg2.IntegrityError
+else:
+    IntegrityError = sqlite3.IntegrityError
+
 def get_db_connection():
-    """Establishes a connection to the SQLite database."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if IS_POSTGRES:
+        conn = psycopg2.connect(
+            host=PG_HOST,
+            user=PG_USER,
+            password=PG_PASS,
+            dbname=PG_DB
+        )
+        return conn
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit=False):
+    if IS_POSTGRES:
+        # Translate SQLite ? to PostgreSQL %s
+        query = query.replace('?', '%s')
+        if 'INTEGER PRIMARY KEY AUTOINCREMENT' in query:
+            query = query.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
+        if 'BOOLEAN DEFAULT 0' in query:
+            query = query.replace('BOOLEAN DEFAULT 0', 'BOOLEAN DEFAULT FALSE')
+            
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(query, params)
+        if commit:
+            conn.commit()
+            
+        if fetchone:
+            res = cursor.fetchone()
+            return dict(res) if res is not None else None
+            
+        if fetchall:
+            res = cursor.fetchall()
+            return [dict(row) for row in res]
+            
+        return cursor
+    else:
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        if commit:
+            conn.commit()
+            
+        if fetchone:
+            res = cursor.fetchone()
+            return dict(res) if res is not None else None
+            
+        if fetchall:
+            res = cursor.fetchall()
+            return [dict(row) for row in res]
+            
+        return cursor
 
 def init_db():
-    """Initializes the database tables."""
     conn = get_db_connection()
-    conn.execute('''
+    execute_query(conn, '''
         CREATE TABLE IF NOT EXISTS graphs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -23,17 +84,16 @@ def init_db():
             edges TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    ''')
-    conn.execute('''
+    ''', commit=False)
+    execute_query(conn, '''
         CREATE TABLE IF NOT EXISTS petri_nets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             content_json TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    ''')
-    # Users table is managed by init_admin.py mostly, but we can ensure it exists
-    conn.execute('''
+    ''', commit=False)
+    execute_query(conn, '''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -42,85 +102,80 @@ def init_db():
             is_blocked BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    ''')
-    conn.commit()
+    ''', commit=True)
     conn.close()
 
 # --- Users ---
 
 def get_user_by_id(user_id):
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+    user = execute_query(conn, 'SELECT * FROM users WHERE id = ?', (user_id,), fetchone=True)
     conn.close()
     return user
 
 def get_user_by_username(username):
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+    user = execute_query(conn, 'SELECT * FROM users WHERE username = ?', (username,), fetchone=True)
     conn.close()
     return user
 
 def get_all_users():
     conn = get_db_connection()
-    users = conn.execute('SELECT id, username, role, is_blocked, created_at FROM users').fetchall()
+    users = execute_query(conn, 'SELECT id, username, role, is_blocked, created_at FROM users', fetchall=True)
     conn.close()
-    return [dict(u) for u in users]
+    return users
 
 def create_user(username, pwhash, role='user'):
     conn = get_db_connection()
     try:
-        conn.execute('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-                     (username, pwhash, role))
-        conn.commit()
+        execute_query(conn, 'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
+                     (username, pwhash, role), commit=True)
         return True
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return False
     finally:
         conn.close()
 
 def update_user_block_status(user_id, is_blocked):
     conn = get_db_connection()
-    conn.execute('UPDATE users SET is_blocked = ? WHERE id = ?', (1 if is_blocked else 0, user_id))
-    conn.commit()
+    val = True if is_blocked else False
+    if not IS_POSTGRES: val = 1 if is_blocked else 0
+    execute_query(conn, 'UPDATE users SET is_blocked = ? WHERE id = ?', (val, user_id), commit=True)
     conn.close()
 
 def delete_user(user_id):
     conn = get_db_connection()
-    conn.execute('DELETE FROM users WHERE id = ?', (user_id,))
-    conn.commit()
+    execute_query(conn, 'DELETE FROM users WHERE id = ?', (user_id,), commit=True)
     conn.close()
 
 def update_user_password(user_id, pwhash):
     conn = get_db_connection()
-    conn.execute('UPDATE users SET password_hash = ? WHERE id = ?', (pwhash, user_id))
-    conn.commit()
+    execute_query(conn, 'UPDATE users SET password_hash = ? WHERE id = ?', (pwhash, user_id), commit=True)
     conn.close()
 
 # --- Graphs (Standard) ---
 
 def get_all_graphs():
     conn = get_db_connection()
-    graphs = conn.execute('SELECT id, name, created_at FROM graphs ORDER BY created_at DESC').fetchall()
+    graphs = execute_query(conn, 'SELECT id, name, created_at FROM graphs ORDER BY created_at DESC', fetchall=True)
     conn.close()
-    return [dict(g) for g in graphs]
+    return graphs
 
 def get_graph(graph_id):
     conn = get_db_connection()
-    graph = conn.execute('SELECT * FROM graphs WHERE id = ?', (graph_id,)).fetchone()
+    graph = execute_query(conn, 'SELECT * FROM graphs WHERE id = ?', (graph_id,), fetchone=True)
     conn.close()
-    return dict(graph) if graph else None
+    return graph
 
 def save_graph(name, nodes, edges):
     conn = get_db_connection()
-    conn.execute('INSERT INTO graphs (name, nodes, edges) VALUES (?, ?, ?)',
-                 (name, json.dumps(nodes), json.dumps(edges)))
-    conn.commit()
+    execute_query(conn, 'INSERT INTO graphs (name, nodes, edges) VALUES (?, ?, ?)',
+                 (name, json.dumps(nodes), json.dumps(edges)), commit=True)
     conn.close()
 
 def delete_graph(graph_id):
     conn = get_db_connection()
-    conn.execute('DELETE FROM graphs WHERE id = ?', (graph_id,))
-    conn.commit()
+    execute_query(conn, 'DELETE FROM graphs WHERE id = ?', (graph_id,), commit=True)
     conn.close()
 
 # --- Petri Nets ---
@@ -129,7 +184,6 @@ def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created
                         min_places=None, min_transitions=None, min_arcs=None, min_tokens=None):
     conn = get_db_connection()
     
-    # Determine if we need to filter or sort in Python
     stat_sort = sort_by in ['places', 'transitions', 'arcs', 'tokens']
     has_advanced_filters = any(v is not None for v in [min_places, min_transitions, min_arcs, min_tokens])
     use_python_logic = has_advanced_filters or stat_sort
@@ -141,7 +195,6 @@ def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created
         query += ' WHERE name LIKE ?'
         params.append(f'%{search_query}%')
         
-    # SQL-side sorting only if it's a native DB column
     if not stat_sort:
         if sort_by not in ['created_at', 'name']:
             sort_by = 'created_at'
@@ -149,22 +202,17 @@ def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created
             order = 'DESC'
         query += f' ORDER BY {sort_by} {order}'
     else:
-        # Default SQL sort when stat-sorting in Python later
         query += ' ORDER BY created_at DESC'
     
-    # If no advanced filters/sorts, we keep SQL-side limit for performance
     if not use_python_logic and limit is not None:
         query += ' LIMIT ? OFFSET ?'
         params.extend([limit, offset])
         
-    rows = conn.execute(query, params).fetchall()
-    conn.close()
+    results_raw = execute_query(conn, query, tuple(params), fetchall=True)
     
     results = []
-    matches_count = 0
-    
-    for row in rows:
-        net = dict(row)
+    for row in results_raw:
+        net = row
         try:
             content = json.loads(net['content_json'])
             places = content.get('places', [])
@@ -172,7 +220,6 @@ def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created
             arcs = content.get('arcs', [])
             model_class = content.get('model_class', '')
             
-            # Total tokens calculation
             total_tokens = sum(p.get('tokens', 0) for p in places)
             
             stats = {
@@ -183,7 +230,6 @@ def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created
                 'class': model_class
             }
             
-            # Apply advanced filters
             if min_places is not None and stats['places'] < min_places: continue
             if min_transitions is not None and stats['transitions'] < min_transitions: continue
             if min_arcs is not None and stats['arcs'] < min_arcs: continue
@@ -192,61 +238,53 @@ def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created
             net['stats'] = stats
             del net['content_json']
             results.append(net)
-        except Exception as e:
-            # Skip corrupted rows if filters/sorts are active
+        except Exception:
             if not use_python_logic:
                 net['stats'] = {'places': 0, 'transitions': 0, 'arcs': 0, 'tokens': 0, 'class': ''}
                 results.append(net)
 
-    # Apply sorting in Python if requested by stat field
     if stat_sort:
         is_reverse = (order.upper() == 'DESC')
         results.sort(key=lambda x: x['stats'].get(sort_by, 0), reverse=is_reverse)
 
     total_filtered = len(results) if use_python_logic else None
     
-    # Manual pagination if filters or stat-sort were applied
     if use_python_logic and limit is not None:
         results = results[offset : offset + limit]
     
-    # Accurate total count for metadata
     if use_python_logic:
         total_count = total_filtered
     else:
-        # If no advanced filters/sorts, SQL count is accurate for search_query
-        conn = get_db_connection()
         count_query = 'SELECT COUNT(*) FROM petri_nets'
         count_params = []
         if search_query:
             count_query += ' WHERE name LIKE ?'
             count_params.append(f'%{search_query}%')
-        total_count = conn.execute(count_query, count_params).fetchone()[0]
-        conn.close()
+        count_res = execute_query(conn, count_query, tuple(count_params), fetchone=True)
+        total_count = list(count_res.values())[0] if count_res else 0
         
+    conn.close()
     return {'nets': results, 'total': total_count}
 
 def get_petri_net(net_id):
     conn = get_db_connection()
-    net = conn.execute('SELECT * FROM petri_nets WHERE id = ?', (net_id,)).fetchone()
+    net = execute_query(conn, 'SELECT * FROM petri_nets WHERE id = ?', (net_id,), fetchone=True)
     conn.close()
-    return dict(net) if net else None
+    return net
 
 def save_petri_net(name, content):
     conn = get_db_connection()
-    conn.execute('INSERT INTO petri_nets (name, content_json) VALUES (?, ?)',
-                 (name, json.dumps(content)))
-    conn.commit()
+    execute_query(conn, 'INSERT INTO petri_nets (name, content_json) VALUES (?, ?)',
+                 (name, json.dumps(content)), commit=True)
     conn.close()
 
 def update_petri_net(net_id, name, content):
     conn = get_db_connection()
-    conn.execute('UPDATE petri_nets SET name = ?, content_json = ? WHERE id = ?',
-                 (name, json.dumps(content), net_id))
-    conn.commit()
+    execute_query(conn, 'UPDATE petri_nets SET name = ?, content_json = ? WHERE id = ?',
+                 (name, json.dumps(content), net_id), commit=True)
     conn.close()
 
 def delete_petri_net(net_id):
     conn = get_db_connection()
-    conn.execute('DELETE FROM petri_nets WHERE id = ?', (net_id,))
-    conn.commit()
+    execute_query(conn, 'DELETE FROM petri_nets WHERE id = ?', (net_id,), commit=True)
     conn.close()

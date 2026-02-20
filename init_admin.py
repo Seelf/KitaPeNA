@@ -1,48 +1,40 @@
-from flask import Flask
-from werkzeug.security import generate_password_hash
-import sqlite3
 import os
+import sys
+from werkzeug.security import generate_password_hash
 
-# Configuration
-base_dir = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(base_dir, 'web_app', 'graphs.db')
+# Ensure we can import web_app
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-def init_user_table():
-    conn = sqlite3.connect(db_path)
-    # Create Users table with role and blocking support
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT DEFAULT 'user',
-            is_blocked BOOLEAN DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
+from web_app.data.database import create_user, init_db, get_user_by_username
 
-def seed_admin():
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
+import time
+
+def init_admin():
+    # PostgreSQL needs a few seconds to boot up and accept connections cleanly
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            init_db()
+            break  # If successful, exit the loop
+        except Exception as e:
+            print(f"Database is booting up, waiting... (Attempt {attempt + 1}/{max_retries})")
+            time.sleep(2)
+            if attempt == max_retries - 1:
+                print("Could not connect to the database after multiple attempts.")
+                raise e
     
-    # Check if admin exists
-    cur.execute('SELECT * FROM users WHERE username = ?', ('admin',))
-    if cur.fetchone():
-        print("Admin user already exists. Skipping creation.")
+    admin = get_user_by_username('admin')
+    if admin:
+        print("Admin user already exists!")
+        return
+        
+    password = 'admin'
+    pwhash = generate_password_hash(password)
+    
+    if create_user('admin', pwhash, 'admin'):
+        print(f"Admin user created successfully with default password: {password}")
     else:
-        # Create default admin: admin / admin
-        # Using pbkdf2:sha256 which is secure enough (default in werkzeug)
-        pwhash = generate_password_hash('admin')
-        cur.execute('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-                    ('admin', pwhash, 'admin'))
-        conn.commit()
-        print("Admin user created (admin / admin).")
-    
-    conn.close()
+        print("Error creating admin user.")
 
 if __name__ == '__main__':
-    print(f"Initializing Auth DB at: {db_path}")
-    init_user_table()
-    seed_admin()
+    init_admin()
