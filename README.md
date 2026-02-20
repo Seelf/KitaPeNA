@@ -1,5 +1,7 @@
 # KitaPeNA [![DOI](https://zenodo.org/badge/1162573243.svg)](https://doi.org/10.5281/zenodo.18712856)
 
+<img src="https://github.com/user-attachments/assets/383e9fc1-5020-4783-8e01-16e6b9613bfa" alt="Widok głównego interfejsu aplikacji KitaPeNA - edytor sieci Petriego" width="1509" height="811">
+
 A web application supporting research on **Concurrent Systems** modeled using **Petri Nets**.
 
 The project is used for:
