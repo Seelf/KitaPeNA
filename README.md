@@ -3,7 +3,7 @@
 A web application supporting research on **Concurrent Systems** modeled using **Petri Nets**.
 
 The project is used for:
-1.  **Edytion and Visualization** of Petri Nets (Places, Transitions, Arcs).
+1.  **Edition and Visualization** of Petri Nets (Places, Transitions, Arcs).
 2.  **Generating Reachability Graphs** - the state space of the system.
 3.  **Generating Concurrency Graphs** based on event independence relations.
 4.  **Structural Graph Analysis**:
@@ -175,3 +175,25 @@ The project is actively developed. Upcoming plans include:
     *   Generating automatic reports with charts and summary tables (latex, docx etc.).
 
 4.  **More Import and Export file extensions for Petri nets**.
+
+---
+
+## Authors
+*   **Dawid Konarczak** - *Lead Developer & Researcher* - ORCID: https://orcid.org/0009-0008-8239-1426
+
+## Citation
+If you use KitaPeNA in your research, please cite it using the generated Zenodo DOI. Once published, you can use the following BibTeX entry:
+
+```bibtex
+@software{kitapena_2026,
+  author       = {Dawid Konarczak},
+  title        = {KitaPeNA: A Web-based Petri nets suite},
+  year         = {2026},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.XXXXXXX},
+  url          = {https://doi.org/10.5281/zenodo.XXXXXXX}
+}
+```
+
+## License
+This project is licensed under the [MIT License](LICENSE) - see the `LICENSE` file for details.
