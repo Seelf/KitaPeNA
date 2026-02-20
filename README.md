@@ -86,11 +86,11 @@ To effectively use KitaPeNA for your research and algorithm evaluation, follow t
 4.  **Algorithm Implementation:** If you are testing your own C++ solutions (e.g., for Graph Coloring), navigate to the Algorithm management section to draft your C++ code (see example C++ code in the `custom_algos/` directory).
 5.  **Benchmarking Execution:** Go to the **Benchmarking** module:
     *   Select your data source (saved graphs from the database or randomly generated ones).
-    *   Select the algorithms to be evaluated (Python methods (not tested) or created C++ scripts).
+    *   Select the algorithms to be evaluated (created C++ scripts in future Python methods).
     *   Configure test parameters (iteration counts, in future also: warm-up phases, CPU thread limits etc.).
     *   Compile & Save.
     *   Execute the benchmark. The system automatically executes your C++ code on-the-fly, isolating and executing the iterations.
-6.  **Results Interpretation:** Review the final compiled statistics, including execution times and accuracy, presented instantly via the user interface (in future also exportable to CSV/JSON and other formats).
+6.  **Results Interpretation:** Review the final compiled statistics (only chart at the moment), including execution times (in future also accuracy), presented instantly via the user interface (in future also exportable to CSV/JSON and other formats).
 
 ---
 
