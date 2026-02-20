@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitapena - Web Version</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Google Fonts for that VS Code look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+    <!-- Monaco Editor Loader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+</head>
+<style>
+    /* Critical render path styles */
+    body {
+        background-color: #222;
+        color: #f00;
+        font-family: sans-serif;
+    }
+</style>
+
+<body>
+
+    <div class="app-container">
+        <!-- DEBUG OVERLAY (Window Mode) -->
+        <div id="debugOverlay"
+            style="position: fixed; top: 50px; right: 20px; width: 400px; height: 300px; background: rgba(0,0,0,0.9); color: lime; font-family: monospace; font-size: 11px; z-index: 9999; border: 1px solid #00ff00; display: none; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+
+            <!-- Title Bar -->
+            <div
+                style="background: #003300; padding: 5px 10px; cursor: move; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid green;">
+                <span>Debug Console</span>
+                <button id="btnCloseDebug"
+                    style="background: none; border: none; color: lime; cursor: pointer; font-weight: bold;">[X]</button>
+            </div>
+
+            <!-- Content -->
+            <div id="debugLogContainer" style="flex: 1; overflow-y: auto; padding: 5px;">
+                <div>> Ready.</div>
+            </div>
+        </div>
+
+        <!-- Header / Title Bar -->
+        <header class="title-bar">
+            <div class="title">Kitapena <span class="badge">Web</span></div>
+            <div class="spacer"></div>
+            <div class="window-controls">
+                <div style="position: relative; display: inline-block;">
+                    <button id="btnToggleSettings" class="btn small"
+                        style="font-size: 11px; padding: 2px 8px; background: #333; color: #aaa; border: 1px solid #555;">⚙️
+                        View</button>
+                    <div id="settingsPanel"
+                        style="display: none; position: absolute; top: 100%; right: 0; margin-top: 5px; background: #222; border: 1px solid #555; padding: 10px; z-index: 10001; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 150px;">
+                        <div style="font-size: 11px; color: #fff; margin-bottom: 5px; font-weight: bold;">VIEW SETTINGS
+                        </div>
+                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                            <input type="checkbox" id="chkShowSidebar" checked> Show Sidebar
+                        </label>
+                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                            <input type="checkbox" id="chkShowToolbar" checked> Show Toolbar
+                        </label>
+                        <hr style="border: none; border-top: 1px solid #444; margin: 8px 0;">
+                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                            <input type="checkbox" id="chkSnapReachability"> Snap Reachability
+                        </label>
+                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                            <input type="checkbox" id="chkSnapConcurrency"> Snap Concurrency
+                        </label>
+                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                            <input type="checkbox" id="chkSnapToGrid" checked> Snap Petri Net
+                        </label>
+                    </div>
+                </div>
+                <button id="btnToggleDebug" class="btn small"
+                    style="font-size: 11px; padding: 2px 8px; background: #333; color: lime; border: 1px solid green; margin-left: 10px;">Debug</button>
+
+                {% if user.role == 'admin' %}
+                <button id="btnAdminConsole" class="btn small"
+                    style="font-size: 11px; padding: 2px 8px; background: #440000; color: #ffcccc; border: 1px solid #ff0000; margin-right: 10px;">🛡️
+                    Admin</button>
+                {% endif %}
+
+                <a href="{{ url_for('auth.logout') }}" class="btn small"
+                    style="font-size: 11px; padding: 2px 8px; background: #333; color: #ccc; border: 1px solid #555; text-decoration: none;">Logout</a>
+            </div>
+        </header>
+
+        <!-- ADMIN MODAL -->
+        <div id="adminModal"
+            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 20000; justify-content: center; align-items: center;">
+            <div
+                style="background: #252526; width: 600px; max-height: 80vh; display: flex; flex-direction: column; border: 1px solid #444; box-shadow: 0 0 20px rgba(0,0,0,0.7);">
+                <div
+                    style="padding: 10px; background: #333; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; color: #ddd;">🛡️ User Management Console</span>
+                    <button id="btnCloseAdmin"
+                        style="background: none; border: none; color: #ccc; cursor: pointer;">✕</button>
+                </div>
+
+                <div style="padding: 20px; overflow-y: auto;">
+                    <!-- Change My Password -->
+                    <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #333;">
+                        <h4 style="color: #aaa; margin-bottom: 10px;">My Credentials</h4>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="password" id="inputNewAdminPass" placeholder="New Password"
+                                style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                            <button id="btnChangeAdminPass" class="btn primary">Update Password</button>
+                        </div>
+                    </div>
+
+                    <!-- User List -->
+                    <h4 style="color: #aaa; margin-bottom: 10px;">Users</h4>
+                    <table
+                        style="width: 100%; text-align: left; font-size: 12px; color: #ccc; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #444;">
+                                <th style="padding: 5px;">ID</th>
+                                <th style="padding: 5px;">Username</th>
+                                <th style="padding: 5px;">Role</th>
+                                <th style="padding: 5px;">Status</th>
+                                <th style="padding: 5px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+
+                    <!-- Add User -->
+                    <h4 style="color: #aaa; margin-top: 20px; margin-bottom: 10px;">Add New User</h4>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="inputNewUser" placeholder="Username"
+                            style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                        <input type="password" id="inputNewPass" placeholder="Password"
+                            style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                        <select id="selectNewRole"
+                            style="background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <button id="btnAddUser" class="btn primary">Create</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ALGO MANAGER MODAL -->
+        <div id="algoModal" class="modal">
+            <div class="modal-content algo-manager-modal">
+                <div class="modal-header">
+                    <span class="title">⚙️ Algorithm Manager (C++)</span>
+                    <button id="closeAlgoModal" class="close-btn">✕</button>
+                </div>
+
+                <div class="modal-body algo-manager-body">
+                    <!-- Left: List -->
+                    <div class="modal-sidebar">
+                        <div class="section-header">
+                            <h4>Algorithms</h4>
+                            <button id="btnNewAlgo" class="btn-xs highlight">+ New</button>
+                        </div>
+                        <div id="customAlgoList" class="standard-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Editor -->
+                    <div class="modal-main editor-panel">
+                        <div class="editor-header-input"
+                            style="display: flex; background: #252526; border-bottom: 1px solid var(--border-color);">
+                            <input type="text" id="editAlgoName" placeholder="Algorithm Name (e.g. my_greedy_v2)"
+                                style="flex: 1; border: none; background: transparent;">
+                            <select id="algoLanguageSelect" class="btn-xs"
+                                style="margin: 5px; background: #333; border: 1px solid #444; color: #ccc;">
+                                <option value="cpp">C++</option>
+                                <option value="python">Python</option>
+                                <option value="php">PHP</option>
+                                <option value="javascript">JavaScript</option>
+                                <option value="plain">Plain Text</option>
+                            </select>
+                        </div>
+
+                        <div id="monacoEditorContainer" style="flex: 1; min-height: 0;"></div>
+
+                        <div class="modal-footer">
+                            <div id="compileStatus" class="status-text">Ready</div>
+                            <div class="actions">
+                                <button id="btnDeleteAlgo" class="btn-danger">Delete</button>
+                                <button id="btnSaveCompile" class="btn-primary">Save & Compile</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-split">
+            <!-- Left: Sidebar (Tools) -->
+            <div class="activity-bar">
+                <div class="icon active" id="tabEditor" title="Edit Graph">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="18" cy="5" r="3"></circle>
+                        <circle cx="6" cy="12" r="3"></circle>
+                        <circle cx="18" cy="19" r="3"></circle>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
+                </div>
+                <div class="icon" id="tabDb" title="Saved Graphs">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <!-- Performance Tab -->
+                <div class="icon" id="tabPerformance" title="Performance Benchmarks">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Center: Canvas Editor + Sidebar Wrapper -->
+            <div id="mainEditorContainer" style="display: flex; flex: 1; overflow: hidden;">
+                <div class="editor-area" id="mainEditorArea">
+                    <!-- ... (existing canvas content) ... -->
+                    <!-- Custom Tab Bar Wrapper (Active Files) -->
+                    <div class="tabs-wrapper">
+                        <button id="btnTabScrollLeft" class="tab-scroll-btn" title="Scroll Left">‹</button>
+                        <div class="editor-tabs-bar" id="editorTabBar">
+                            <!-- Tabs injected by tabs.js -->
+                        </div>
+                        <button id="btnTabScrollRight" class="tab-scroll-btn" title="Scroll Right">›</button>
+                    </div>
+
+                    <!-- Context Wrapper (Model/Analysis) -->
+                    <div class="editor-header">
+                        <span class="tab active" id="tabContextPetri">Petri Net (Model)</span>
+                        <span class="tab" id="tabContextGraph">Reachability Graph (Analysis)</span>
+                        <span class="tab" id="tabContextConcurrency">Concurrency Graph (Structural)</span>
+                    </div>
+                    <div class="canvas-container" id="canvasContainer">
+                        <div id="graphStats" class="graph-stats">Nodes: 0 | Edges: 0</div>
+                        <!-- Toolbars ... -->
+                        <div class="floating-toolbar" id="toolbarGraph">
+                            <button class="tool-btn" id="btnModeView" title="Move / Pan">✋</button>
+                            <button class="tool-btn" id="btnModeNode" title="Add Node">
+                                <svg width="20" height="20" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" />
+                                    <text x="12" y="16" text-anchor="middle" fill="currentColor" font-size="12"
+                                        font-family="monospace" id="iconNodeNum">1</text>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnModeEdge" title="Add Edge">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="5" cy="19" r="3"></circle>
+                                    <circle cx="19" cy="5" r="3"></circle>
+                                    <line x1="7.5" y1="16.5" x2="16.5" y2="7.5"></line>
+                                </svg>
+                            </button>
+                            <div class="tool-separator"></div>
+                            <button class="tool-btn" id="btnSaveGraph" title="Save Graph">💾</button>
+                            <button class="tool-btn" id="btnGraphLayout" title="Auto Layout">✨</button>
+                            <button class="tool-btn" id="btnDelete" title="Delete Selected">🗑️</button>
+                            <button class="tool-btn danger" id="btnClear" title="Clear All">❌</button>
+                            <div class="tool-separator" id="concurrencySeparator" style="display: none;"></div>
+                            <button class="tool-btn" id="btnCheckTransitive" title="Check Transitive Orientability"
+                                style="display: none;">🔀</button>
+                        </div>
+
+                        <!-- Petri Net Toolbar (Hidden by default) -->
+                        <div class="floating-toolbar" id="toolbarPetri" style="display: none;">
+                            <button class="tool-btn" id="btnPetriPan" title="Move / Pan">✋</button>
+                            <button class="tool-btn" id="btnPetriPlace" title="Add Place (O)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="8"></circle>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriTransition" title="Add Transition ([ ])">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="8" y="4" width="8" height="16"></rect>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriArc" title="Add Arc (->)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M5 12h14m-4-4l4 4-4 4"></path>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriToken" title="Add/Remove Token">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriRename" title="Rename Element (Text)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriDelete" title="Delete Element (Eraser)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M3 6h18"></path>
+                                    <path
+                                        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                    </path>
+                                </svg>
+                            </button>
+                            <div class="tool-separator"></div>
+                            <button class="tool-btn" id="btnPetriSave" title="Save Petri Net">💾</button>
+                            <button class="tool-btn" id="btnPetriImport" title="Import .pnh">📂</button>
+                            <button class="tool-btn highlight" id="btnPetriReachability"
+                                title="Generate Reachability Graph">🕸️</button>
+                            <button class="tool-btn" id="btnPetriLayout" title="Auto Layout">✨</button>
+                            <button class="tool-btn danger" id="btnPetriClear" title="Clear All">❌</button>
+
+                            <!-- Hidden File Input -->
+                            <input type="file" id="fileInputPnh" accept=".pnh" style="display: none;">
+                        </div>
+
+                        <canvas id="graphCanvas"></canvas>
+                    </div>
+                </div>
+                <!-- Moved Resizer and Sidebar Here -->
+                <div id="resizer" class="resizer"></div>
+                <!-- Right: Results Panel -->
+                <div class="sidebar-panel">
+                    <!-- RESULTS VIEW -->
+                    <div id="viewResults" style="display: flex; flex-direction: column; height: 100%;">
+                        <div class="panel-header">EXPLORER: RESULTS</div>
+                        <div class="results-list" id="resultsList">
+                            <div class="empty-state">No MIS found yet. Draw graph and click Start.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance View (Hidden by default) -->
+            <!-- Performance View (Hidden by default) -->
+            <div id="viewPerformance" class="performance-view">
+                <div class="performance-header">
+                    <div class="icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </div>
+                    Algorithm Benchmarks
+                </div>
+
+                <div class="perf-container">
+                    <!-- Sidebar Config -->
+                    <div class="perf-sidebar">
+                        <div class="config-section">
+                            <h4>Graph Source</h4>
+                            <div class="input-group">
+                                <select id="benchSourceSelect">
+                                    <option value="random">Random Graphs</option>
+                                    <option value="saved">Saved Graphs</option>
+                                    <option value="petri" selected>Petri Nets</option>
+                                    <option value="pnh">PNH Files (Local)</option>
+                                </select>
+                            </div>
+
+                            <!-- Random Config -->
+                            <div id="configRandom">
+                                <div class="input-group">
+                                    <label>Node Count (N) Range</label>
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="number" id="benchStartN" value="10" placeholder="Start">
+                                        <input type="number" id="benchEndN" value="100" placeholder="End">
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>Step Size</label>
+                                    <input type="number" id="benchStepN" value="10">
+                                </div>
+                                <div class="input-group">
+                                    <label>Density (0.0 - 1.0)</label>
+                                    <input type="number" id="benchDensity" value="0.5" step="0.1" max="1.0" min="0.0">
+                                </div>
+                            </div>
+
+                            <!-- Saved Config -->
+                            <div id="configSaved" style="display: none;">
+                                <div class="input-group">
+                                    <label>Select Graphs</label>
+                                    <div class="list-controls">
+                                        <span onclick="window.selectListItems('benchSavedList', true)">All</span> |
+                                        <span onclick="window.selectListItems('benchSavedList', false)">None</span>
+                                    </div>
+                                    <input type="text" id="searchBenchGraphs" placeholder="Search Graphs...">
+                                    <div id="benchSavedList">
+                                        <div style="padding: 5px; color: #888; font-style: italic;">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="configPetri" style="display: none;">
+                                <div class="input-group">
+                                    <label>Graph Representation</label>
+                                    <select id="benchPetriGraphType">
+                                        <option value="concurrency" selected>Concurrency Graph (Default)</option>
+                                        <option value="reachability">Reachability Graph</option>
+                                        <option value="pnh">PNH File (Direct)</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Select Petri Nets</label>
+                                    <div class="list-controls">
+                                        <span onclick="window.selectListItems('benchPetriList', true)">All</span> |
+                                        <span onclick="window.selectListItems('benchPetriList', false)">None</span>
+                                    </div>
+                                    <input type="text" id="searchBenchPetri" placeholder="Search...">
+                                    <div id="benchPetriList">
+                                        <div style="padding: 5px; color: #888; font-style: italic;">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="configPnh" style="display: none;">
+                                <div class="input-group">
+                                    <label>Select PNH Files</label>
+                                    <div class="list-controls">
+                                        <span onclick="window.selectListItems('benchPnhFileList', true)">All</span> |
+                                        <span onclick="window.selectListItems('benchPnhFileList', false)">None</span>
+                                    </div>
+                                    <input type="text" id="searchBenchPnh" placeholder="Search filenames...">
+                                    <div id="benchPnhFileList">
+                                        <div style="padding: 5px; color: #888; font-style: italic;">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Iterations per Graph</label>
+                                <input type="number" id="benchIterations" value="5">
+                            </div>
+                        </div>
+
+                        <div class="config-section">
+                            <div class="section-header">
+                                <h4>Algorithms</h4>
+                                <button id="btnManageAlgos" class="btn-xs">Manage</button>
+                            </div>
+                            <div class="list-controls">
+                                <span onclick="window.selectListItems('algoListContainer', true)">All</span> |
+                                <span onclick="window.selectListItems('algoListContainer', false)">None</span>
+                            </div>
+                            <input type="text" id="searchAlgos" placeholder="Search algorithms...">
+                            <div id="algoListContainer" class="algo-list">
+                                <!-- Dynamic Algos Here -->
+                            </div>
+                        </div>
+
+                        <div class="config-section run-section">
+                            <h4>Actions</h4>
+                            <button id="btnRunBenchmark" class="btn-run-bench">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                Run Benchmark
+                            </button>
+                            <div id="benchmarkStatus" class="perf-status">Ready</div>
+
+                            <div class="console-wrapper">
+                                <div class="console-header">
+                                    <span>Execution Console</span>
+                                    <div class="header-actions">
+                                        <button id="btnClearConsole" class="btn-xs" title="Clear Console">🗑️</button>
+                                        <button id="btnExpandConsole" class="btn-xs" title="Fullscreen">⛶</button>
+                                    </div>
+                                </div>
+                                <div id="benchConsole" class="bench-console">
+                                    <div class="console-line system">Console initialized. Ready for benchmark...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Chart Area -->
+                    <div class="perf-main">
+                        <canvas id="perfChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database Explorer View -->
+            <div id="viewDatabaseExplorer" class="db-explorer-view" style="display: none;">
+                <!-- Toolbar -->
+                <div class="db-toolbar">
+                    <div class="db-search">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right: 8px; color: #666;">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="dbSearchInput" placeholder="Search nets by name...">
+                    </div>
+
+                    <div class="db-actions">
+                        <span id="dbStats" style="margin-right: 15px; font-size: 12px; color: #888;"></span>
+
+                        <div class="db-filters-advanced"
+                            style="display: flex; gap: 8px; margin-right: 15px; align-items: center;">
+                            <div class="filter-unit" title="Min Places">
+                                <span style="font-size: 10px; color: #666;">P≥</span>
+                                <input type="number" id="dbMinP" class="db-input-small" min="0" style="width: 40px;">
+                            </div>
+                            <div class="filter-unit" title="Min Transitions">
+                                <span style="font-size: 10px; color: #666;">T≥</span>
+                                <input type="number" id="dbMinT" class="db-input-small" min="0" style="width: 40px;">
+                            </div>
+                            <div class="filter-unit" title="Min Arcs">
+                                <span style="font-size: 10px; color: #666;">A≥</span>
+                                <input type="number" id="dbMinA" class="db-input-small" min="0" style="width: 40px;">
+                            </div>
+                            <div class="filter-unit" title="Min Tokens">
+                                <span style="font-size: 10px; color: #666;">K≥</span>
+                                <input type="number" id="dbMinK" class="db-input-small" min="0" style="width: 40px;">
+                            </div>
+                        </div>
+
+                        <select id="dbSortSelect" class="db-select">
+                            <option value="date_desc">Newest First</option>
+                            <option value="date_asc">Oldest First</option>
+                            <option value="name_asc">Name A-Z</option>
+                            <option value="places_desc">Most Places</option>
+                            <option value="places_asc">Least Places</option>
+                            <option value="transitions_desc">Most Transitions</option>
+                            <option value="transitions_asc">Least Transitions</option>
+                            <option value="arcs_desc">Most Arcs</option>
+                            <option value="arcs_asc">Least Arcs</option>
+                            <option value="tokens_desc">Most Tokens</option>
+                            <option value="tokens_asc">Least Tokens</option>
+                        </select>
+
+                        <label for="importNetInput" class="btn primary">
+                            Import Net
+                        </label>
+                        <input type="file" id="importNetInput" accept=".pnh,.json,.pnml,.xml" style="display: none;">
+
+                        <button id="btnRefreshDb" class="btn secondary">
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Grid Container -->
+                <div id="dbGrid" class="db-grid">
+                    <!-- Cards will be injected here -->
+                    <div class="empty-state">Loading saved nets...</div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Footer / Status Bar with Controls -->
+        <footer class="status-bar">
+            <!-- Simulation Controls Only -->
+            <div class="controls-group" style="width: 100%; justify-content: center;">
+                <button id="btnStart" class="btn primary">Start / Solve</button>
+                <div class="separator"></div>
+
+                <button id="btnPrev" class="btn" disabled>Prev</button>
+                <button id="btnNext" class="btn" disabled>Next</button>
+                <button id="btnAuto" class="btn" disabled>Auto</button>
+
+                <div class="separator"></div>
+
+                <div class="slider-container" title="Simulation Speed">
+                    <span style="font-size: 10px; opacity: 0.7;">Speed</span>
+                    <input type="range" id="speedSlider" min="1" max="100" value="50">
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Large Console Modal -->
+    <div id="largeConsoleModal" class="modal">
+        <div class="modal-content large-console-content">
+            <div class="modal-header">
+                <h3>Benchmark Execution Console</h3>
+                <span id="closeLargeConsole" class="close-btn">&times;</span>
+            </div>
+            <div class="large-console-wrapper">
+                <div class="console-header">
+                    <span>Live Output</span>
+                    <div class="header-actions">
+                        <button id="btnClearLargeConsole" class="btn-xs" title="Clear Console">🗑️</button>
+                    </div>
+                </div>
+                <div id="largeBenchConsole" class="bench-console large"></div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Main App Logic (ES Modules) -->
+    <script type="module" src="{{ url_for('static', filename='js/core/main.js') }}?v=infiniteScrollOnly"></script>
+</body>
+
+</html>

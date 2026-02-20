@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitapena - Petri nets toolset</title>
+    <!-- Dark Mode CSS (Inline for simplicity) -->
+    <style>
+        :root {
+            --bg: #09090b;
+            --box-bg: rgba(24, 24, 27, 0.8);
+            --border: rgba(39, 39, 42, 0.8);
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-muted: #a1a1aa;
+            --text: #f4f4f5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, #1e1e2e 0%, #09090b 100%);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-box {
+            background: var(--box-bg);
+            backdrop-filter: blur(12px);
+            padding: 48px 40px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2 {
+            color: #fff;
+            margin-bottom: 32px;
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.05em;
+            text-align: center;
+            background: linear-gradient(to bottom right, #fff, #9ca3af);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        form {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(39, 39, 42, 0.5);
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            background: rgba(39, 39, 42, 0.8);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.2s;
+            margin-top: 12px;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .alert {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            padding: 14px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 10px;
+            font-size: 0.875rem;
+            width: 100%;
+            text-align: center;
+        }
+
+        .cf-turnstile {
+            margin: 16px 0;
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .footer a {
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .footer a:hover {
+            color: var(--accent);
+        }
+    </style>
+    <!-- Cloudflare Turnstile -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+
+<body>
+    <div class="login-box">
+        <h2>Kitapena - a Petri nets toolset</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="username" class="input-field" placeholder="Username" required autofocus>
+            <input type="password" name="password" class="input-field" placeholder="Password" required>
+
+            <div class="cf-turnstile" data-sitekey="{{ site_key }}" data-theme="dark"></div>
+
+            <button type="submit">Login</button>
+        </form>
+        <div class="footer">
+            &copy; 2025 Dawid Konarczak. All rights reserved.<br>
+            <a href="https://konarczak.pl" target="_blank">konarczak.pl</a>
+        </div>
+    </div>
+</body>
+
+</html>

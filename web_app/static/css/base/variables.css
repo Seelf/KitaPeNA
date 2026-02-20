@@ -1,0 +1,14 @@
+:root {
+    --bg-color: #1e1e1e;
+    --panel-bg: #252526;
+    --sidebar-bg: #333333;
+    --accent: #007acc;
+    --text-color: #cccccc;
+    --text-bright: #ffffff;
+    --border-color: #3e3e42;
+    --hover-bg: #2a2d2e;
+    --selection-bg: #094771;
+    --input-bg: #3c3c3c;
+    --danger: #d44c47;
+    --success: #89d185;
+}
