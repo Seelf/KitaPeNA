@@ -169,7 +169,7 @@ The project is implemented as a multi-tier system, decomposing flows into disjoi
 ### 4. The Benchmarking Pipeline
 The logical core of the application manages an asynchronous statistical evaluation pipeline, which can be broken down into the following execution stages during an on-demand execution:
 
-1.  **C++ Code Upload:** The system receives the C++ code payload from the web wrapper in encrypted POST packets into the temporary preprocessor environment (temp virtualization).
+1.  **C++ Code:** The system receives the C++ code payload from the web wrapper in encrypted POST packets into the temporary preprocessor environment (temp virtualization).
 2.  **On-the-fly Compilation:** The context automatically launches the system compiler (e.g., `clang++`). The process is obligatorily equipped with the necessary flags: level 3 optimization (`-O3`), position-independent code generation (`-fPIC`), and targeting the production of shared objects for dynamic linking (`-shared`).
 3.  **Shared Object Initialization:** The created `.so` shells (`.dll` for Windows OS) are loaded directly into the host memory area of the Python virtual machine using descriptors in `ctypes.CDLL()`.
 4.  **Memory Pointer Resolving:** Pointer compatibility is ensured for dynamic casts from Python to C – including the allocation of reference arrays for large graphs using vector casting instructions like `POINTER(c_int)`.
