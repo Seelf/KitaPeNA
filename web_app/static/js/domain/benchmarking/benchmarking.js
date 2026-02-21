@@ -102,6 +102,7 @@ export function initBenchmarking() {
     const configSaved = document.getElementById('configSaved');
     const configPetri = document.getElementById('configPetri');
     const configPnh = document.getElementById('configPnh');
+    const configRandomCount = document.getElementById('configRandomCount');
 
     if (sourceSelect) {
         sourceSelect.addEventListener('change', (e) => {
@@ -109,6 +110,7 @@ export function initBenchmarking() {
             configSaved.style.display = 'none';
             if (configPetri) configPetri.style.display = 'none';
             if (configPnh) configPnh.style.display = 'none';
+            if (configRandomCount) configRandomCount.style.display = 'none';
 
             if (e.target.value === 'saved') {
                 configSaved.style.display = 'block';
@@ -125,6 +127,7 @@ export function initBenchmarking() {
                 }
             } else {
                 configRandom.style.display = 'block';
+                if (configRandomCount) configRandomCount.style.display = 'block';
             }
         });
         // Initial Trigger
@@ -467,6 +470,7 @@ async function runBenchmark() {
     const mode = sourceSelect ? sourceSelect.value : 'random';
 
     const iterations = parseInt(document.getElementById('benchIterations').value) || 5;
+    const graphCount = parseInt(document.getElementById('benchGraphCount')?.value) || 5;
 
     // Get Algorithms from Dynamic List
     const algos = [];
@@ -524,6 +528,7 @@ async function runBenchmark() {
                 const payload = {
                     mode: 'random',
                     iterations: iterations,
+                    graph_count: graphCount,
                     start_n: n,
                     end_n: n,
                     step_n: stepN,

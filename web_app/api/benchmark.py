@@ -229,7 +229,8 @@ def run_benchmark():
                 'start_n': int(data.get('start_n', 10)),
                 'end_n': int(data.get('end_n', 50)),
                 'step_n': int(data.get('step_n', 10)),
-                'density': float(data.get('density', 0.5))
+                'density': float(data.get('density', 0.5)),
+                'graph_count': int(data.get('graph_count', 5))
             }
         else:
             exec_args = {'graphs': graphs}

@@ -55,24 +55,72 @@ def save_algorithm():
 
     cpp_path = os.path.join(CUSTOM_ALGOS_DIR, f"{name}.cpp")
     so_path = os.path.join(CUSTOM_ALGOS_DIR, f"{name}.so")
+    wrapped_cpp_path = os.path.join(CUSTOM_ALGOS_DIR, f"{name}_wrapped.cpp")
     
     try:
-        # 1. Save Code
+        # 1. Save Original Code
         with open(cpp_path, 'w') as f:
             f.write(code)
             
-        # 2. Compile
+        # 2. Generator Wrapper Code
+        has_solve = bool(re.search(r'\bsolve\s*\(', code))
+        has_solve_petri = bool(re.search(r'\bsolve_petri\s*\(', code))
+        
+        wrapper_code = f"""#include <chrono>
+
+#define solve user_solve
+#define solve_petri user_solve_petri
+
+// --- USER CODE START ---
+{code}
+// --- USER CODE END ---
+
+#undef solve
+#undef solve_petri
+
+extern "C" {{
+"""
+        if has_solve:
+            wrapper_code += """
+    double solve(int n, int m, int* u, int* v, int* colors) {
+        auto __start_time = std::chrono::high_resolution_clock::now();
+        user_solve(n, m, u, v, colors);
+        auto __end_time = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration<double, std::milli>(__end_time - __start_time).count();
+    }
+"""
+        if has_solve_petri:
+            wrapper_code += """
+    double solve_petri(const char* pnh_path) {
+        auto __start_time = std::chrono::high_resolution_clock::now();
+        user_solve_petri(pnh_path);
+        auto __end_time = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration<double, std::milli>(__end_time - __start_time).count();
+    }
+"""
+        wrapper_code += "}\n"
+        
+        with open(wrapped_cpp_path, 'w') as f:
+            f.write(wrapper_code)
+
+        # 3. Compile the wrapped code
         cmd = [
             'clang++', 
             '-shared', '-fPIC', '-O3', 
             '-undefined', 'dynamic_lookup', 
             '-o', so_path, 
-            cpp_path
+            wrapped_cpp_path
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True)
         
+        # 4. Clean up the wrapped code
+        if os.path.exists(wrapped_cpp_path):
+            os.remove(wrapped_cpp_path)
+            
         if result.returncode != 0:
+            # Clean up the .so file if it failed previously but created something (unlikely, but safe)
+            if os.path.exists(so_path): os.remove(so_path)
             return jsonify({
                 'success': False, 
                 'message': 'Compilation Failed', 

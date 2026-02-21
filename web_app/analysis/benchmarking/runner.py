@@ -73,7 +73,7 @@ def execute_custom_cpp(algo_name, nodes, edges):
             ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), 
             ctypes.POINTER(ctypes.c_int)
         ]
-        lib.solve.restype = None
+        lib.solve.restype = ctypes.c_double
 
         n = len(nodes)
         m = len(edges)
@@ -101,10 +101,10 @@ def execute_custom_cpp(algo_name, nodes, edges):
         colors_arr = (ctypes.c_int * n)()
         
         # Call
-        lib.solve(n, m, u_arr, v_arr, colors_arr)
+        exec_time = lib.solve(n, m, u_arr, v_arr, colors_arr)
         
         # Return colors as list
-        return list(colors_arr)
+        return list(colors_arr), exec_time
     except Exception as e:
         print(f"Error executing custom algo {algo_name}: {e}")
         raise e
@@ -140,7 +140,7 @@ class BenchmarkRunner:
     def __init__(self):
         pass
 
-    def run_suite(self, algo_names, start_n, end_n, step_n, density, iterations):
+    def run_suite(self, algo_names, start_n, end_n, step_n, density, graph_count, iterations):
         """
         Runs a benchmark suite.
         Returns a dict structure suitable for Chart.js.
@@ -157,7 +157,7 @@ class BenchmarkRunner:
         n_values = list(range(start_n, end_n + 1, step_n))
         results["labels"] = n_values
 
-        print(f"[Bechmark] Starting suite: N={start_n}-{end_n}, dens={density}, iters={iterations}")
+        print(f"[Bechmark] Starting suite: N={start_n}-{end_n}, dens={density}, graphs={graph_count}, iters={iterations}")
 
         for n in n_values:
             print(f"  > Testing N={n}...")
@@ -166,7 +166,7 @@ class BenchmarkRunner:
             # Standard is: Average over X random executions.
             
             # Pre-calculate graphs for this batch to ensure all algos run on SAME data
-            test_graphs = [generate_random_graph(n, density) for _ in range(iterations)]
+            test_graphs = [generate_random_graph(n, density) for _ in range(graph_count)]
 
             for algo_name in algo_names:
                 is_custom = False
@@ -174,66 +174,68 @@ class BenchmarkRunner:
                 
                 if algo_name in ALGORITHMS:
                     func = ALGORITHMS[algo_name]
+                elif algo_name == 'cpp_solve':
+                    func = CppAdapter.solve
                 else:
                     # Check if custom
                     if os.path.exists(os.path.join(CUSTOM_ALGOS_DIR, f"{algo_name}.so")):
                         is_custom = True
                     else:
                         print(f"Skipping unknown algo: {algo_name}")
-                        algo_data[algo_name].append(None)
+                        algo_data[algo_name].append(0)  # append numeric 0 instead of None
                         continue
                 
                 times = []
 
-                for i in range(iterations):
-                    nodes, edges = test_graphs[i]
+                for g_idx in range(graph_count):
+                    nodes, edges = test_graphs[g_idx]
                     
-                    # Execution Logic
-                    if is_custom:
-                        start_time = time.perf_counter() * 1000 # ms
-                        with CaptureOutput() as capture:
-                            result_colors = execute_custom_cpp(algo_name, nodes, edges)
-                        
-                        end_time = time.perf_counter() * 1000 # ms
-                        times.append(end_time - start_time)
-
-                        if capture.output:
-                            if "logs" not in results: results["logs"] = []
-                            results["logs"].append(capture.output)
-                        
-                        # Add result info for the first iteration of specific N
-                        if i == 0 and result_colors:
-                            counts = {}
-                            for c in result_colors:
-                                if c > 0: counts[c] = counts.get(c, 0) + 1
+                    for i in range(iterations):
+                    
+                        # Execution Logic
+                        if is_custom:
+                            with CaptureOutput() as capture:
+                                result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges)
                             
-                            unique_colors = sorted(counts.keys())
-                            chrom_num = len(unique_colors)
-                            dist_str = ", ".join([f"C{c}:{counts[c]}" for c in unique_colors])
+                            times.append(exec_time)
+    
+                            if capture.output:
+                                if "logs" not in results: results["logs"] = []
+                                results["logs"].append(capture.output)
                             
-                            if "logs" not in results: results["logs"] = []
-                            results["logs"].append(f"[{algo_name}] Result (N={n}): Chromatic Number = {chrom_num} (Dist: {dist_str})")
-                    elif algo_name == 'cpp_solve':
-                        # C++: Add artificial delay + Use Python Timer
-                        start_time = time.perf_counter() * 1000 # ms
-                        time.sleep(0.01) # 10ms artificial delay
-                        with CaptureOutput() as capture:
-                            func(nodes, edges) 
-                        end_time = time.perf_counter() * 1000 # ms
-                        times.append(end_time - start_time)
-                        if capture.output:
-                            if "logs" not in results: results["logs"] = []
-                            results["logs"].append(capture.output)
-                    else:
-                        # Python External Timer
-                        start_time = time.perf_counter() * 1000 # ms
-                        with CaptureOutput() as capture:
-                            func(nodes, edges) # Output ignored
-                        end_time = time.perf_counter() * 1000 # ms
-                        times.append(end_time - start_time)
-                        if capture.output:
-                            if "logs" not in results: results["logs"] = []
-                            results["logs"].append(capture.output)
+                            # Add result info for the first iteration of specific N
+                            if i == 0 and result_colors:
+                                counts = {}
+                                for c in result_colors:
+                                    if c > 0: counts[c] = counts.get(c, 0) + 1
+                                
+                                unique_colors = sorted(counts.keys())
+                                chrom_num = len(unique_colors)
+                                dist_str = ", ".join([f"C{c}:{counts[c]}" for c in unique_colors])
+                                
+                                if "logs" not in results: results["logs"] = []
+                                results["logs"].append(f"[{algo_name}] Result (N={n}): Chromatic Number = {chrom_num} (Dist: {dist_str})")
+                        elif algo_name == 'cpp_solve':
+                            # C++: Add artificial delay + Use Python Timer
+                            start_time = time.perf_counter() * 1000 # ms
+                            time.sleep(0.01) # 10ms artificial delay
+                            with CaptureOutput() as capture:
+                                func(nodes, edges) 
+                            end_time = time.perf_counter() * 1000 # ms
+                            times.append(end_time - start_time)
+                            if capture.output:
+                                if "logs" not in results: results["logs"] = []
+                                results["logs"].append(capture.output)
+                        else:
+                            # Python External Timer
+                            start_time = time.perf_counter() * 1000 # ms
+                            with CaptureOutput() as capture:
+                                func(nodes, edges) # Output ignored
+                            end_time = time.perf_counter() * 1000 # ms
+                            times.append(end_time - start_time)
+                            if capture.output:
+                                if "logs" not in results: results["logs"] = []
+                                results["logs"].append(capture.output)
 
                 # Average
                 if times:
@@ -285,6 +287,8 @@ class BenchmarkRunner:
                 
                 if algo_name in ALGORITHMS:
                     func = ALGORITHMS[algo_name]
+                elif algo_name == 'cpp_solve':
+                    func = CppAdapter.solve
                 else:
                      # Check if custom
                     if os.path.exists(os.path.join(CUSTOM_ALGOS_DIR, f"{algo_name}.so")):
@@ -299,34 +303,33 @@ class BenchmarkRunner:
                 for _ in range(iterations):
                     # Execution Logic
                     if is_custom:
-                        start_time = time.perf_counter() * 1000 # ms
-                        
                         success = False
                         result_colors = None
+                        exec_time = 0
                         # Try PNH execution if path available
                         if 'pnh_path' in graph:
                             try:
                                 with CaptureOutput() as capture:
                                     execute_custom_cpp_petri(algo_name, graph['pnh_path'])
                                 success = True
+                                # It doesn't report time yet for PNH, put 0 or measure here?
+                                # (Left as standard python measure for PNH just as fallback for now...)
                             except AttributeError:
                                 # Fallback to standard graph if Petri solver missing
                                 print(f"  [Runner] {algo_name} has no solve_petri. Falling back to graph solve.")
                                 with CaptureOutput() as capture:
-                                    result_colors = execute_custom_cpp(algo_name, nodes, edges)
+                                    result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges)
                                 success = True
                             except Exception as e:
                                 print(f"  [Runner] PNH Execution failed for {algo_name}: {e}")
                                 # Try fallback anyway? Or fail? Let's try fallback.
                                 with CaptureOutput() as capture:
-                                    result_colors = execute_custom_cpp(algo_name, nodes, edges)
+                                    result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges)
                                 success = True
                         else:
                             with CaptureOutput() as capture:
-                                result_colors = execute_custom_cpp(algo_name, nodes, edges)
+                                result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges)
                             success = True
-                            
-                        end_time = time.perf_counter() * 1000 # ms
                         if capture.output:
                             if "logs" not in results: results["logs"] = []
                             results["logs"].append(capture.output)
@@ -345,15 +348,17 @@ class BenchmarkRunner:
                             results["logs"].append(f"[{algo_name}] Result ({graph['name']}): Chromatic Number = {chrom_num} (Dist: {dist_str})")
 
                         if success:
-                            times.append(end_time - start_time)
+                            times.append(exec_time)
                     elif algo_name == 'cpp_solve':
-                        # C++: Add artificial delay + Use Python Timer
-                        start_time = time.perf_counter() * 1000 # ms
-                        time.sleep(0.01) # 10ms artificial delay
+                        # Native execution time from C++ Module
                         with CaptureOutput() as capture:
-                            func(nodes, edges) 
-                        end_time = time.perf_counter() * 1000 # ms
-                        times.append(end_time - start_time)
+                            res = func(nodes, edges) 
+                        
+                        if isinstance(res, dict) and "execution_time_ms" in res:
+                            times.append(res["execution_time_ms"])
+                        else:
+                            times.append(0)
+
                         if capture.output:
                             if "logs" not in results: results["logs"] = []
                             results["logs"].append(capture.output)
