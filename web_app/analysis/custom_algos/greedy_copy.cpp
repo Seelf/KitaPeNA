@@ -1,15 +1,16 @@
-#include <vector>
+#include <algorithm>
+#include <chrono>
 #include <map>
 #include <set>
-#include <algorithm>
+#include <vector>
 
-// Definicja pomocnicza (jeśli chcesz używać stylu obiektowego)
+// Definicja pomocnicza
 struct Graph {
-    int n;
-    std::vector<std::vector<int>> adj;
+  int n;
+  std::vector<std::vector<int>> adj;
 };
 
-// Funkcja pomocnicza (Twoja logika)
+// Funkcja pomocnicza
 std::map<int, int> greedy_coloring(const Graph &G) {
   std::map<int, int> result;
   std::vector<int> colors(G.n, -1);
@@ -31,23 +32,23 @@ std::map<int, int> greedy_coloring(const Graph &G) {
 }
 
 extern "C" {
-    // WYMAGANY INTERFEJS WEJŚCIOWY
-    void solve(int n, int m, int* u, int* v, int* colors) {
-        // 1. Budujemy strukturę Graph z surowych danych
-        Graph G;
-        G.n = n;
-        G.adj.resize(n);
-        for(int i=0; i<m; ++i) {
-            G.adj[u[i]].push_back(v[i]);
-            G.adj[v[i]].push_back(u[i]);
-        }
+// WYMAGANY INTERFEJS WEJŚCIOWY
+void solve(int n, int m, int *u, int *v, int *colors) {
+  // 1. Budujemy strukturę Graph z surowych danych
+  Graph G;
+  G.n = n;
+  G.adj.resize(n);
+  for (int i = 0; i < m; ++i) {
+    G.adj[u[i]].push_back(v[i]);
+    G.adj[v[i]].push_back(u[i]);
+  }
 
-        // 2. Wywołujemy Twoją funkcję
-        std::map<int, int> res = greedy_coloring(G);
+  // 2. Wywołujemy Twoją funkcję
+  std::map<int, int> res = greedy_coloring(G);
 
-        // 3. Przepisujemy wynik do tablicy wyjściowej
-        for(auto const& [node, color] : res) {
-            colors[node] = color;
-        }
-    }
+  // 3. Przepisujemy wynik do tablicy wyjściowej
+  for (auto const &[node, color] : res) {
+    colors[node] = color;
+  }
+}
 }
