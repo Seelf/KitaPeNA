@@ -5,6 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kitapena - Petri nets toolset</title>
+    <meta name="description"
+        content="Kitapena is a modern toolset for modeling and analyzing Petri nets, including generic graph support, reachability analysis, and state space exploration. Research backed by Zenodo (DOI: 10.5281/zenodo.8271701).">
+    <meta name="keywords"
+        content="Petri nets, reachability graph, concurrency, MIS, graph theory, state space, formal methods, Zenodo, research tool">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Dark Mode CSS (Inline for simplicity) -->
     <style>
         :root {
@@ -40,35 +46,83 @@
         .login-box {
             background: var(--box-bg);
             backdrop-filter: blur(12px);
-            padding: 48px 40px;
             border: 1px solid var(--border);
             border-radius: 20px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             width: 100%;
-            max-width: 400px;
+            max-width: 850px;
+            display: flex;
+            overflow: hidden;
+            margin: 20px;
+        }
+
+        .login-side {
+            flex: 1;
+            padding: 48px;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            justify-content: center;
+        }
+
+        .info-side {
+            flex: 1;
+            padding: 48px;
+            background: rgba(39, 39, 42, 0.3);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        @media (max-width: 768px) {
+            .login-box {
+                flex-direction: column;
+                max-width: 450px;
+            }
+
+            .info-side {
+                border-left: none;
+                border-top: 1px solid var(--border);
+            }
         }
 
         h2 {
             color: #fff;
-            margin-bottom: 32px;
-            font-size: 1.75rem;
+            margin-bottom: 24px;
+            font-size: 1.85rem;
             font-weight: 700;
             letter-spacing: -0.05em;
-            text-align: center;
             background: linear-gradient(to bottom right, #fff, #9ca3af);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
+        .project-desc {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
         form {
             width: 100%;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 16px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-left: 4px;
         }
 
         .input-field {
@@ -100,18 +154,14 @@
             font-weight: 600;
             font-size: 1rem;
             transition: all 0.2s;
-            margin-top: 12px;
+            margin-top: 8px;
             box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
         }
 
         button:hover {
             background: var(--accent-hover);
-            transform: translateY(-2px);
+            transform: translateY(-1px);
             box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
-        }
-
-        button:active {
-            transform: translateY(0);
         }
 
         .alert {
@@ -122,20 +172,17 @@
             border: 1px solid rgba(239, 68, 68, 0.2);
             border-radius: 10px;
             font-size: 0.875rem;
-            width: 100%;
             text-align: center;
         }
 
         .cf-turnstile {
-            margin: 16px 0;
+            margin: 4px 0;
             display: flex;
             justify-content: center;
-            width: 100%;
         }
 
         .footer {
-            margin-top: 40px;
-            text-align: center;
+            margin-top: 32px;
             font-size: 0.75rem;
             color: var(--text-muted);
             line-height: 1.6;
@@ -151,6 +198,45 @@
         .footer a:hover {
             color: var(--accent);
         }
+
+        /* Research Section Styling */
+        .research-links {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .research-item a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .research-item a i {
+            font-size: 1.15rem;
+            color: var(--accent);
+            width: 24px;
+            text-align: center;
+        }
+
+        .research-item a:hover {
+            color: var(--text);
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .research-item a span {
+            font-weight: 500;
+        }
     </style>
     <!-- Cloudflare Turnstile -->
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
@@ -158,28 +244,70 @@
 
 <body>
     <div class="login-box">
-        <h2>Kitapena - a Petri nets toolset</h2>
+        <div class="login-side">
+            <h2>Welcome back</h2>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, message in messages %}
-        <div class="alert">{{ message }}</div>
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert">{{ message }}</div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
 
-        <form method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="text" name="username" class="input-field" placeholder="Username" required autofocus>
-            <input type="password" name="password" class="input-field" placeholder="Password" required>
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="input-group">
+                    <label class="input-label">Username</label>
+                    <input type="text" name="username" class="input-field" placeholder="Enter your username" required
+                        autofocus>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Password</label>
+                    <input type="password" name="password" class="input-field" placeholder="••••••••" required>
+                </div>
 
-            <div class="cf-turnstile" data-sitekey="{{ site_key }}" data-theme="dark"></div>
+                <div class="cf-turnstile" data-sitekey="{{ site_key }}" data-theme="dark"></div>
 
-            <button type="submit">Login</button>
-        </form>
-        <div class="footer">
-            &copy; 2025 Dawid Konarczak. All rights reserved.<br>
-            <a href="https://konarczak.pl" target="_blank">konarczak.pl</a>
+                <button type="submit">Sign in</button>
+            </form>
+        </div>
+
+        <div class="info-side">
+            <div>
+                <h2>Kitapena</h2>
+                <p class="project-desc">
+                    A comprehensive, modern toolset for modeling, simulating, and analyzing <strong>Petri nets</strong>
+                    and <strong>state space graphs</strong>.
+                    Built for accuracy and high-performance formal verification in computer science research.
+                </p>
+
+                <div class="research-links">
+                    <div class="research-item">
+                        <a href="https://github.com/dkonarc/Kitapena" target="_blank">
+                            <i class="fab fa-github"></i>
+                            <span>Reference implementation on GitHub</span>
+                        </a>
+                    </div>
+                    <div class="research-item">
+                        <a href="https://zenodo.org/record/8271701" target="_blank">
+                            <i class="fas fa-archive"></i>
+                            <span>Archived via Zenodo</span>
+                        </a>
+                    </div>
+                    <div class="research-item">
+                        <a href="https://doi.org/10.5281/zenodo.8271701" target="_blank">
+                            <i class="fas fa-quote-right"></i>
+                            <span>DOI: 10.5281/zenodo.8271701</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                &copy; 2025 Dawid Konarczak. All rights reserved.<br>
+                <a href="https://konarczak.pl" target="_blank">konarczak.pl</a>
+            </div>
         </div>
     </div>
 </body>
