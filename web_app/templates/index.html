@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kitapena - Web Version</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- Google Fonts for that VS Code look -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -249,6 +252,7 @@
                         <span class="tab active" id="tabContextPetri">Petri Net (Model)</span>
                         <span class="tab" id="tabContextGraph">Reachability Graph (Analysis)</span>
                         <span class="tab" id="tabContextConcurrency">Concurrency Graph (Structural)</span>
+                        <span class="tab" id="tabContextStandardGraph" style="display:none;">Graph</span>
                     </div>
                     <div class="canvas-container" id="canvasContainer">
                         <div id="graphStats" class="graph-stats">Nodes: 0 | Edges: 0</div>
@@ -271,6 +275,11 @@
                                 </svg>
                             </button>
                             <div class="tool-separator"></div>
+                            <button class="tool-btn" id="btnToggleDirected" title="Toggle Directed (On/Off)">↔️</button>
+                            <button class="tool-btn" id="btnGraphImport" title="Import Graph">📂</button>
+                            <input type="file" id="fileInputGraph" accept=".json,.gml,.graphml,.edgelist"
+                                style="display: none;">
+                            <button class="tool-btn" id="btnGraphExport" title="Export Graph">💾*</button>
                             <button class="tool-btn" id="btnSaveGraph" title="Save Graph">💾</button>
                             <button class="tool-btn" id="btnGraphLayout" title="Auto Layout">✨</button>
                             <button class="tool-btn" id="btnDelete" title="Delete Selected">🗑️</button>
@@ -559,6 +568,11 @@
                     </div>
 
                     <div class="db-actions">
+                        <select id="dbViewSelect" class="db-select"
+                            style="margin-right: 15px; background: #333; color: #fff; border: 1px solid #555; padding: 5px; border-radius: 4px;">
+                            <option value="petri" selected>View: Petri Nets</option>
+                            <option value="graphs">View: Standard Graphs</option>
+                        </select>
                         <span id="dbStats" style="margin-right: 15px; font-size: 12px; color: #888;"></span>
 
                         <div class="db-filters-advanced"
@@ -657,6 +671,22 @@
     </div>
 
 
+
+    <!-- Universal Custom Modal -->
+    <div id="universalModal" class="modal" style="display: none; z-index: 999999;">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div class="modal-header">
+                <h3 id="universalModalTitle">Title</h3>
+            </div>
+            <div class="modal-body" style="padding: 20px 0; font-size: 14px; color: #ccc;">
+                <p id="universalModalMessage">Message goes here</p>
+            </div>
+            <div class="modal-actions" style="display: flex; justify-content: space-around; padding-top: 15px;">
+                <button id="btnUniversalCancel" class="btn secondary">Cancel</button>
+                <button id="btnUniversalConfirm" class="btn primary">Confirm</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Main App Logic (ES Modules) -->
     <script type="module" src="{{ url_for('static', filename='js/core/main.js') }}?v=infiniteScrollOnly"></script>
