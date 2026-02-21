@@ -20,7 +20,7 @@ window.selectListItems = function (containerId, bool) {
 
 const benchmarkUrl = '/api/benchmark';
 
-let perfChart = null;
+let perfCharts = {}; // Map of charts
 let abortBenchmark = false;
 let isBenchmarking = false;
 
@@ -103,6 +103,7 @@ export function initBenchmarking() {
     const configPetri = document.getElementById('configPetri');
     const configPnh = document.getElementById('configPnh');
     const configRandomCount = document.getElementById('configRandomCount');
+    const configAtlas = document.getElementById('configAtlas');
 
     if (sourceSelect) {
         sourceSelect.addEventListener('change', (e) => {
@@ -111,6 +112,7 @@ export function initBenchmarking() {
             if (configPetri) configPetri.style.display = 'none';
             if (configPnh) configPnh.style.display = 'none';
             if (configRandomCount) configRandomCount.style.display = 'none';
+            if (configAtlas) configAtlas.style.display = 'none';
 
             if (e.target.value === 'saved') {
                 configSaved.style.display = 'block';
@@ -124,6 +126,10 @@ export function initBenchmarking() {
                 if (configPnh) {
                     configPnh.style.display = 'block';
                     loadBenchmarkPnhFiles();
+                }
+            } else if (e.target.value === 'atlas') {
+                if (configAtlas) {
+                    configAtlas.style.display = 'block';
                 }
             } else {
                 configRandom.style.display = 'block';
@@ -365,102 +371,173 @@ function appendLog(text, type = 'info') {
     });
 }
 
+window.addAggregationSelector = function () {
+    const container = document.getElementById('aggregationContainer');
+    const newDiv = document.createElement('div');
+    newDiv.className = 'input-group aggregation-item';
+    newDiv.style.cssText = 'display: flex; gap: 5px; align-items: flex-end; margin-top: 5px;';
+    newDiv.innerHTML = `
+        <div style="flex: 1;">
+            <select class="benchAggregationSelect">
+                <option value="mean">Mean (Average)</option>
+                <option value="median">Median (Middle Value)</option>
+                <option value="min">Minimum (Best Time)</option>
+                <option value="max">Maximum (Worst Time)</option>
+                <option value="p95">95th Percentile</option>
+            </select>
+        </div>
+        <button type="button" class="btn btn-sm btn-danger" style="height: 38px; padding: 0 15px;" onclick="this.parentElement.remove()">-</button>
+    `;
+    container.appendChild(newDiv);
+};
+
 const COLORS = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#ff9f40', '#4bc0c0'];
 
-function initChart(algoNames) {
-    const ctx = document.getElementById('perfChart').getContext('2d');
+function initChart(algoNames, aggregations, mode) {
+    const container = document.getElementById('perfChartsContainer');
+    if (!container) return;
 
-    if (perfChart) {
-        perfChart.destroy();
-    }
+    // Clear old charts completely
+    container.innerHTML = '';
 
-    const datasets = algoNames.map((name, i) => ({
-        label: name,
-        data: [],
-        borderColor: COLORS[i % COLORS.length],
-        backgroundColor: COLORS[i % COLORS.length],
-        fill: false,
-        barPercentage: 0.8,
-        categoryPercentage: 0.9
-    }));
+    // Destroy previous Chart instances
+    Object.values(perfCharts).forEach(chart => {
+        if (chart) chart.destroy();
+    });
+    perfCharts = {};
 
-    const ChartLib = window.Chart || Chart;
-    perfChart = new ChartLib(ctx, {
-        type: 'bar',
-        data: {
-            labels: [],
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            title: {
-                display: true,
-                text: 'Execution Time vs Graph / Problem Size'
+    aggregations.forEach((agg, index) => {
+        // Create canvas
+        const canvasWrapper = document.createElement('div');
+        canvasWrapper.className = 'chart-wrapper';
+        canvasWrapper.style.cssText = 'position: relative; flex: 1; min-height: 400px; width: 100%; margin-bottom: 20px;';
+
+        const c = document.createElement('canvas');
+        c.id = `perfChart_${agg}_${index}`;
+        canvasWrapper.appendChild(c);
+        container.appendChild(canvasWrapper);
+
+        const ctx = c.getContext('2d');
+
+        const datasets = algoNames.map((name, i) => ({
+            label: name,
+            data: [],
+            borderColor: COLORS[i % COLORS.length],
+            backgroundColor: COLORS[i % COLORS.length],
+            fill: false,
+            barPercentage: 0.8,
+            categoryPercentage: 0.9
+        }));
+
+        const ChartLib = window.Chart || Chart;
+
+        let titleName = "Execution Time / Size";
+        if (agg === 'mean') titleName = "Mean (Average) Time";
+        else if (agg === 'median') titleName = "Median Time";
+        else if (agg === 'min') titleName = "Minimum (Best) Time";
+        else if (agg === 'max') titleName = "Maximum (Worst) Time";
+        else if (agg === 'p95') titleName = "95th Percentile Time";
+
+        let xLabel = 'Graph / Node Count (N)';
+
+        if (mode === 'random') {
+            xLabel = 'Random Graph Node Count (N)';
+        } else if (mode === 'saved') {
+            xLabel = 'Saved Graph Instance';
+            titleName += ' over Custom Data';
+        } else if (mode === 'petri') {
+            xLabel = 'Petri Net Translation';
+            titleName += ' over Petri Nets';
+        } else if (mode === 'pnh_files') {
+            xLabel = 'File Name';
+            titleName += ' over Datasets';
+        } else if (mode === 'atlas') {
+            xLabel = 'Atlas Graph Designation';
+            titleName += ' against NetworkX Atlas';
+        }
+
+        perfCharts[agg] = new ChartLib(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: datasets
             },
-            tooltips: {
-                mode: 'index',
-                intersect: false,
-            },
-            hover: {
-                mode: 'nearest',
-                intersect: true
-            },
-            scales: {
-                xAxes: [{
-                    stacked: false,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                title: {
                     display: true,
-                    scaleLabel: {
+                    text: titleName
+                },
+                tooltips: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                hover: {
+                    mode: 'nearest',
+                    intersect: true
+                },
+                scales: {
+                    xAxes: [{
+                        stacked: false,
                         display: true,
-                        labelString: 'Graph / Node Count (N)'
-                    },
-                    gridLines: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    ticks: {
+                        scaleLabel: {
+                            display: true,
+                            labelString: xLabel
+                        },
+                        gridLines: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            fontColor: '#ccc'
+                        }
+                    }],
+                    yAxes: [{
+                        stacked: false,
+                        display: true,
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Time (ms)'
+                        },
+                        gridLines: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            fontColor: '#ccc',
+                            beginAtZero: true
+                        }
+                    }]
+                },
+                legend: {
+                    labels: {
                         fontColor: '#ccc'
                     }
-                }],
-                yAxes: [{
-                    stacked: false,
-                    display: true,
-                    scaleLabel: {
-                        display: true,
-                        labelString: 'Time (ms)'
-                    },
-                    gridLines: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    ticks: {
-                        fontColor: '#ccc',
-                        beginAtZero: true
-                    }
-                }]
-            },
-            legend: {
-                labels: {
-                    fontColor: '#ccc'
                 }
             }
-        }
+        });
     });
 }
 
-function updateChart(resultChunk) {
-    if (!perfChart) return;
+function updateChart(resultChunk, aggregations) {
+    aggregations.forEach(agg => {
+        const chart = perfCharts[agg];
+        if (!chart) return;
+        const dataForAgg = resultChunk[agg];
+        if (!dataForAgg) return;
 
-    if (resultChunk.labels && resultChunk.labels.length > 0) {
-        perfChart.data.labels.push(resultChunk.labels[0]);
-    }
-
-    resultChunk.datasets.forEach(remoteDs => {
-        const localDs = perfChart.data.datasets.find(d => d.label === remoteDs.label);
-        if (localDs && remoteDs.data.length > 0) {
-            localDs.data.push(remoteDs.data[0]);
+        if (dataForAgg.labels && dataForAgg.labels.length > 0) {
+            chart.data.labels.push(...dataForAgg.labels);
         }
-    });
 
-    perfChart.update();
+        dataForAgg.datasets.forEach(remoteDs => {
+            const localDs = chart.data.datasets.find(d => d.label === remoteDs.label);
+            if (localDs && remoteDs.data.length > 0) {
+                localDs.data.push(...remoteDs.data);
+            }
+        });
+
+        chart.update();
+    });
 }
 
 async function runBenchmark() {
@@ -500,8 +577,15 @@ async function runBenchmark() {
     btnRun.classList.add('btn-running');
     statusDiv.textContent = "Initializing...";
 
-    // Initialize Chart
-    initChart(algos);
+    // Find aggregations arrays
+    const aggSelects = document.querySelectorAll('.benchAggregationSelect');
+    const selectedAggregations = Array.from(aggSelects).map(s => s.value);
+
+    // Remove duplicates
+    const uniqueAggregations = [...new Set(selectedAggregations)];
+
+    // Initialize Charts
+    initChart(algos, uniqueAggregations, mode);
 
     // Clear Console
     const consoleEl = document.getElementById('benchConsole');
@@ -534,6 +618,7 @@ async function runBenchmark() {
                     step_n: stepN,
                     density: density,
                     algorithms: algos,
+                    aggregations: uniqueAggregations,
                     displayName: `N=${n}`
                 };
 
@@ -564,6 +649,7 @@ async function runBenchmark() {
                     iterations: iterations,
                     graph_ids: [graph.id],
                     algorithms: algos,
+                    aggregations: uniqueAggregations,
                     displayName: graph.name
                 };
 
@@ -624,7 +710,42 @@ async function runBenchmark() {
                     iterations: iterations,
                     filenames: [fname],
                     algorithms: algos,
+                    aggregations: uniqueAggregations,
                     displayName: fname
+                };
+
+                if (abortBenchmark) throw new Error("Benchmark stopped by user.");
+                await executeBenchmarkStep(payload);
+            }
+        } else if (mode === 'atlas') {
+            const atlasN = parseInt(document.getElementById('benchAtlasN').value) || 7;
+
+            if (atlasN < 2 || atlasN > 7) {
+                alert("Atlas Vertex Count must be between 2 and 7.");
+                btnRun.disabled = false;
+                btnRun.textContent = "Run Benchmark";
+                return;
+            }
+
+            statusDiv.textContent = `Generating Atlas Graphs for N=${atlasN} on server...`;
+            const resp = await fetch(`/api/benchmark/atlas/${atlasN}`, { headers: { 'X-CSRFToken': getCsrfToken() } });
+            let graphs = await resp.json();
+
+            if (graphs.error) throw new Error(graphs.error);
+            if (!Array.isArray(graphs)) graphs = graphs.graphs; // fallback if wrapped
+
+            for (let i = 0; i < graphs.length; i++) {
+                const graph = graphs[i];
+                statusDiv.textContent = `Running Atlas Graph (${i + 1}/${graphs.length})...`;
+
+                const payload = {
+                    mode: 'atlas',
+                    iterations: iterations,
+                    atlas_n: atlasN,
+                    atlas_id: graph.id,
+                    algorithms: algos,
+                    aggregations: uniqueAggregations,
+                    displayName: graph.name
                 };
 
                 if (abortBenchmark) throw new Error("Benchmark stopped by user.");
@@ -654,6 +775,7 @@ async function executeBenchmarkStep(payload) {
         const ctx = payload.displayName || (payload.start_n ? `N=${payload.start_n}` : "Unknown");
         appendLog(`>>> Executing ${payload.algorithms.join(', ')} on ${ctx}`, 'system');
 
+        // Remove obsolete legacy injector
         const response = await fetch(benchmarkUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
@@ -663,15 +785,23 @@ async function executeBenchmarkStep(payload) {
         const results = await response.json();
         if (results.error) throw new Error(results.error);
 
-        // Display Logs if any
-        if (results.logs && Array.isArray(results.logs)) {
-            results.logs.forEach(log => {
+        // Display Logs if any logs present in *first* aggregation object
+        // assuming standard results dictionary
+        let logList = [];
+        if (payload.aggregations && results[payload.aggregations[0]] && results[payload.aggregations[0]].logs) {
+            logList = results[payload.aggregations[0]].logs;
+        } else if (results.logs) {
+            logList = results.logs; // fallback
+        }
+
+        if (Array.isArray(logList)) {
+            logList.forEach(log => {
                 const logType = log.includes('Result') ? 'success' : 'info';
                 appendLog(log, logType);
             });
         }
 
-        updateChart(results);
+        updateChart(results, payload.aggregations);
     } catch (e) {
         throw e;
     }

@@ -13,6 +13,7 @@ try:
 except ImportError:
     petri_analysis = None
 from .petri.utils import export_pnh
+from web_app.analysis.benchmarking.generator import generate_atlas_graphs
 
 benchmark_bp = Blueprint('benchmark', __name__)
 
@@ -50,6 +51,16 @@ def stop_benchmark():
         active_benchmark_process = None
         return jsonify({'status': 'stopped'})
     return jsonify({'status': 'no_active_benchmark'})
+
+@benchmark_bp.route('/atlas/<int:n>', methods=['GET'])
+@login_required
+def get_atlas_graphs(n):
+    """Returns the metadata of Atlas graphs for given N."""
+    if n < 1 or n > 7:
+        return jsonify({'error': 'N must be 1-7'}), 400
+    graphs = generate_atlas_graphs(n)
+    res = [{'id': g['id'], 'name': g['name']} for g in graphs]
+    return jsonify(res)
 
 @benchmark_bp.route('', methods=['POST'])
 @login_required
@@ -216,6 +227,20 @@ def run_benchmark():
             
             if not graphs:
                  return jsonify({'error': 'No valid PNH files found.'}), 404
+
+        elif mode == 'atlas':
+            atlas_n = int(data.get('atlas_n', 7))
+            atlas_id = data.get('atlas_id')
+            if atlas_n < 1 or atlas_n > 7:
+                 return jsonify({'error': 'Atlas N must be between 1 and 7.'}), 400
+            
+            graphs = generate_atlas_graphs(atlas_n)
+            
+            if atlas_id:
+                graphs = [g for g in graphs if g['id'] == atlas_id]
+            
+            if not graphs:
+                 return jsonify({'error': 'No Atlas graphs found for given N.'}), 404
             
         elif mode == 'random':
             pass
@@ -234,6 +259,8 @@ def run_benchmark():
             }
         else:
             exec_args = {'graphs': graphs}
+
+        exec_args['aggregations'] = data.get('aggregations', ['mean'])
 
         p = multiprocessing.Process(target=benchmark_worker, args=(mode, algo_names, iterations, exec_args, q))
         active_benchmark_process = p

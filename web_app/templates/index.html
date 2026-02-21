@@ -376,6 +376,7 @@
                                     <option value="saved">Saved Graphs</option>
                                     <option value="petri" selected>Petri Nets</option>
                                     <option value="pnh">PNH Files (Local)</option>
+                                    <option value="atlas">NetworkX Atlas Graphs</option>
                                 </select>
                             </div>
 
@@ -449,6 +450,20 @@
                                 </div>
                             </div>
 
+                            <div id="configAtlas" style="display: none;">
+                                <div class="input-group">
+                                    <label>Vertex Count (N)</label>
+                                    <select id="benchAtlasN">
+                                        <option value="2">Up to 2 Vertices (3 graphs total)</option>
+                                        <option value="3">Up to 3 Vertices (7 graphs total)</option>
+                                        <option value="4">Up to 4 Vertices (18 graphs total)</option>
+                                        <option value="5">Up to 5 Vertices (52 graphs total)</option>
+                                        <option value="6">Up to 6 Vertices (208 graphs total)</option>
+                                        <option value="7" selected>Up to 7 Vertices (1252 graphs total)</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <div id="configRandomCount">
                                 <div class="input-group">
                                     <label>Number of Graphs to Generate</label>
@@ -458,6 +473,27 @@
                             <div class="input-group">
                                 <label>Iterations per Graph</label>
                                 <input type="number" id="benchIterations" value="5">
+                            </div>
+
+                            <h4
+                                style="margin-top: 15px; margin-bottom: 5px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                                Results Aggregation</h4>
+                            <div id="aggregationContainer">
+                                <div class="input-group aggregation-item"
+                                    style="display: flex; gap: 5px; align-items: flex-end;">
+                                    <div style="flex: 1;">
+                                        <select class="benchAggregationSelect">
+                                            <option value="mean" selected>Mean (Average)</option>
+                                            <option value="median">Median (Middle Value)</option>
+                                            <option value="min">Minimum (Best Time)</option>
+                                            <option value="max">Maximum (Worst Time)</option>
+                                            <option value="p95">95th Percentile</option>
+                                        </select>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-primary btn-add-agg"
+                                        style="height: 38px; padding: 0 15px;"
+                                        onclick="window.addAggregationSelector()">+</button>
+                                </div>
                             </div>
                         </div>
 
@@ -503,8 +539,8 @@
                     </div>
 
                     <!-- Main Chart Area -->
-                    <div class="perf-main">
-                        <canvas id="perfChart"></canvas>
+                    <div class="perf-main" id="perfChartsContainer" style="overflow-y: auto;">
+                        <canvas id="perfChart_0" style="min-height: 400px;"></canvas>
                     </div>
                 </div>
             </div>

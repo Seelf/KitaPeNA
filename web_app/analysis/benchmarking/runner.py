@@ -140,22 +140,41 @@ class BenchmarkRunner:
     def __init__(self):
         pass
 
-    def run_suite(self, algo_names, start_n, end_n, step_n, density, graph_count, iterations):
+    def _aggregate_times(self, times, aggregation):
+        if not times:
+            return 0
+        
+        if aggregation == 'median':
+            return statistics.median(times)
+        elif aggregation == 'min':
+            return min(times)
+        elif aggregation == 'max':
+            return max(times)
+        elif aggregation == 'p95':
+            s_times = sorted(times)
+            idx = int(len(s_times) * 0.95)
+            if idx >= len(s_times): idx = len(s_times) - 1
+            return s_times[idx]
+        else:
+            return statistics.mean(times)
+
+    def run_suite(self, algo_names, start_n, end_n, step_n, density, graph_count, iterations, aggregations=['mean']):
         """
         Runs a benchmark suite.
-        Returns a dict structure suitable for Chart.js.
+        Returns a dict structure suitable for Chart.js, keyed by aggregation method.
         """
-        results = {
-            "labels": [], # X-axis: specific N values
-            "datasets": [] # Data per algorithm
-        }
+        results = {agg: {
+            "labels": [],
+            "datasets": []
+        } for agg in aggregations}
 
         # Prepare datasets structure
-        algo_data = {name: [] for name in algo_names}
+        algo_data = {agg: {name: [] for name in algo_names} for agg in aggregations}
         
         # Determine N values
         n_values = list(range(start_n, end_n + 1, step_n))
-        results["labels"] = n_values
+        for agg in aggregations:
+            results[agg]["labels"] = n_values
 
         print(f"[Bechmark] Starting suite: N={start_n}-{end_n}, dens={density}, graphs={graph_count}, iters={iterations}")
 
@@ -200,8 +219,9 @@ class BenchmarkRunner:
                             times.append(exec_time)
     
                             if capture.output:
-                                if "logs" not in results: results["logs"] = []
-                                results["logs"].append(capture.output)
+                                for agg in aggregations:
+                                    if "logs" not in results[agg]: results[agg]["logs"] = []
+                                    results[agg]["logs"].append(capture.output)
                             
                             # Add result info for the first iteration of specific N
                             if i == 0 and result_colors:
@@ -213,8 +233,9 @@ class BenchmarkRunner:
                                 chrom_num = len(unique_colors)
                                 dist_str = ", ".join([f"C{c}:{counts[c]}" for c in unique_colors])
                                 
-                                if "logs" not in results: results["logs"] = []
-                                results["logs"].append(f"[{algo_name}] Result (N={n}): Chromatic Number = {chrom_num} (Dist: {dist_str})")
+                                for agg in aggregations:
+                                    if "logs" not in results[agg]: results[agg]["logs"] = []
+                                    results[agg]["logs"].append(f"[{algo_name}] Result (N={n}): Chromatic Number = {chrom_num} (Dist: {dist_str})")
                         elif algo_name == 'cpp_solve':
                             # C++: Add artificial delay + Use Python Timer
                             start_time = time.perf_counter() * 1000 # ms
@@ -224,8 +245,9 @@ class BenchmarkRunner:
                             end_time = time.perf_counter() * 1000 # ms
                             times.append(end_time - start_time)
                             if capture.output:
-                                if "logs" not in results: results["logs"] = []
-                                results["logs"].append(capture.output)
+                                for agg in aggregations:
+                                    if "logs" not in results[agg]: results[agg]["logs"] = []
+                                    results[agg]["logs"].append(capture.output)
                         else:
                             # Python External Timer
                             start_time = time.perf_counter() * 1000 # ms
@@ -234,46 +256,51 @@ class BenchmarkRunner:
                             end_time = time.perf_counter() * 1000 # ms
                             times.append(end_time - start_time)
                             if capture.output:
-                                if "logs" not in results: results["logs"] = []
-                                results["logs"].append(capture.output)
+                                for agg in aggregations:
+                                    if "logs" not in results[agg]: results[agg]["logs"] = []
+                                    results[agg]["logs"].append(capture.output)
 
-                # Average
+                # Aggregate
                 if times:
-                    avg_time = statistics.mean(times)
-                    algo_data[algo_name].append(round(avg_time, 4))
+                    for agg in aggregations:
+                        agg_time = self._aggregate_times(times, agg)
+                        algo_data[agg][algo_name].append(round(agg_time, 4))
                 else:
-                    algo_data[algo_name].append(0)
+                    for agg in aggregations:
+                        algo_data[agg][algo_name].append(0)
 
         # Build Final Structure
         colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
-        for i, (name, data) in enumerate(algo_data.items()):
-            color = colors[i % len(colors)]
-            results["datasets"].append({
-                "label": name,
-                "data": data,
-                "borderColor": color,
-                "backgroundColor": color,
-                "fill": False
-            })
+        for agg in aggregations:
+            for i, (name, data) in enumerate(algo_data[agg].items()):
+                color = colors[i % len(colors)]
+                results[agg]["datasets"].append({
+                    "label": name,
+                    "data": data,
+                    "borderColor": color,
+                    "backgroundColor": color,
+                    "fill": False
+                })
 
         return results
 
-    def run_specific(self, algo_names, graphs, iterations):
+    def run_specific(self, algo_names, graphs, iterations, aggregations=['mean']):
         """
         Runs benchmark on specific graphs.
         graphs: list of dicts {'id': int, 'name': str, 'nodes': [], 'edges': []}
         """
-        results = {
+        results = {agg: {
             "labels": [], # Graph Names
             "datasets": []
-        }
+        } for agg in aggregations}
 
         # Use Graph Names as labels
-        results["labels"] = [g['name'] for g in graphs]
+        for agg in aggregations:
+            results[agg]["labels"] = [g['name'] for g in graphs]
         
         print(f"[Bechmark] Starting specific suite: {len(graphs)} graphs, iters={iterations}")
         
-        algo_data = {name: [] for name in algo_names}
+        algo_data = {agg: {name: [] for name in algo_names} for agg in aggregations}
 
         for graph in graphs:
             nodes = graph['nodes']
@@ -295,7 +322,8 @@ class BenchmarkRunner:
                         is_custom = True
                     else:
                         print(f"Skipping unknown algo: {algo_name}")
-                        algo_data[algo_name].append(None)
+                        for agg in aggregations:
+                            algo_data[agg][algo_name].append(None)
                         continue
 
                 times = []
@@ -331,8 +359,9 @@ class BenchmarkRunner:
                                 result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges)
                             success = True
                         if capture.output:
-                            if "logs" not in results: results["logs"] = []
-                            results["logs"].append(capture.output)
+                            for agg in aggregations:
+                                if "logs" not in results[agg]: results[agg]["logs"] = []
+                                results[agg]["logs"].append(capture.output)
 
                         # Add result info
                         if success and result_colors:
@@ -344,8 +373,9 @@ class BenchmarkRunner:
                             chrom_num = len(unique_colors)
                             dist_str = ", ".join([f"C{c}:{counts[c]}" for c in unique_colors])
                             
-                            if "logs" not in results: results["logs"] = []
-                            results["logs"].append(f"[{algo_name}] Result ({graph['name']}): Chromatic Number = {chrom_num} (Dist: {dist_str})")
+                            for agg in aggregations:
+                                if "logs" not in results[agg]: results[agg]["logs"] = []
+                                results[agg]["logs"].append(f"[{algo_name}] Result ({graph['name']}): Chromatic Number = {chrom_num} (Dist: {dist_str})")
 
                         if success:
                             times.append(exec_time)
@@ -360,8 +390,9 @@ class BenchmarkRunner:
                             times.append(0)
 
                         if capture.output:
-                            if "logs" not in results: results["logs"] = []
-                            results["logs"].append(capture.output)
+                            for agg in aggregations:
+                                if "logs" not in results[agg]: results[agg]["logs"] = []
+                                results[agg]["logs"].append(capture.output)
                     else:
                         # Python External Timer
                         start_time = time.perf_counter() * 1000 # ms
@@ -370,26 +401,30 @@ class BenchmarkRunner:
                         end_time = time.perf_counter() * 1000 # ms
                         times.append(end_time - start_time)
                         if capture.output:
-                            if "logs" not in results: results["logs"] = []
-                            results["logs"].append(capture.output)
+                            for agg in aggregations:
+                                if "logs" not in results[agg]: results[agg]["logs"] = []
+                                results[agg]["logs"].append(capture.output)
 
-                # Average
+                # Aggregate
                 if times:
-                    avg_time = statistics.mean(times)
-                    algo_data[algo_name].append(round(avg_time, 4))
+                    for agg in aggregations:
+                        agg_time = self._aggregate_times(times, agg)
+                        algo_data[agg][algo_name].append(round(agg_time, 4))
                 else:
-                    algo_data[algo_name].append(0)
+                    for agg in aggregations:
+                        algo_data[agg][algo_name].append(0)
 
         # Build Final Structure
         colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
-        for i, (name, data) in enumerate(algo_data.items()):
-            color = colors[i % len(colors)]
-            results["datasets"].append({
-                "label": name,
-                "data": data,
-                "borderColor": color,
-                "backgroundColor": color,
-                "fill": False
-            })
+        for agg in aggregations:
+            for i, (name, data) in enumerate(algo_data[agg].items()):
+                color = colors[i % len(colors)]
+                results[agg]["datasets"].append({
+                    "label": name,
+                    "data": data,
+                    "borderColor": color,
+                    "backgroundColor": color,
+                    "fill": False
+                })
 
         return results
