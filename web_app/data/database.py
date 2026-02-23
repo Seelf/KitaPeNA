@@ -82,9 +82,18 @@ def init_db():
             name TEXT NOT NULL,
             nodes TEXT NOT NULL,
             edges TEXT NOT NULL,
+            is_directed BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''', commit=False)
+    
+    # Migration for existing graphs table
+    try:
+        execute_query(conn, 'ALTER TABLE graphs ADD COLUMN is_directed BOOLEAN DEFAULT 0', commit=True)
+    except Exception as e:
+        # Expected if column already exists
+        pass
+        
     execute_query(conn, '''
         CREATE TABLE IF NOT EXISTS petri_nets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,7 +166,7 @@ def update_user_password(user_id, pwhash):
 
 def get_all_graphs():
     conn = get_db_connection()
-    graphs = execute_query(conn, 'SELECT id, name, created_at FROM graphs ORDER BY created_at DESC', fetchall=True)
+    graphs = execute_query(conn, "SELECT * FROM graphs", fetchall=True)
     conn.close()
     return graphs
 
@@ -167,10 +176,12 @@ def get_graph(graph_id):
     conn.close()
     return graph
 
-def save_graph(name, nodes, edges):
+def save_graph(name, nodes, edges, is_directed=False):
     conn = get_db_connection()
-    execute_query(conn, 'INSERT INTO graphs (name, nodes, edges) VALUES (?, ?, ?)',
-                 (name, json.dumps(nodes), json.dumps(edges)), commit=True)
+    val = True if is_directed else False
+    if not IS_POSTGRES: val = 1 if is_directed else 0
+    execute_query(conn, 'INSERT INTO graphs (name, nodes, edges, is_directed) VALUES (?, ?, ?, ?)',
+                 (name, json.dumps(nodes), json.dumps(edges), val), commit=True)
     conn.close()
 
 def delete_graph(graph_id):

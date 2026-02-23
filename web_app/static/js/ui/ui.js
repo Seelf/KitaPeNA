@@ -15,10 +15,12 @@ export function updateStats() {
         } else {
             // MIS / Reachability Graph
             let statusText = `Nodes: ${nodes.length} | Edges: ${edges.length}`;
-            if (state.graphTruncated) {
-                statusText += ' | ⚠️ TRUNCATED (possible unbounded net)';
-            } else if (nodes.length > 0) {
-                statusText += ' | ✓ Complete';
+            if (state.activeDocumentType === 'PETRI') {
+                if (state.graphTruncated) {
+                    statusText += ' | ⚠️ TRUNCATED (possible unbounded net)';
+                } else if (nodes.length > 0) {
+                    statusText += ' | ✓ Complete';
+                }
             }
             stats.textContent = statusText;
         }
@@ -419,4 +421,44 @@ export function initViewSettings() {
             applyToolbar(state.showToolbar);
         });
     }
+}
+
+export function showCustomModal(title, message, isConfirm = false, onConfirm = null, onCancel = null) {
+    const modal = document.getElementById('universalModal');
+    if (!modal) return;
+
+    document.getElementById('universalModalTitle').textContent = title;
+    document.getElementById('universalModalMessage').innerHTML = message;
+
+    const btnConfirm = document.getElementById('btnUniversalConfirm');
+    const btnCancel = document.getElementById('btnUniversalCancel');
+
+    btnConfirm.style.display = 'inline-block';
+
+    // Reset listeners
+    const newBtnConfirm = btnConfirm.cloneNode(true);
+    btnConfirm.parentNode.replaceChild(newBtnConfirm, btnConfirm);
+
+    const newBtnCancel = btnCancel.cloneNode(true);
+    btnCancel.parentNode.replaceChild(newBtnCancel, btnCancel);
+
+    if (isConfirm) {
+        newBtnCancel.style.display = 'inline-block';
+        newBtnConfirm.textContent = 'Confirm';
+    } else {
+        newBtnCancel.style.display = 'none';
+        newBtnConfirm.textContent = 'OK';
+    }
+
+    modal.style.display = 'flex';
+
+    newBtnConfirm.addEventListener('click', () => {
+        modal.style.display = 'none';
+        if (onConfirm) onConfirm();
+    });
+
+    newBtnCancel.addEventListener('click', () => {
+        modal.style.display = 'none';
+        if (onCancel) onCancel();
+    });
 }

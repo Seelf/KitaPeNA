@@ -96,6 +96,30 @@ export function initBenchmarking() {
         }
     });
 
+    // Logarithmic Scale Live Toggle
+    const logScaleToggle = document.getElementById('benchLogScale');
+    if (logScaleToggle) {
+        logScaleToggle.addEventListener('change', (e) => {
+            const isLog = e.target.checked;
+            Object.values(perfCharts).forEach(chart => {
+                if (chart && chart.options && chart.options.scales && chart.options.scales.yAxes[0]) {
+                    chart.options.scales.yAxes[0].type = isLog ? 'logarithmic' : 'linear';
+                    chart.options.scales.yAxes[0].ticks = chart.options.scales.yAxes[0].ticks || {};
+                    chart.options.scales.yAxes[0].ticks.callback = function (value, index, values) {
+                        if (isLog) {
+                            if (value === 10 || value === 100 || value === 1000 || value === 10000 || value === 100000) {
+                                return value.toString();
+                            }
+                            return '';
+                        }
+                        return value;
+                    };
+                    chart.update();
+                }
+            });
+        });
+    }
+
     // Toggle Logic (Dropdown)
     const sourceSelect = document.getElementById('benchSourceSelect');
     const configRandom = document.getElementById('configRandom');
@@ -186,6 +210,48 @@ async function renderAlgoList() {
 
         container.innerHTML = '';
 
+        // --- Hardcoded DSPN-Tool Item ---
+        const dspnDiv = document.createElement('div');
+        dspnDiv.className = 'saved-item algo-item';
+        dspnDiv.dataset.id = 'DSPN-Tool';
+        dspnDiv.innerHTML = `
+            <input type="checkbox" value="DSPN-Tool" style="margin-right: 10px; cursor: pointer;">
+            <span class="name" style="color: #ff9f40; font-weight: bold;">[GreatSPN] DSPN-Tool</span>
+            <span class="actions" style="margin-left: auto; display: inline-flex; gap: 8px; align-items: center; position: relative;">
+                <button title="Settings" class="btn-settings-dspn" style="font-size: 14px; color: #ccc; background: none; border: none; cursor: pointer;">⚙️</button>
+                <div class="dspn-settings-panel" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 5px; background: #222; border: 1px solid #555; padding: 10px; z-index: 10001; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 200px;">
+                    <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">CLI Arguments</label>
+                    <input type="text" id="dspnArgsInput" value="-pinv" style="width: 100%; padding: 4px; background: #111; color: white; border: 1px solid #444; font-family: monospace;">
+                </div>
+            </span>
+        `;
+        // Toggle settings panel
+        const dspnSettingsBtn = dspnDiv.querySelector('.btn-settings-dspn');
+        const dspnSettingsPanel = dspnDiv.querySelector('.dspn-settings-panel');
+        dspnSettingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dspnSettingsPanel.style.display = dspnSettingsPanel.style.display === 'none' ? 'block' : 'none';
+        });
+        dspnSettingsPanel.addEventListener('click', (e) => {
+            e.stopPropagation(); // keep open while interacting with input
+        });
+        document.addEventListener('click', (e) => {
+            if (!dspnDiv.contains(e.target)) {
+                dspnSettingsPanel.style.display = 'none';
+            }
+        });
+
+        dspnDiv.addEventListener('click', (e) => {
+            if (e.target.closest('button') || e.target.closest('input[type="text"]')) return;
+            const cb = dspnDiv.querySelector('input[type="checkbox"]');
+            if (e.target !== cb) {
+                cb.checked = !cb.checked;
+            }
+            dspnDiv.classList.toggle('selected', cb.checked);
+        });
+        container.appendChild(dspnDiv);
+        // --------------------------------
+
         // Helper: Create Action Buttons
         const mkActions = (name) => `
             <span style="margin-left: auto; display: inline-flex; gap: 4px;">
@@ -256,7 +322,7 @@ async function loadBenchmarkGraphs() {
             div.className = 'saved-item';
             div.innerHTML = `
                 <input type="checkbox" name="benchGraphId" value="${g.id}" style="margin-right: 10px; cursor: pointer;">
-                <span class="name">${g.name}</span>
+                <span class="name">${g.name} <small style="color: #666;">(${g.is_directed ? 'Directed' : 'Undirected'})</small></span>
                 <span class="date">${new Date(g.created_at).toLocaleDateString()}</span>
             `;
             div.addEventListener('click', (e) => {
@@ -353,6 +419,42 @@ async function loadBenchmarkPnhFiles() {
 }
 
 
+function colorizeConsoleOutput(text) {
+    if (!text) return "";
+    let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // ANSI / CLI style syntax highlighting
+
+    // 1. Numbers (including floats)
+    html = html.replace(/\b(\d+(\.\d+)?)\b/g, '<span style="color: #b5cea8;">$1</span>');
+
+    // 2. Error / Warning keywords
+    html = html.replace(/\b(Error|Warning|Failed|Exception|Skipped)\b/gi, '<span style="color: #f14c4c; font-weight: bold;">$1</span>');
+
+    // 3. Success / Good keywords
+    html = html.replace(/\b(Success|Done|Ready)\b/gi, '<span style="color: #23d18b; font-weight: bold;">$1</span>');
+
+    // 4. Action / Info keywords
+    html = html.replace(/\b(Command|Executing|Starting|Completed|Running)\b/gi, '<span style="color: #569cd6;">$1</span>');
+
+    // 5. Special Tool Names
+    html = html.replace(/\b(DSPN-Tool|GreatSPN)\b/g, '<span style="color: #ff9f40; font-weight: bold;">$1</span>');
+
+    // 6. CLI Flags (-flag)
+    html = html.replace(/(\B-\w+)/g, '<span style="color: #dcdcaa;">$1</span>');
+
+    // 7. Data patterns like vectors entirely enclosed in brackets
+    html = html.replace(/(\[.*?\])/g, '<span style="color: #ce9178;">$1</span>');
+
+    // 8. Newlines to breaks
+    html = html.replace(/\n/g, '<br>');
+
+    return html;
+}
+
 function appendLog(text, type = 'info') {
     const consoleEl = document.getElementById('benchConsole');
     const largeConsoleEl = document.getElementById('largeBenchConsole');
@@ -361,11 +463,7 @@ function appendLog(text, type = 'info') {
         if (!el) return;
         const line = document.createElement('div');
         line.className = `console-line ${type}`;
-        if (text.includes('\n')) {
-            line.innerText = text;
-        } else {
-            line.textContent = text;
-        }
+        line.innerHTML = colorizeConsoleOutput(text);
         el.appendChild(line);
         el.scrollTop = el.scrollHeight;
     });
@@ -493,6 +591,7 @@ function initChart(algoNames, aggregations, mode) {
                         }
                     }],
                     yAxes: [{
+                        type: document.getElementById('benchLogScale')?.checked ? 'logarithmic' : 'linear',
                         stacked: false,
                         display: true,
                         scaleLabel: {
@@ -504,7 +603,16 @@ function initChart(algoNames, aggregations, mode) {
                         },
                         ticks: {
                             fontColor: '#ccc',
-                            beginAtZero: true
+                            beginAtZero: true,
+                            callback: function (value, index, values) {
+                                if (document.getElementById('benchLogScale')?.checked) {
+                                    if (value === 10 || value === 100 || value === 1000 || value === 10000 || value === 100000) {
+                                        return value.toString();
+                                    }
+                                    return '';
+                                }
+                                return value;
+                            }
                         }
                     }]
                 },
@@ -609,6 +717,12 @@ async function runBenchmark() {
             for (let n = startN; n <= endN; n += stepN) {
                 statusDiv.textContent = `Running Random Graph N=${n}...`;
 
+                // DSPN Specific Settings
+                const isDspnSelected = algos.includes('DSPN-Tool');
+                const dspnArgsInput = document.getElementById('dspnArgsInput');
+                const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+                const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
+
                 const payload = {
                     mode: 'random',
                     iterations: iterations,
@@ -619,6 +733,8 @@ async function runBenchmark() {
                     density: density,
                     algorithms: algos,
                     aggregations: uniqueAggregations,
+                    dspnOptions: dspnOptions,
+                    baseTimeout: baseTimeout,
                     displayName: `N=${n}`
                 };
 
@@ -644,12 +760,20 @@ async function runBenchmark() {
                 const graph = graphTasks[i];
                 statusDiv.textContent = `Running Saved Graph (${i + 1}/${graphTasks.length})...`;
 
+                // DSPN Specific Settings
+                const isDspnSelected = algos.includes('DSPN-Tool');
+                const dspnArgsInput = document.getElementById('dspnArgsInput');
+                const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+                const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
+
                 const payload = {
                     mode: 'saved',
                     iterations: iterations,
                     graph_ids: [graph.id],
                     algorithms: algos,
                     aggregations: uniqueAggregations,
+                    dspnOptions: dspnOptions,
+                    baseTimeout: baseTimeout,
                     displayName: graph.name
                 };
 
@@ -677,12 +801,21 @@ async function runBenchmark() {
 
                 const graphType = document.getElementById('benchPetriGraphType').value;
 
+                // DSPN Specific Settings
+                const isDspnSelected = algos.includes('DSPN-Tool');
+                const dspnArgsInput = document.getElementById('dspnArgsInput');
+                const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+                const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
+
                 const payload = {
                     mode: 'petri',
                     iterations: iterations,
                     petri_ids: [petri.id],
                     petri_graph_type: graphType,
                     algorithms: algos,
+                    aggregations: uniqueAggregations,
+                    dspnOptions: dspnOptions,
+                    baseTimeout: baseTimeout,
                     displayName: petri.name
                 };
 
@@ -705,12 +838,20 @@ async function runBenchmark() {
                 const fname = filenames[i];
                 statusDiv.textContent = `Running PNH File (${i + 1}/${filenames.length})...`;
 
+                // DSPN Specific Settings
+                const isDspnSelected = algos.includes('DSPN-Tool');
+                const dspnArgsInput = document.getElementById('dspnArgsInput');
+                const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+                const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
+
                 const payload = {
                     mode: 'pnh_files',
                     iterations: iterations,
                     filenames: [fname],
                     algorithms: algos,
                     aggregations: uniqueAggregations,
+                    dspnOptions: dspnOptions,
+                    baseTimeout: baseTimeout,
                     displayName: fname
                 };
 
@@ -738,6 +879,12 @@ async function runBenchmark() {
                 const graph = graphs[i];
                 statusDiv.textContent = `Running Atlas Graph (${i + 1}/${graphs.length})...`;
 
+                // DSPN Specific Settings
+                const isDspnSelected = algos.includes('DSPN-Tool');
+                const dspnArgsInput = document.getElementById('dspnArgsInput');
+                const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+                const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
+
                 const payload = {
                     mode: 'atlas',
                     iterations: iterations,
@@ -745,6 +892,8 @@ async function runBenchmark() {
                     atlas_id: graph.id,
                     algorithms: algos,
                     aggregations: uniqueAggregations,
+                    dspnOptions: dspnOptions,
+                    baseTimeout: baseTimeout,
                     displayName: graph.name
                 };
 

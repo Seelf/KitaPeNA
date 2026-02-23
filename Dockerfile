@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM dawidkonarczak/greatspn-for-kitapena:latest
 
 # Install system dependencies required for C++ compilation and algorithms
 RUN apt-get update && \

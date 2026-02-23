@@ -168,6 +168,7 @@
 
 .card-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-top: auto;
     border-top: 1px solid rgba(255, 255, 255, 0.05);

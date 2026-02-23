@@ -107,45 +107,6 @@ export function initInteractions() {
 
                 draw();
             } else if (state.mode === 'edges') {
-                if (!clickedNode) {
-                    state.selectedNode = null;
-                } else {
-                    state.selectedNode = clickedNode;
-
-                    if (clickedNode.marking) {
-                        const sorted = nodes.filter(n => n.marking).sort((a, b) => a.id - b.id);
-                        const idx = sorted.findIndex(n => n.id === clickedNode.id);
-
-                        if (idx !== -1) {
-                            state.selectedReachabilityIndex = idx;
-
-                            import('../../ui/ui.js').then(ui => {
-                                ui.updateResultsList();
-                                const list = document.getElementById('resultsList');
-                                if (list && list.children[idx + 1]) {
-                                    list.children[idx + 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                }
-                            });
-
-                            import('../../domain/petri/petri_state.js').then(({ places }) => {
-                                let restoredCount = 0;
-                                for (const p of places) {
-                                    if (clickedNode.marking[p.id] !== undefined) {
-                                        p.tokens = clickedNode.marking[p.id];
-                                        restoredCount++;
-                                    }
-                                }
-                                if (restoredCount > 0) {
-                                    import('../rendering/petri_render.js').then(pr => pr.drawPetri());
-                                    import('../../ui/ui.js').then(ui => ui.updateStats());
-                                    import('../../core/storage.js').then(s => s.saveToLocalStorage());
-                                }
-                            });
-                        }
-                    }
-                }
-
-
                 if (!state.selectedNode) {
                     state.selectedNode = clickedNode;
 
@@ -175,31 +136,28 @@ export function initInteractions() {
                             });
                         }
                     }
-
                 } else {
-                    if (state.selectedNode !== clickedNode) {
+                    if (state.selectedNode && state.selectedNode.id !== clickedNode.id) {
                         // Check for existing edge
+                        // If directed, we only check exact match. If undirected, we check both directions.
+                        const isDir = state.isDirected;
                         const existingEdgeIndex = edges.findIndex(e =>
                             (e[0] === state.selectedNode.id && e[1] === clickedNode.id) ||
-                            (e[1] === state.selectedNode.id && e[0] === clickedNode.id)
+                            (!isDir && e[1] === state.selectedNode.id && e[0] === clickedNode.id)
                         );
 
                         if (existingEdgeIndex >= 0) {
                             if (e.ctrlKey || e.metaKey) {
                                 edges.splice(existingEdgeIndex, 1);
-                                updateStats();
-                                resetSimulation();
-                                saveToLocalStorage();
+                                updateAndSave();
                             }
                         } else {
                             edges.push([state.selectedNode.id, clickedNode.id]);
-                            updateStats();
-                            resetSimulation();
-                            saveToLocalStorage();
+                            updateAndSave();
                         }
                         state.selectedNode = null;
                     } else {
-                        state.selectedNode = null;
+                        state.selectedNode = clickedNode;
                     }
                 }
                 draw();
@@ -212,9 +170,7 @@ export function initInteractions() {
             const world = toWorld(x, y);
             const newId = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
             nodes.push({ id: newId, x: world.x, y: world.y });
-            updateStats();
-            resetSimulation();
-            saveToLocalStorage();
+            updateAndSave();
             draw();
         } else if (state.mode === 'edges') {
             state.selectedNode = null;

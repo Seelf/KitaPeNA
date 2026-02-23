@@ -75,12 +75,6 @@ def run_benchmark():
         # Algorithm Selection
         algo_names = data.get('algorithms', [])
         
-        # Legacy Fallback
-        if not algo_names:
-            if data.get('algoPyColoring'): algo_names.append('python_coloring')
-            if data.get('algoCpp'): algo_names.append('cpp_solve')
-            if data.get('algoCppDSatur'): algo_names.append('cpp_dsatur')
-        
         if not algo_names:
             return jsonify({'error': 'No algorithms selected'}), 400
 
@@ -92,7 +86,7 @@ def run_benchmark():
             # Fetch from DB
             conn = db.get_db_connection()
             placeholders = ','.join('?' for _ in graph_ids)
-            query = f'SELECT id, name, nodes, edges FROM graphs WHERE id IN ({placeholders})'
+            query = f'SELECT id, name, nodes, edges, is_directed FROM graphs WHERE id IN ({placeholders})'
             rows = conn.execute(query, graph_ids).fetchall()
             conn.close()
             
@@ -101,6 +95,7 @@ def run_benchmark():
                 try:
                     g_nodes = json.loads(r['nodes'])
                     g_edges = json.loads(r['edges'])
+                    g_directed = bool(r['is_directed']) if 'is_directed' in r.keys() else False
                     
                     # Normalize Edges
                     norm_edges = []
@@ -112,7 +107,13 @@ def run_benchmark():
                         elif isinstance(e, list) and len(e) >= 2:
                             norm_edges.append([e[0], e[1]])
                             
-                    graphs.append({'id': r['id'], 'name': r['name'], 'nodes': g_nodes, 'edges': norm_edges})
+                    graphs.append({
+                        'id': r['id'], 
+                        'name': r['name'], 
+                        'nodes': g_nodes, 
+                        'edges': norm_edges,
+                        'is_directed': g_directed
+                    })
                 except Exception as e:
                     print(f"Error parsing graph {r['id']}: {e}")
 
@@ -143,16 +144,28 @@ def run_benchmark():
                     if not os.path.exists(temp_dir):
                         os.makedirs(temp_dir)
                     
-                    pnh_filename = f"petri_{r['id']}_{int(time.time())}.pnh"
+                    file_base = f"petri_{r['id']}_{int(time.time())}"
+                    pnh_filename = f"{file_base}.pnh"
                     pnh_path = os.path.abspath(os.path.join(temp_dir, pnh_filename))
                     
                     with open(pnh_path, 'w') as f:
                         f.write(pnh_str)
 
+                    # Generate GSPN files for DSPN-Tool
+                    from .petri.utils import export_gspn
+                    gspn_data = export_gspn(content)
+                    gspn_base_path = os.path.abspath(os.path.join(temp_dir, file_base))
+                    with open(f"{gspn_base_path}.net", 'w') as f:
+                        f.write(gspn_data['net'])
+                    with open(f"{gspn_base_path}.def", 'w') as f:
+                        f.write(gspn_data['def'])
+
                     nodes = []
                     edges = []
+                    name_prefix = ""
                     
                     if petri_graph_type == 'reachability':
+                        name_prefix = "RG"
                         r_nodes, r_edges, _ = petri_reachability.calculate_reachability_graph(
                             content.get('places', []),
                             content.get('transitions', []),
@@ -166,12 +179,14 @@ def run_benchmark():
                             'id': r['id'],
                             'name': r['name'] + " (PNH)",
                             'pnh_path': pnh_path,
+                            'gspn_base': gspn_base_path,
                             'nodes': [],
                             'edges': []
                         })
                         continue 
                     else:
                         # Default: Concurrency Graph
+                        name_prefix = "CG"
                         if petri_analysis:
                             c_nodes, c_edges = petri_analysis.build_concurrency_graph(
                                 content.get('places', []),
@@ -190,10 +205,12 @@ def run_benchmark():
 
                     graphs.append({
                         'id': r['id'], 
-                        'name': f"RG: {r['name']}", 
+                        'name': f"{name_prefix}: {r['name']}" if name_prefix else r['name'], 
+                        'raw_name': r['name'],
                         'nodes': nodes, 
                         'edges': edges,
-                        'pnh_path': pnh_path
+                        'pnh_path': pnh_path,
+                        'gspn_base': gspn_base_path
                     })
 
                 except Exception as e:
@@ -261,6 +278,8 @@ def run_benchmark():
             exec_args = {'graphs': graphs}
 
         exec_args['aggregations'] = data.get('aggregations', ['mean'])
+        exec_args['dspn_options'] = data.get('dspnOptions', '')
+        exec_args['base_timeout'] = data.get('baseTimeout', None)
 
         p = multiprocessing.Process(target=benchmark_worker, args=(mode, algo_names, iterations, exec_args, q))
         active_benchmark_process = p

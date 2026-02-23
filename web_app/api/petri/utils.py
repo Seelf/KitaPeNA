@@ -1,3 +1,4 @@
+import math
 import xml.etree.ElementTree as ET
 
 def parse_pnh(content):
@@ -228,3 +229,97 @@ def export_pnml(data, net_name="petrinet"):
         ET.SubElement(inscription, 'text').text = str(arc.get('weight', 1))
 
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(pnml, encoding='unicode')
+
+def export_gspn(data):
+    """Exports Petri net to GSPN format (.net and .def strings)."""
+    places = data.get('places', [])
+    transitions = data.get('transitions', [])
+    raw_arcs = data.get('arcs', [])
+    
+    # Sort for consistency
+    places.sort(key=lambda x: x['id'])
+    transitions.sort(key=lambda x: x['id'])
+    
+    p_ids = {p['id'] for p in places}
+    t_ids = {t['id'] for t in transitions}
+    arcs = normalize_arcs(raw_arcs, p_ids, t_ids)
+    
+    P = len(places)
+    T = len(transitions)
+    
+    # 1-based indexing map for places
+    p_map_1based = {p['id']: i + 1 for i, p in enumerate(places)}
+    
+    cx, cy = 10.0, 10.0
+    Rp, Rt = 6.0, 9.0
+    place_pos = []
+    for i in range(P):
+        ang = 2 * math.pi * i / max(1, P)
+        x = cx + Rp * math.cos(ang)
+        y = cy + Rp * math.sin(ang)
+        place_pos.append((x, y, x, y + 0.5))
+        
+    tr_pos = []
+    for j in range(T):
+        ang = 2 * math.pi * j / max(1, T)
+        x = cx + Rt * math.cos(ang)
+        y = cy + Rt * math.sin(ang)
+        tr_pos.append((x, y, x + 0.4, y + 0.4, x + 0.2, y - 0.4))
+
+    inputs = [[] for _ in range(T)]
+    outputs = [[] for _ in range(T)]
+    
+    # t_id to index 0...T-1
+    t_map = {t['id']: j for j, t in enumerate(transitions)}
+    
+    for arc in arcs:
+        weight = int(arc.get('weight', 1))
+        if arc['type'] == 'place_to_transition':
+            t_idx = t_map.get(arc['targetId'])
+            p_idx_1 = p_map_1based.get(arc['sourceId'])
+            if t_idx is not None and p_idx_1 is not None:
+                inputs[t_idx].append((p_idx_1, weight))
+        elif arc['type'] == 'transition_to_place':
+            t_idx = t_map.get(arc['sourceId'])
+            p_idx_1 = p_map_1based.get(arc['targetId'])
+            if t_idx is not None and p_idx_1 is not None:
+                outputs[t_idx].append((p_idx_1, weight))
+                
+    net_lines = []
+    net_lines.append("|0|\n|")
+    net_lines.append(f"f 0 {P} 0 {T} 0 0 0")
+    
+    for i in range(P):
+        p = places[i]
+        name = p.get('label', f"p{p['id']}")
+        name = name.replace(' ', '_').replace('-', '_').replace('+', '_')
+        if not name.strip():
+            name = f"p{p['id']}"
+        m0 = p.get('tokens', 0)
+        x, y, lx, ly = place_pos[i]
+        net_lines.append(f"{name} {m0} {x:.4f} {y:.4f} {lx:.4f} {ly:.4f} 0")
+        
+    for j in range(T):
+        t = transitions[j]
+        name = t.get('label', f"t{t['id']}")
+        name = name.replace(' ', '_').replace('-', '_').replace('+', '_')
+        if not name.strip():
+            name = f"t{t['id']}"
+        x, y, tagx, tagy, ratex, ratey = tr_pos[j]
+        m_in = inputs[j]
+        m_out = outputs[j]
+        
+        net_lines.append(f"{name} 1.0 0 0 {len(m_in)} 1 {x:.4f} {y:.4f} {tagx:.4f} {tagy:.4f} {ratex:.4f} {ratey:.4f} 0")
+        for (p_idx, mult) in m_in:
+            net_lines.append(f"   {mult} {p_idx} 0 0")
+            
+        net_lines.append(f"   {len(m_out)}")
+        for (p_idx, mult) in m_out:
+            net_lines.append(f"   {mult} {p_idx} 0 0")
+            
+        net_lines.append("   0")
+        
+    net_content = "\n".join(net_lines) + "\n"
+    def_content = "|256\n%\n|\n"
+    
+    return {'net': net_content, 'def': def_content}
