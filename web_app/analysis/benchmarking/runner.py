@@ -157,7 +157,7 @@ class BenchmarkRunner:
         else:
             return statistics.mean(times)
 
-    def run_suite(self, algo_names, start_n, end_n, step_n, density, graph_count, iterations, aggregations=['mean'], dspn_options='', base_timeout=None):
+    def run_suite(self, algo_names, start_n, end_n, step_n, density, graph_count, iterations, aggregations=['mean'], dspn_options='', custom_cmds=None, base_timeout=None):
         """
         Runs a benchmark suite.
         Returns a dict structure suitable for Chart.js, keyed by aggregation method.
@@ -189,10 +189,13 @@ class BenchmarkRunner:
             for algo_name in algo_names:
                 is_custom = False
                 is_dspn = False
+                is_cmd = False
                 func = None
                 
                 if algo_name == 'DSPN-Tool':
                     is_dspn = True
+                elif custom_cmds and algo_name in custom_cmds:
+                    is_cmd = True
                 elif algo_name in ALGORITHMS:
                     func = ALGORITHMS[algo_name]
                 else:
@@ -215,6 +218,12 @@ class BenchmarkRunner:
                                 for agg in aggregations:
                                     if "logs" not in results[agg]: results[agg]["logs"] = []
                                     results[agg]["logs"].append(f"[{algo_name}] Skipped: DSPN-Tool only supports Petri Nets, not Random Graphs.")
+                            times.append(0)
+                        elif is_cmd:
+                            if i == 0 and g_idx == 0:
+                                for agg in aggregations:
+                                    if "logs" not in results[agg]: results[agg]["logs"] = []
+                                    results[agg]["logs"].append(f"[{algo_name}] Skipped: CLI tooling usually tested against file paths, skipped for generated graphs.")
                             times.append(0)
                         elif is_custom:
                             with CaptureOutput() as capture:
@@ -276,7 +285,7 @@ class BenchmarkRunner:
 
         return results
 
-    def run_specific(self, algo_names, graphs, iterations, aggregations=['mean'], dspn_options='', base_timeout=None):
+    def run_specific(self, algo_names, graphs, iterations, aggregations=['mean'], dspn_options='', custom_cmds=None, base_timeout=None):
         """
         Runs benchmark on specific graphs.
         graphs: list of dicts {'id': int, 'name': str, 'nodes': [], 'edges': []}
@@ -304,10 +313,13 @@ class BenchmarkRunner:
             for algo_name in algo_names:
                 is_custom = False
                 is_dspn = False
+                is_cmd = False
                 func = None
                 
                 if algo_name == 'DSPN-Tool':
                     is_dspn = True
+                elif custom_cmds and algo_name in custom_cmds:
+                    is_cmd = True
                 elif algo_name in ALGORITHMS:
                     func = ALGORITHMS[algo_name]
                 else:
@@ -386,6 +398,72 @@ class BenchmarkRunner:
                         if success:
                             times.append(exec_time)
                             
+                    elif is_cmd:
+                        success = False
+                        exec_time = 0
+                        raw_name = graph.get('raw_name', graph['name'])
+                        
+                        try:
+                            import subprocess
+                            import shlex
+                            
+                            cmd_data = custom_cmds.get(algo_name, {})
+                            cmd_path = cmd_data.get('cmd_path', '')
+                            cmd_args = cmd_data.get('cmd_args', '')
+                            
+                            if not cmd_path:
+                                raise ValueError("Executable path not provided.")
+                                
+                            # Replicate exactly what DSPN execution logic has
+                            arg_str = cmd_args.replace('{pnh}', graph.get('pnh_path', ''))
+                            arg_str = arg_str.replace('{gspn}', graph.get('gspn_base', ''))
+                            arg_str = arg_str.replace('{id}', str(graph.get('id', '')))
+                            arg_str = arg_str.replace('{name}', raw_name)
+                            
+                            args_list = shlex.split(arg_str)
+                            cmd = [cmd_path] + args_list
+                            
+                            start_time = time.perf_counter() * 1000
+                            try:
+                                process = subprocess.run(cmd, capture_output=True, text=True, timeout=base_timeout if base_timeout else None)
+                                end_time = time.perf_counter() * 1000
+                                exec_time = end_time - start_time
+                                success = True
+                                
+                                output_text = f"--- [{raw_name}] CMD Output ---\n{process.stdout}\n"
+                                if process.stderr:
+                                    output_text += f"\n--- CMD STDERR ---\n{process.stderr}\n"
+
+                                for agg in aggregations:
+                                    if "logs" not in results[agg]: results[agg]["logs"] = []
+                                    results[agg]["logs"].append(output_text)
+                                    
+                            except subprocess.TimeoutExpired as e:
+                                end_time = time.perf_counter() * 1000
+                                exec_time = end_time - start_time
+                                success = True
+                                timed_out_in_iteration = True
+                                
+                                output_text = f"--- [{raw_name}] CMD Output ---\n"
+                                output_text += f"TIMEOUT: Process killed by system after {base_timeout} seconds. Skipping remaining iterations.\n"
+                                if e.stdout:
+                                    if isinstance(e.stdout, bytes):
+                                        output_text += f"\nPartial Output:\n{e.stdout.decode('utf-8', errors='ignore')}\n"
+                                    else:
+                                        output_text += f"\nPartial Output:\n{e.stdout}\n"
+                                for agg in aggregations:
+                                    if "logs" not in results[agg]: results[agg]["logs"] = []
+                                    results[agg]["logs"].append(output_text)
+
+                        except Exception as e:
+                            print(f"  [Runner] CMD Execution failed: {e}")
+                            for agg in aggregations:
+                                if "logs" not in results[agg]: results[agg]["logs"] = []
+                                results[agg]["logs"].append(f"Custom-CMD Error: {e}")
+                        
+                        if success:
+                            times.append(exec_time)
+
                     elif is_custom:
                         success = False
                         result_colors = None

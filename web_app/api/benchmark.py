@@ -279,6 +279,7 @@ def run_benchmark():
 
         exec_args['aggregations'] = data.get('aggregations', ['mean'])
         exec_args['dspn_options'] = data.get('dspnOptions', '')
+        exec_args['custom_cmds'] = data.get('customCmds', {})
         exec_args['base_timeout'] = data.get('baseTimeout', None)
 
         p = multiprocessing.Process(target=benchmark_worker, args=(mode, algo_names, iterations, exec_args, q))
