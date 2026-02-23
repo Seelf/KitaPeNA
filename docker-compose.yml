@@ -29,7 +29,7 @@ services:
     ports:
       - "${PORT:-5002}:${PORT:-5002}"
     volumes:
-      - .:/app # Mount current directory for development auto-reload
+      - .:/app # Sync local code with container
     env_file:
       - .env
     environment:

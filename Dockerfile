@@ -28,5 +28,5 @@ ENV PORT=5002
 # Expose the application port
 EXPOSE 5002
 
-# Initialize admin user then run the app using Gunicorn binding to all interfaces
-CMD python init_admin.py && gunicorn --bind 0.0.0.0:5002 --workers 2 --timeout 120 web_app.app:app
+# Start the application using the entrypoint script
+ENTRYPOINT ["./entrypoint.sh"]
