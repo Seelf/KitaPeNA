@@ -92,6 +92,8 @@ def init_db():
         execute_query(conn, 'ALTER TABLE graphs ADD COLUMN is_directed BOOLEAN DEFAULT 0', commit=True)
     except Exception as e:
         # Expected if column already exists
+        if IS_POSTGRES:
+            conn.rollback() # Clear aborted transaction state for next commands
         pass
         
     execute_query(conn, '''

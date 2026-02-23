@@ -20,7 +20,7 @@ import time
 import subprocess
 
 directory_to_watch = '.'
-container_name = 'kitapena-instance'
+container_name = 'kitapena_instance'
 
 # ANSI color codes for terminal output
 COLOR_CYAN = '\033[96m'
