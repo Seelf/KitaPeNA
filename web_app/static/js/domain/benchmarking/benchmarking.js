@@ -96,6 +96,92 @@ export function initBenchmarking() {
         }
     });
 
+    // --- CMD MODAL INIT ---
+    const cmdModal = document.getElementById('cmdModal');
+    const closeCmdModal = document.getElementById('closeCmdModal');
+    if (cmdModal && closeCmdModal) {
+        closeCmdModal.onclick = () => cmdModal.style.display = 'none';
+        window.addEventListener('click', (e) => { if (e.target == cmdModal) cmdModal.style.display = 'none'; });
+    }
+
+    const btnSaveCmd = document.getElementById('btnSaveCmd');
+    if (btnSaveCmd) {
+        btnSaveCmd.onclick = async () => {
+            const id = document.getElementById('modalCmdId').value;
+            const name = document.getElementById('modalCmdName').value;
+            const path = document.getElementById('modalCmdPath').value;
+            const args = document.getElementById('modalCmdArgs').value;
+
+            if (!name || !path) { alert("Name and Path are required."); return; }
+
+            try {
+                const resp = await fetch('/api/algorithms/cmd', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                    body: JSON.stringify({ id, name, cmd_path: path, cmd_args: args })
+                });
+                if (resp.ok) {
+                    cmdModal.style.display = 'none';
+                    renderAlgoList();
+                } else {
+                    const err = await resp.json();
+                    alert("Error: " + (err.error || "Failed to save"));
+                }
+            } catch (err) { alert(err); }
+        };
+    }
+
+    const btnExportCmd = document.getElementById('btnExportCmd');
+    if (btnExportCmd) {
+        btnExportCmd.onclick = () => {
+            const name = document.getElementById('modalCmdName').value;
+            const path = document.getElementById('modalCmdPath').value;
+            const args = document.getElementById('modalCmdArgs').value;
+            const data = { type: 'kitapena_cmd_script', version: '1.0', name, cmd_path: path, cmd_args: args };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${name.replace(/\s+/g, '_')}_script.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+    }
+
+    // --- DSPN MODAL INIT ---
+    const dspnModal = document.getElementById('dspnModal');
+    const closeDspnModal = document.getElementById('closeDspnModal');
+    if (dspnModal && closeDspnModal) {
+        closeDspnModal.onclick = () => dspnModal.style.display = 'none';
+        window.addEventListener('click', (e) => { if (e.target == dspnModal) dspnModal.style.display = 'none'; });
+
+        // Tab Switching
+        const cats = dspnModal.querySelectorAll('.dspn-cat');
+        cats.forEach(cat => {
+            cat.onclick = () => {
+                cats.forEach(c => c.classList.remove('active'));
+                cat.classList.add('active');
+                const targetId = cat.dataset.target;
+                dspnModal.querySelectorAll('.dspn-section').forEach(s => s.style.display = 'none');
+                document.getElementById(targetId).style.display = 'block';
+            };
+        });
+
+        // Live Preview Binding
+        const dspnInputs = dspnModal.querySelectorAll('input, select');
+        dspnInputs.forEach(input => {
+            input.addEventListener('input', updateDspnPreview);
+            input.addEventListener('change', updateDspnPreview);
+        });
+
+        document.getElementById('btnSaveDspnConfig').onclick = () => {
+            const args = buildDspnArgs();
+            const input = document.getElementById('dspnArgsInput');
+            if (input) input.value = args;
+            dspnModal.style.display = 'none';
+        };
+    }
+
     // Logarithmic Scale Live Toggle
     const logScaleToggle = document.getElementById('benchLogScale');
     if (logScaleToggle) {
@@ -170,9 +256,65 @@ export function initBenchmarking() {
     setupSearch('searchBenchPnh', 'benchPnhFileList');
     setupSearch('searchAlgos', 'algoListContainer');
 
-    // Load Algos Initially
     renderAlgoList();
     window.addEventListener('algosUpdated', renderAlgoList);
+}
+
+function updateDspnPreview() {
+    const preview = document.getElementById('dspnCmdPreviewText');
+    if (preview) preview.textContent = buildDspnArgs();
+}
+
+function buildDspnArgs() {
+    let args = [];
+
+    // Verbosity
+    const v = document.getElementById('dspn_opt_verbose').value;
+    if (v) args.push(v);
+
+    // PT
+    if (document.getElementById('dspn_opt_pt').checked) args.push('-pt');
+
+    // Analysis State
+    if (document.getElementById('dspn_opt_trg').checked) args.push('-trg');
+    if (document.getElementById('dspn_opt_rg').checked) args.push('-rg');
+    if (document.getElementById('dspn_opt_novpaths').checked) args.push('-no-vpaths');
+
+    // Invariants
+    if (document.getElementById('dspn_opt_pinv').checked) args.push('-pinv');
+    if (document.getElementById('dspn_opt_tinv').checked) args.push('-tinv');
+    if (document.getElementById('dspn_opt_traps').checked) args.push('-traps');
+
+    // Prints
+    if (document.getElementById('dspn_opt_dot').checked) args.push('-dot');
+    if (document.getElementById('dspn_opt_allmeas').checked) args.push('-all-measures');
+
+    // Solution
+    if (document.getElementById('dspn_opt_s').checked) args.push('-s');
+    const tVal = document.getElementById('dspn_val_t').value;
+    if (tVal) args.push('-t ' + tVal);
+
+    // Method
+    const m = document.getElementById('dspn_opt_method').value;
+    if (m) args.push(m);
+
+    // Solver
+    const s = document.getElementById('dspn_opt_solver').value;
+    if (s) args.push(s);
+
+    // Prec
+    const p = document.getElementById('dspn_opt_prec').value;
+    if (p) args.push(p);
+
+    // Numerical
+    const eps = document.getElementById('dspn_val_epsilon').value;
+    if (eps) args.push('-epsilon ' + eps);
+    const iters = document.getElementById('dspn_val_maxiters').value;
+    if (iters) args.push('-max-iters ' + iters);
+    const timeout = document.getElementById('dspn_val_timeout').value;
+    if (timeout) args.push('-timeout ' + timeout);
+
+    return args.join(' ');
 }
 
 function setupSearch(inputId, listId) {
@@ -208,7 +350,24 @@ async function renderAlgoList() {
             customAlgos = await resp.json();
         }
 
+        const respCmd = await fetch('/api/algorithms/cmd');
+        let customCmds = [];
+        if (respCmd.ok) {
+            customCmds = await respCmd.json();
+        }
+
         container.innerHTML = '';
+
+        // Helper: Create Header
+        const mkHeader = (title) => {
+            const h = document.createElement('div');
+            h.style.cssText = 'padding: 8px 10px; font-size: 10px; font-weight: bold; color: #888; text-transform: uppercase; background: rgba(0,0,0,0.1); border-bottom: 1px solid #333; margin-bottom: 5px; position: sticky; top: 0; z-index: 10;';
+            h.innerText = title;
+            return h;
+        };
+
+        // --- SECTION: SYSTEM ---
+        container.appendChild(mkHeader('System Engines (Other tools)'));
 
         // --- Hardcoded DSPN-Tool Item ---
         const dspnDiv = document.createElement('div');
@@ -219,28 +378,16 @@ async function renderAlgoList() {
             <span class="name" style="color: #ff9f40; font-weight: bold;">[GreatSPN] DSPN-Tool</span>
             <span class="actions" style="margin-left: auto; display: inline-flex; gap: 8px; align-items: center; position: relative;">
                 <button title="Settings" class="btn-settings-dspn" style="font-size: 14px; color: #ccc; background: none; border: none; cursor: pointer;">⚙️</button>
-                <div class="dspn-settings-panel" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 5px; background: #222; border: 1px solid #555; padding: 10px; z-index: 10001; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 200px;">
-                    <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">CLI Arguments</label>
-                    <input type="text" id="dspnArgsInput" value="-pinv" style="width: 100%; padding: 4px; background: #111; color: white; border: 1px solid #444; font-family: monospace;">
-                </div>
+                <input type="hidden" id="dspnArgsInput" value="-nv">
             </span>
         `;
         // Toggle settings panel
         const dspnSettingsBtn = dspnDiv.querySelector('.btn-settings-dspn');
-        const dspnSettingsPanel = dspnDiv.querySelector('.dspn-settings-panel');
         dspnSettingsBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            dspnSettingsPanel.style.display = dspnSettingsPanel.style.display === 'none' ? 'block' : 'none';
+            document.getElementById('dspnModal').style.display = 'flex';
+            updateDspnPreview();
         });
-        dspnSettingsPanel.addEventListener('click', (e) => {
-            e.stopPropagation(); // keep open while interacting with input
-        });
-        document.addEventListener('click', (e) => {
-            if (!dspnDiv.contains(e.target)) {
-                dspnSettingsPanel.style.display = 'none';
-            }
-        });
-
         dspnDiv.addEventListener('click', (e) => {
             if (e.target.closest('button') || e.target.closest('input[type="text"]')) return;
             const cb = dspnDiv.querySelector('input[type="checkbox"]');
@@ -250,7 +397,106 @@ async function renderAlgoList() {
             dspnDiv.classList.toggle('selected', cb.checked);
         });
         container.appendChild(dspnDiv);
+
+        // --- SECTION: USER ---
+        container.appendChild(mkHeader('User Algorithms & Scripts'));
+
+        // --- Generic CMD Buttons (Add / Import) ---
+        const cmdActionsDiv = document.createElement('div');
+        cmdActionsDiv.style.display = 'flex';
+        cmdActionsDiv.style.gap = '5px';
+        cmdActionsDiv.style.marginBottom = '5px';
+        cmdActionsDiv.innerHTML = `
+            <button id="btnNewCmd" style="flex:1; background: none; border: 1px dashed #555; color: #b180ff; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 11px;">+ New CLI Script</button>
+            <button id="btnImportCmd" style="background: none; border: 1px dashed #555; color: #acf; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px;" title="Import JSON">Import JSON</button>
+        `;
+
+        cmdActionsDiv.querySelector('#btnNewCmd').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('modalCmdId').value = '';
+            document.getElementById('modalCmdName').value = '';
+            document.getElementById('modalCmdPath').value = '';
+            document.getElementById('modalCmdArgs').value = '{pnh}';
+            document.getElementById('btnExportCmd').style.display = 'none';
+            document.getElementById('cmdModal').style.display = 'flex';
+        });
+
+        cmdActionsDiv.querySelector('#btnImportCmd').addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = async (re) => {
+                    try {
+                        const data = JSON.parse(re.target.result);
+                        if (data.type !== 'kitapena_cmd_script') throw new Error("Invalid format.");
+                        document.getElementById('modalCmdId').value = '';
+                        document.getElementById('modalCmdName').value = data.name || 'Imported Script';
+                        document.getElementById('modalCmdPath').value = data.cmd_path || '';
+                        document.getElementById('modalCmdArgs').value = data.cmd_args || '';
+                        document.getElementById('btnExportCmd').style.display = 'none';
+                        document.getElementById('cmdModal').style.display = 'flex';
+                    } catch (err) { alert("Import failed: " + err.message); }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        });
+        container.appendChild(cmdActionsDiv);
+
+        // --- Render Fetched Generic CMDs ---
+        customCmds.forEach(cmd => {
+            const cmdId = `cmd_${cmd.id}`;
+            const cmdDiv = document.createElement('div');
+            cmdDiv.className = 'saved-item algo-item';
+            cmdDiv.dataset.id = cmdId;
+            cmdDiv.innerHTML = `
+                <input type="checkbox" value="${cmdId}" style="margin-right: 10px; cursor: pointer;">
+                <span class="name" style="color: #b180ff; font-weight: bold;">[CMD] ${cmd.name}</span>
+                <span class="actions" style="margin-left: auto; display: inline-flex; gap: 8px; align-items: center;">
+                    <button title="Settings" class="btn-edit-cmd" style="font-size: 14px; color: #ccc; background: none; border: none; cursor: pointer;">⚙️</button>
+                    <button title="Delete" class="btn-delete-cmd" style="font-size: 14px; color: #f66; background: none; border: none; cursor: pointer;">🗑️</button>
+                </span>
+                <input type="hidden" class="cmd-path-input" value="${cmd.cmd_path}">
+                <input type="hidden" class="cmd-args-input" value="${cmd.cmd_args}">
+            `;
+
+            cmdDiv.querySelector('.btn-edit-cmd').addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('modalCmdId').value = cmd.id;
+                document.getElementById('modalCmdName').value = cmd.name;
+                document.getElementById('modalCmdPath').value = cmd.cmd_path;
+                document.getElementById('modalCmdArgs').value = cmd.cmd_args;
+                document.getElementById('btnExportCmd').style.display = 'inline-block';
+                document.getElementById('cmdModal').style.display = 'flex';
+            });
+
+            cmdDiv.querySelector('.btn-delete-cmd').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (!confirm("Delete this CLI Script?")) return;
+                try {
+                    const resp = await fetch('/api/algorithms/cmd/' + cmd.id, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRFToken': getCsrfToken() }
+                    });
+                    if (resp.ok) renderAlgoList();
+                } catch (err) { }
+            });
+
+            cmdDiv.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return;
+                const cb = cmdDiv.querySelector('input[type="checkbox"]');
+                if (e.target !== cb) {
+                    cb.checked = !cb.checked;
+                }
+                cmdDiv.classList.toggle('selected', cb.checked);
+            });
+            container.appendChild(cmdDiv);
+        });
         // --------------------------------
+
 
         // Helper: Create Action Buttons
         const mkActions = (name) => `
@@ -706,6 +952,19 @@ async function runBenchmark() {
     appendLog(`Mode: ${mode}`, 'system');
     appendLog('------------------------------------------', 'system');
 
+    // Extract custom CMD mappings
+    const customCmds = {};
+    algos.forEach(algo_id => {
+        if (algo_id.startsWith('cmd_')) {
+            const row = document.querySelector(`div[data-id="${algo_id}"]`);
+            if (row) {
+                const path = row.querySelector('.cmd-path-input').value;
+                const args = row.querySelector('.cmd-args-input').value;
+                customCmds[algo_id] = { cmd_path: path, cmd_args: args };
+            }
+        }
+    });
+
     try {
         if (mode === 'random') {
             const startN = parseInt(document.getElementById('benchStartN').value) || 10;
@@ -721,6 +980,7 @@ async function runBenchmark() {
                 const isDspnSelected = algos.includes('DSPN-Tool');
                 const dspnArgsInput = document.getElementById('dspnArgsInput');
                 const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+
                 const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
 
                 const payload = {
@@ -734,6 +994,7 @@ async function runBenchmark() {
                     algorithms: algos,
                     aggregations: uniqueAggregations,
                     dspnOptions: dspnOptions,
+                    customCmds: customCmds,
                     baseTimeout: baseTimeout,
                     displayName: `N=${n}`
                 };
@@ -764,6 +1025,7 @@ async function runBenchmark() {
                 const isDspnSelected = algos.includes('DSPN-Tool');
                 const dspnArgsInput = document.getElementById('dspnArgsInput');
                 const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+
                 const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
 
                 const payload = {
@@ -773,6 +1035,7 @@ async function runBenchmark() {
                     algorithms: algos,
                     aggregations: uniqueAggregations,
                     dspnOptions: dspnOptions,
+                    customCmds: customCmds,
                     baseTimeout: baseTimeout,
                     displayName: graph.name
                 };
@@ -805,6 +1068,7 @@ async function runBenchmark() {
                 const isDspnSelected = algos.includes('DSPN-Tool');
                 const dspnArgsInput = document.getElementById('dspnArgsInput');
                 const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+
                 const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
 
                 const payload = {
@@ -815,6 +1079,7 @@ async function runBenchmark() {
                     algorithms: algos,
                     aggregations: uniqueAggregations,
                     dspnOptions: dspnOptions,
+                    customCmds: customCmds,
                     baseTimeout: baseTimeout,
                     displayName: petri.name
                 };
@@ -842,6 +1107,7 @@ async function runBenchmark() {
                 const isDspnSelected = algos.includes('DSPN-Tool');
                 const dspnArgsInput = document.getElementById('dspnArgsInput');
                 const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+
                 const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
 
                 const payload = {
@@ -851,6 +1117,7 @@ async function runBenchmark() {
                     algorithms: algos,
                     aggregations: uniqueAggregations,
                     dspnOptions: dspnOptions,
+                    customCmds: customCmds,
                     baseTimeout: baseTimeout,
                     displayName: fname
                 };
@@ -883,6 +1150,7 @@ async function runBenchmark() {
                 const isDspnSelected = algos.includes('DSPN-Tool');
                 const dspnArgsInput = document.getElementById('dspnArgsInput');
                 const dspnOptions = isDspnSelected && dspnArgsInput ? dspnArgsInput.value : '';
+
                 const baseTimeout = parseInt(document.getElementById('benchTimeout')?.value) || null;
 
                 const payload = {
@@ -893,6 +1161,7 @@ async function runBenchmark() {
                     algorithms: algos,
                     aggregations: uniqueAggregations,
                     dspnOptions: dspnOptions,
+                    customCmds: customCmds,
                     baseTimeout: baseTimeout,
                     displayName: graph.name
                 };
@@ -931,26 +1200,40 @@ async function executeBenchmarkStep(payload) {
             body: JSON.stringify(payload)
         });
 
-        const results = await response.json();
+        let results;
+        const responseText = await response.text();
+        try {
+            results = JSON.parse(responseText);
+        } catch (e) {
+            console.error("Failed to parse benchmark response:", responseText);
+            throw new Error(`Server returned invalid JSON. Status: ${response.status}. Body starts with: ${responseText.substring(0, 100)}`);
+        }
+
         if (results.error) throw new Error(results.error);
 
         // Display Logs if any logs present in *first* aggregation object
         // assuming standard results dictionary
         let logList = [];
-        if (payload.aggregations && results[payload.aggregations[0]] && results[payload.aggregations[0]].logs) {
-            logList = results[payload.aggregations[0]].logs;
+        const firstAgg = payload.aggregations && payload.aggregations[0];
+        if (firstAgg && results[firstAgg] && results[firstAgg].logs) {
+            logList = results[firstAgg].logs;
         } else if (results.logs) {
             logList = results.logs; // fallback
         }
 
-        if (Array.isArray(logList)) {
+        if (logList && logList.length > 0) {
             logList.forEach(log => {
                 const logType = log.includes('Result') ? 'success' : 'info';
                 appendLog(log, logType);
             });
         }
 
+        if (!response.ok) {
+            throw new Error(results.error || `Server error: ${response.status}`);
+        }
+
         updateChart(results, payload.aggregations);
+        return results;
     } catch (e) {
         throw e;
     }

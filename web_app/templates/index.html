@@ -159,7 +159,7 @@
         <div id="algoModal" class="modal">
             <div class="modal-content algo-manager-modal">
                 <div class="modal-header">
-                    <span class="title">⚙️ Algorithm Manager (C++)</span>
+                    <span class="title">Algorithm Manager (C++)</span>
                     <button id="closeAlgoModal" class="close-btn">✕</button>
                 </div>
 
@@ -200,6 +200,224 @@
                                 <button id="btnSaveCompile" class="btn-primary">Save & Compile</button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CMD MANAGER MODAL -->
+        <div id="cmdModal" class="modal">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <span class="title">CLI Script Manager</span>
+                    <button id="closeCmdModal" class="close-btn">✕</button>
+                </div>
+                <div class="modal-body modal-padding">
+                    <input type="hidden" id="modalCmdId">
+                    <div class="input-row">
+                        <label>Script Name</label>
+                        <input type="text" id="modalCmdName" placeholder="e.g. My Fast Solver">
+                    </div>
+                    <div class="input-row">
+                        <label>Executable Path</label>
+                        <input type="text" id="modalCmdPath" placeholder="/usr/bin/python3"
+                            style="font-family: monospace;">
+                        <small class="hint-text">Absolute path to binary inside the Docker container.</small>
+                    </div>
+                    <div class="input-row">
+                        <label>Args Template</label>
+                        <input type="text" id="modalCmdArgs" placeholder="{pnh}" style="font-family: monospace;">
+                        <div class="macro-hint">
+                            <strong style="display: block; margin-bottom: 5px;">Supported Macros:</strong>
+                            <ul
+                                style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+                                <li><code>{pnh}</code> — Full path to the generated <strong>.pnh</strong> file (Petri
+                                    Net).</li>
+                                <li><code>{gspn}</code> — Path to <strong>.net</strong>/<strong>.def</strong> files
+                                    (GreatSPN format).</li>
+                                <li><code>{id}</code> — The unique ID of the graph in the database.</li>
+                                <li><code>{name}</code> — The original name of the graph/net.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btnExportCmd" class="btn secondary">Export JSON</button>
+                    <div style="flex: 1;"></div>
+                    <button id="btnSaveCmd" class="btn primary">Save Script</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- DSPN TOOL CONFIG MODAL -->
+        <div id="dspnModal" class="modal">
+            <div class="modal-content" style="width: 750px; max-height: 90vh;">
+                <div class="modal-header">
+                    <span class="title">DSPN-Tool Configurator</span>
+                    <button id="closeDspnModal" class="close-btn">✕</button>
+                </div>
+                <div class="modal-body dspn-config-body"
+                    style="padding:0; display: flex; flex-direction: row; overflow: hidden;">
+                    <!-- Sidebar for Categories -->
+                    <div class="modal-sidebar" style="width: 180px; background: #252526;">
+                        <div class="dspn-cat active" data-target="dspn-general">General</div>
+                        <div class="dspn-cat" data-target="dspn-analysis">Analysis Type</div>
+                        <div class="dspn-cat" data-target="dspn-solver">Solver & Precond</div>
+                        <div class="dspn-cat" data-target="dspn-params">Parameters</div>
+                        <div class="dspn-cat" data-target="dspn-exports">Output & Invariants</div>
+                    </div>
+                    <!-- Main Content -->
+                    <div class="modal-main modal-padding" style="flex: 1; overflow-y: auto; background: #1e1e1e;">
+                        <div id="dspn-general" class="dspn-section">
+                            <h4
+                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                General Settings</h4>
+                            <div class="input-row">
+                                <label>Verbosity</label>
+                                <select id="dspn_opt_verbose" style="width: 100%;">
+                                    <option value="-nv">Basic Verbose (-nv)</option>
+                                    <option value="-nnv">Quiet Mode (-nnv)</option>
+                                    <option value="-v">Verbose (-v)</option>
+                                    <option value="-vv">Very Verbose (-vv)</option>
+                                </select>
+                            </div>
+                            <div class="input-row">
+                                <label>Load Type</label>
+                                <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_pt"> <span>Load as P/T
+                                        net (ignore delays) [-pt]</span></div>
+                            </div>
+                        </div>
+
+                        <div id="dspn-analysis" class="dspn-section" style="display:none;">
+                            <h4
+                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                Analysis Type</h4>
+                            <div class="input-col-group"
+                                style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="font-size:10px; color:#888;">State Space</label>
+                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_trg"> <span>Build TRG
+                                            [-trg]</span></div>
+                                    <small class="hint-text">Tangible Reachability Graph.</small>
+                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_rg"> <span>Build RG
+                                            [-rg]</span></div>
+                                    <small class="hint-text">Reachability Graph with vanishings.</small>
+                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_novpaths"> <span>No
+                                            vanishing paths [-no-vpaths]</span></div>
+                                </div>
+                                <div>
+                                    <label style="font-size:10px; color:#888;">Solution</label>
+                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_s"> <span>Steady
+                                            State [-s]</span></div>
+                                    <small class="hint-text">Compute stationary distribution.</small>
+                                    <div class="input-row" style="margin-top:5px;">
+                                        <label>Transient Time [-t]</label>
+                                        <input type="number" id="dspn_val_t" step="0.1" placeholder="Time (sec)">
+                                        <small class="hint-text">Compute transient solution at time T.</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="input-row" style="margin-top:10px;">
+                                <label>Method</label>
+                                <select id="dspn_opt_method">
+                                    <option value="">Default (Auto)</option>
+                                    <option value="-i">Implicit MRP Method [-i]</option>
+                                    <option value="-e">Explicit MRP Method [-e]</option>
+                                </select>
+                                <small class="hint-text">Implicit uses Power/GMRES, Explicit builds EMC.</small>
+                            </div>
+                        </div>
+
+                        <div id="dspn-solver" class="dspn-section" style="display:none;">
+                            <h4
+                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                Solver & Preconditioner</h4>
+                            <div class="input-row">
+                                <label>Iterative Solver</label>
+                                <select id="dspn_opt_solver">
+                                    <option value="">Default (Power method)</option>
+                                    <option value="-gmres">GMRES [-gmres]</option>
+                                    <option value="-bicgstab">BiCG-STAB [-bicgstab]</option>
+                                    <option value="-cgs">CGS [-cgs]</option>
+                                    <option value="-jor">JOR [-jor]</option>
+                                    <option value="-forward-sor">Forward SOR [-forward-sor]</option>
+                                    <option value="-backward-sor">Backward SOR [-backward-sor]</option>
+                                    <option value="-ssor">Symmetric SOR [-ssor]</option>
+                                </select>
+                                <small class="hint-text">Select numerical method for solving the linear system.</small>
+                            </div>
+                            <div class="input-row">
+                                <label>Preconditioner</label>
+                                <select id="dspn_opt_prec">
+                                    <option value="">No Preconditioner [-no-prec]</option>
+                                    <option value="-diag-prec">Diagonal (Jacobi) [-diag-prec]</option>
+                                    <option value="-ilu0-prec">ILU(0) Preconditioner [-ilu0-prec]</option>
+                                </select>
+                                <small class="hint-text">Speeds up convergence for GMRES/BiCG-STAB.</small>
+                            </div>
+                        </div>
+
+                        <div id="dspn-params" class="dspn-section" style="display:none;">
+                            <h4
+                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                Numerical Parameters</h4>
+                            <div class="input-row">
+                                <label>Residual Error (Epsilon) [-epsilon]</label>
+                                <input type="text" id="dspn_val_epsilon" placeholder="1.0e-10">
+                                <small class="hint-text">Target accuracy for convergence.</small>
+                            </div>
+                            <div class="input-row">
+                                <label>Max Iterations [-max-iters]</label>
+                                <input type="number" id="dspn_val_maxiters" placeholder="1000">
+                            </div>
+                            <div class="input-row">
+                                <label>Timeout (seconds) [-timeout]</label>
+                                <input type="number" id="dspn_val_timeout" placeholder="60">
+                            </div>
+                        </div>
+
+                        <div id="dspn-exports" class="dspn-section" style="display:none;">
+                            <h4
+                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                Output & Invariants</h4>
+                            <div class="input-col-group"
+                                style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_pinv">
+                                        <span>P-Invariants [-pinv]</span>
+                                    </div>
+                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_tinv">
+                                        <span>T-Invariants [-tinv]</span>
+                                    </div>
+                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_traps">
+                                        <span>Traps/Siphons [-traps]</span>
+                                    </div>
+                                    <small class="hint-text">Structural analysis of the net.</small>
+                                </div>
+                                <div>
+                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_dot"> <span>Save as
+                                            Dot [-dot]</span></div>
+                                    <small class="hint-text">Exports graph to GraphViz format.</small>
+                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_allmeas"> <span>Print
+                                            All Measures [-all-measures]</span></div>
+                                    <small class="hint-text">Prints all basic measures (avg tokens, throughput,
+                                        etc).</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer"
+                    style="flex-direction: column; align-items: stretch; padding: 15px; background: #252526;">
+                    <div
+                        style="font-size: 10px; color: #888; margin-bottom: 5px; text-transform: uppercase; font-weight:bold;">
+                        Live Command Preview:</div>
+                    <div class="cmd-preview"
+                        style="background:#000; padding:10px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #ff9f40; border: 1px solid #444; word-break: break-all;">
+                        DSPN-Tool -load {net} <span id="dspnCmdPreviewText" style="color:#fff;"></span>
+                    </div>
+                    <div style="display:flex; justify-content: flex-end; margin-top:10px;">
+                        <button id="btnSaveDspnConfig" class="btn primary">Apply & Close</button>
                     </div>
                 </div>
             </div>
@@ -480,7 +698,7 @@
                                 </div>
                             </div>
                             <div class="input-group">
-                                <label>Iterations per Graph</label>
+                                <label>Iterations per benchmark</label>
                                 <input type="number" id="benchIterations" value="5" min="1">
                             </div>
 

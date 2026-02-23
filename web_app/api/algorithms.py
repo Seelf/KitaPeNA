@@ -2,7 +2,8 @@ import os
 import re
 import subprocess
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import login_required, current_user
+from web_app.data.database import get_user_cmds, create_user_cmd, update_user_cmd, delete_user_cmd
 
 algos_bp = Blueprint('algorithms', __name__)
 
@@ -148,3 +149,46 @@ def delete_algorithm(name):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# --- Custom CMDs ---
+
+@algos_bp.route('/cmd', methods=['GET'])
+@login_required
+def get_custom_cmds():
+    """Get all custom CMD algorithms for the current user."""
+    try:
+        cmds = get_user_cmds(current_user.id)
+        return jsonify([dict(cmd) for cmd in cmds])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@algos_bp.route('/cmd', methods=['POST'])
+@login_required
+def save_custom_cmd():
+    try:
+        data = request.json
+        cmd_id = data.get('id')
+        name = data.get('name')
+        cmd_path = data.get('cmd_path')
+        cmd_args = data.get('cmd_args', '')
+        
+        if not name or not cmd_path:
+            return jsonify({'error': 'Name and executable path are required'}), 400
+            
+        if cmd_id:
+            update_user_cmd(cmd_id, current_user.id, name, cmd_path, cmd_args)
+        else:
+            create_user_cmd(current_user.id, name, cmd_path, cmd_args)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@algos_bp.route('/cmd/<int:cmd_id>', methods=['DELETE'])
+@login_required
+def delete_cmd(cmd_id):
+    try:
+        delete_user_cmd(cmd_id, current_user.id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+

@@ -112,6 +112,18 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''', commit=True)
+    
+    execute_query(conn, '''
+        CREATE TABLE IF NOT EXISTS custom_cmds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            name TEXT NOT NULL,
+            cmd_path TEXT NOT NULL,
+            cmd_args TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''', commit=True)
     conn.close()
 
 # --- Users ---
@@ -160,6 +172,31 @@ def delete_user(user_id):
 def update_user_password(user_id, pwhash):
     conn = get_db_connection()
     execute_query(conn, 'UPDATE users SET password_hash = ? WHERE id = ?', (pwhash, user_id), commit=True)
+    conn.close()
+
+# --- Custom CMDs ---
+
+def get_user_cmds(user_id):
+    conn = get_db_connection()
+    cmds = execute_query(conn, 'SELECT * FROM custom_cmds WHERE user_id = ? ORDER BY created_at ASC', (user_id,), fetchall=True)
+    conn.close()
+    return cmds
+
+def create_user_cmd(user_id, name, cmd_path, cmd_args):
+    conn = get_db_connection()
+    execute_query(conn, 'INSERT INTO custom_cmds (user_id, name, cmd_path, cmd_args) VALUES (?, ?, ?, ?)',
+                 (user_id, name, cmd_path, cmd_args), commit=True)
+    conn.close()
+
+def update_user_cmd(cmd_id, user_id, name, cmd_path, cmd_args):
+    conn = get_db_connection()
+    execute_query(conn, 'UPDATE custom_cmds SET name=?, cmd_path=?, cmd_args=? WHERE id=? AND user_id=?',
+                 (name, cmd_path, cmd_args, cmd_id, user_id), commit=True)
+    conn.close()
+
+def delete_user_cmd(cmd_id, user_id):
+    conn = get_db_connection()
+    execute_query(conn, 'DELETE FROM custom_cmds WHERE id=? AND user_id=?', (cmd_id, user_id), commit=True)
     conn.close()
 
 # --- Graphs (Standard) ---

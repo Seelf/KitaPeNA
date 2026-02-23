@@ -4,35 +4,36 @@ services:
   db:
     image: postgres:15-alpine
     container_name: kitapena_postgres
+    restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secretpassword
-      POSTGRES_DB: kitapena_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
 
   kitapena:
     build: .
-    container_name: kitapena_app
+    container_name: kitapena_instance
+    restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
-      - "5002:5002"
+      - "${PORT:-5002}:${PORT:-5002}"
     volumes:
-      - data_volume:/app/web_app
+      - .:/app # Mount current directory for development auto-reload
+    env_file:
+      - .env
     environment:
-      - FLASK_ENV=development
-      - PORT=5002
-      - SECRET_KEY=super_secret_docker_key_12345
       - POSTGRES_HOST=db
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=secretpassword
-      - POSTGRES_DB=kitapena_db
-      - TURNSTILE_SITE_KEY=1x00000000000000000000AA
-      - TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 
 volumes:
-  data_volume:
   postgres_data:
