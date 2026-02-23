@@ -20,25 +20,28 @@ export function initTabs(switchContextCallback) {
     // Try to restore session
     if (!restoreSession()) {
         createNewTab('PETRI');
-    } else {
-        // If restored, ensure active tab is set
-        if (activeTabId) {
-            const tab = tabs.find(t => t.id === activeTabId);
-            if (tab) {
-                activateTab(tab.id);
-            }
-        }
     }
+    // restoreSession already calls contextSwitcher and renderTabBar;
+    // no need to call activateTab again here (it would return early anyway).
 }
 
 export function createNewTab(type = 'PETRI', name = null, content = null) {
     const id = `tab_${nextTabId++}`;
-    const title = name || `Untitled-${nextTabId - 1}`;
+    const defaultName = type === 'MIS' ? 'Graph' : 'Petri Net';
+    const title = name || defaultName;
 
     // Initial Data
     let data = {};
     if (type === 'MIS') {
-        data = content || { nodes: [], edges: [], camera: { x: 0, y: 0, zoom: 1 } };
+        const initNodes = content && content.nodes ? JSON.parse(JSON.stringify(content.nodes)) : [];
+        const initEdges = content && content.edges ? JSON.parse(JSON.stringify(content.edges)) : [];
+        data = {
+            graphs: {
+                MIS: { nodes: initNodes, edges: initEdges },
+                CONCURRENCY: { nodes: [], edges: [] }
+            },
+            camera: { x: 0, y: 0, zoom: 1 }
+        };
     } else {
         data = content || { places: [], transitions: [], arcs: [], nextPlaceId: 1, nextTransitionId: 1 };
     }
@@ -56,6 +59,14 @@ export function createNewTab(type = 'PETRI', name = null, content = null) {
     activateTab(id);
     saveSession();
     return id;
+}
+
+export function getTabs() {
+    return tabs;
+}
+
+export function getActiveTab() {
+    return tabs.find(t => t.id === activeTabId);
 }
 
 export function activateTab(id) {
@@ -76,6 +87,7 @@ export function activateTab(id) {
 
     // 3. Restore state
     restoreStateFromTab(tab);
+    state.activeDocumentType = tab.type;
 
     // 4. Update UI
     renderTabBar();
@@ -208,6 +220,12 @@ function restoreStateFromTab(tab) {
         if (tab.data.troResult) state.troResult = tab.data.troResult;
         if (tab.data.coloringResult) state.coloringResult = tab.data.coloringResult;
 
+        // CRITICAL: push restored graph data to global buffers
+        if (state.graphs && state.graphs.MIS) {
+            state.graphs.MIS.nodes.forEach(n => nodes.push(n));
+            state.graphs.MIS.edges.forEach(e => edges.push(e));
+        }
+
     } else {
         places.length = 0;
         transitions.length = 0;
@@ -294,15 +312,82 @@ function renderTabBar() {
 
         tabBar.appendChild(el);
     });
+    // Single Add Button with Dropdown
+    const addContainer = document.createElement('div');
+    addContainer.style.position = 'relative';
+    addContainer.style.display = 'inline-block';
 
     const addBtn = document.createElement('div');
     addBtn.className = 'editor-tab-add';
     addBtn.innerHTML = '+';
-    addBtn.title = 'New Tab';
-    addBtn.addEventListener('click', () => {
+    addBtn.title = 'New File';
+
+    const dropdown = document.createElement('div');
+    dropdown.style.display = 'none';
+    dropdown.style.position = 'absolute';
+    dropdown.style.top = '100%';
+    dropdown.style.left = '0';
+    dropdown.style.backgroundColor = '#2d2d2d';
+    dropdown.style.border = '1px solid #444';
+    dropdown.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
+    dropdown.style.zIndex = '99999';
+    dropdown.style.minWidth = '140px';
+    dropdown.style.padding = '5px 0';
+    dropdown.style.marginTop = '2px';
+
+    const optPetri = document.createElement('div');
+    optPetri.innerHTML = '🧬 Petri Net';
+    optPetri.style.padding = '8px 15px';
+    optPetri.style.cursor = 'pointer';
+    optPetri.style.color = '#ccc';
+    optPetri.style.fontSize = '12px';
+    optPetri.onmouseover = () => optPetri.style.backgroundColor = '#444';
+    optPetri.onmouseout = () => optPetri.style.backgroundColor = 'transparent';
+    optPetri.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.style.display = 'none';
         createNewTab('PETRI');
     });
-    tabBar.appendChild(addBtn);
+
+    const optGraph = document.createElement('div');
+    optGraph.innerHTML = '🕸️ Graph';
+    optGraph.style.padding = '8px 15px';
+    optGraph.style.cursor = 'pointer';
+    optGraph.style.color = '#ccc';
+    optGraph.style.fontSize = '12px';
+    optGraph.onmouseover = () => optGraph.style.backgroundColor = '#444';
+    optGraph.onmouseout = () => optGraph.style.backgroundColor = 'transparent';
+    optGraph.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.style.display = 'none';
+        createNewTab('MIS');
+    });
+
+    dropdown.appendChild(optPetri);
+    dropdown.appendChild(optGraph);
+
+    // Append to body to avoid overflow clipping from the tabs bar
+    document.body.appendChild(dropdown);
+
+    addBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (dropdown.style.display === 'none') {
+            const rect = addBtn.getBoundingClientRect();
+            dropdown.style.left = rect.left + 'px';
+            dropdown.style.top = rect.bottom + 'px';
+            dropdown.style.display = 'block';
+        } else {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+        dropdown.style.display = 'none';
+    }, { once: false });
+
+    addContainer.appendChild(addBtn);
+    tabBar.appendChild(addContainer);
 }
 
 export function renameActiveTab(newName) {
@@ -359,9 +444,11 @@ function restoreSession() {
         if (activeTabId) {
             const tab = tabs.find(t => t.id === activeTabId);
             restoreStateFromTab(tab);
+            state.activeDocumentType = tab.type;
             if (contextSwitcher) {
-                const targetContext = tab.data.activeContext || tab.type;
-                contextSwitcher(targetContext);
+                const targetContext = tab.data?.activeContext || tab.type;
+                // skipSave=true prevents overwriting the just-restored nodes with an empty buffer
+                contextSwitcher(targetContext, true);
             }
         }
 

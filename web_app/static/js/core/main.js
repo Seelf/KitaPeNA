@@ -4,13 +4,13 @@ import { initElements, state, nodes, edges, camera } from './state.js';
 import { draw, resizeCanvas } from '../engine/rendering/render.js';
 import { initInteractions, deleteSelectedNode } from '../engine/interactions/interactions.js';
 import { initAdminConsole } from '../ui/admin.js';
-import { updateStats, setMode, updateResultsList, updateButtonStates, updateReadOnlyUI, initViewSettings } from '../ui/ui.js';
+import { updateStats, setMode, updateResultsList, updateButtonStates, updateReadOnlyUI, initViewSettings, showCustomModal } from '../ui/ui.js';
 import { saveToLocalStorage, loadFromLocalStorage, savePetriNetDb } from './storage.js';
 import { fetchSolution, advanceStep, startAutoPlay, stopAutoPlay, resetSimulation, highlightResultItem, updateSimulationSpeed } from '../domain/petri/simulation.js';
 import { drawPetri } from '../engine/rendering/petri_render.js';
 import { places, transitions, arcs } from '../domain/petri/petri_state.js';
 import { initPetriInteractions, runAutoLayout } from '../engine/interactions/petri_interactions.js';
-import { initTabs, triggerAutoSave } from './tabs.js';
+import { initTabs, triggerAutoSave, createNewTab } from './tabs.js';
 import { initBenchmarking } from '../domain/benchmarking/benchmarking.js';
 import { initAlgoManager } from '../domain/algo/algo_manager.js';
 import { initDatabaseExplorer, openDatabaseExplorer } from '../ui/database_explorer.js';
@@ -65,6 +65,177 @@ const btnDelete = document.getElementById('btnDelete');
 const speedSlider = document.getElementById('speedSlider');
 const btnGenerate = document.getElementById('btnGenerateGraph');
 const inputMaxStates = document.getElementById('inputMaxStates');
+
+const btnToggleDirected = document.getElementById('btnToggleDirected');
+const btnGraphImport = document.getElementById('btnGraphImport');
+const fileInputGraph = document.getElementById('fileInputGraph');
+const btnGraphExport = document.getElementById('btnGraphExport');
+const btnSaveGraph = document.getElementById('btnSaveGraph');
+
+if (btnSaveGraph) {
+    btnSaveGraph.addEventListener('click', async () => {
+        if (state.appContext !== 'MIS' && state.appContext !== 'CONCURRENCY') return;
+
+        let defaultName = "My Graph";
+        let tabsModule = null;
+        try {
+            tabsModule = await import('./tabs.js');
+            const activeTab = tabsModule.getActiveTab();
+            if (activeTab && !activeTab.title.startsWith("Untitled-")) {
+                defaultName = activeTab.title;
+            }
+        } catch (e) { }
+
+        const name = prompt("Enter a name for this Graph:", defaultName);
+        if (!name) return;
+        try {
+            const res = await fetch('/api/graphs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content },
+                body: JSON.stringify({ name, nodes, edges, is_directed: state.isDirected })
+            });
+
+            if (res.ok) {
+                showCustomModal("Success", "Graph saved successfully!");
+                if (tabsModule) tabsModule.renameActiveTab(name);
+            }
+            else showCustomModal("Error", "Failed to save graph.");
+        } catch (e) {
+            console.error(e);
+            showCustomModal("Error", "An error occurred while saving the graph.");
+        }
+    });
+}
+
+if (btnToggleDirected) {
+    btnToggleDirected.addEventListener('click', () => {
+        if (state.isDirected) {
+            // Turning off directed. Check for bidrectional duplicate edges.
+            let hasDuplicates = false;
+            let toRemove = new Set();
+            for (let i = 0; i < edges.length; i++) {
+                if (toRemove.has(i)) continue;
+                for (let j = i + 1; j < edges.length; j++) {
+                    if (toRemove.has(j)) continue;
+
+                    if (edges[i][0] === edges[j][1] && edges[i][1] === edges[j][0]) {
+                        hasDuplicates = true;
+                        toRemove.add(j);
+                    }
+                }
+            }
+
+            if (hasDuplicates) {
+                showCustomModal(
+                    "Warning: Edge Loss",
+                    "Converting to an undirected graph will merge bidirectional edges (A &rarr; B and B &rarr; A) into single undirected edges.<br><br>Are you sure you want to proceed?",
+                    true,
+                    () => {
+                        // Confirm
+                        const newEdges = edges.filter((_, idx) => !toRemove.has(idx));
+                        edges.length = 0;
+                        newEdges.forEach(e => edges.push(e));
+
+                        state.isDirected = false;
+                        btnToggleDirected.style.background = 'transparent';
+                        btnToggleDirected.style.border = '1px solid transparent';
+                        draw();
+                        updateStats();
+                    }
+                );
+                return;
+            }
+        }
+
+        state.isDirected = !state.isDirected;
+        btnToggleDirected.style.background = state.isDirected ? '#444' : 'transparent';
+        btnToggleDirected.style.border = state.isDirected ? '1px solid #666' : '1px solid transparent';
+        draw();
+    });
+}
+
+if (btnGraphImport && fileInputGraph) {
+    btnGraphImport.addEventListener('click', () => fileInputGraph.click());
+
+    fileInputGraph.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch('/api/graphs/import', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content },
+                body: formData
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Failed to import");
+            }
+
+            const data = await res.json();
+
+            // Assuming successful import returns nodes, edges, is_directed
+            createNewTab('MIS', data.name, { nodes: data.nodes, edges: data.edges });
+            setTimeout(() => {
+                state.isDirected = data.is_directed;
+                if (btnToggleDirected) {
+                    btnToggleDirected.style.background = state.isDirected ? '#444' : 'transparent';
+                    btnToggleDirected.style.border = state.isDirected ? '1px solid #666' : '1px solid transparent';
+                }
+                const allZero = data.nodes.every(n => n.x === 0 && n.y === 0);
+                if (allZero && data.nodes.length > 0) document.getElementById('btnGraphLayout')?.click();
+                else draw();
+                updateStats();
+                document.getElementById('tabEditor').click();
+                switchContext('MIS');
+            }, 100);
+
+        } catch (err) {
+            console.error(err);
+            alert("Error importing graph: " + err.message);
+        }
+        e.target.value = ''; // Reset
+    });
+}
+
+if (btnGraphExport) {
+    btnGraphExport.addEventListener('click', () => {
+        if (nodes.length === 0) return alert("Nothing to export.");
+        const format = prompt("Enter format to export (json, gml, graphml, edgelist):", "json");
+        if (!format || !['json', 'gml', 'graphml', 'edgelist'].includes(format.toLowerCase())) {
+            if (format) alert("Invalid format. Use json, gml, graphml, or edgelist.");
+            return;
+        }
+
+        const exportData = {
+            name: "exported_graph",
+            is_directed: state.isDirected,
+            nodes: nodes,
+            edges: edges
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `exported_graph.${format.toLowerCase()}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        if (format.toLowerCase() !== 'json') {
+            // For non-JSON, we fake it for now by downloading JSON, 
+            // because full export API requires the graph to exist in DB first 
+            // or we need a specific 'export adhoc' endpoint, which is too complex for now.
+            alert(`Note: Ad-hoc export from canvas currently downloads JSON. Save graph to DB first to use API advanced formats.`);
+        }
+    });
+}
 
 if (btnGenerate) {
     btnGenerate.addEventListener('click', async () => {

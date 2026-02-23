@@ -6,7 +6,6 @@ from .generator import generate_random_graph
 # Import algorithms
 from ..coloring import get_optimal_coloring
 from ..transitivity import check_transitive_orientability
-from ..extensions.interface import CppAdapter
 
 import sys
 import io
@@ -60,7 +59,7 @@ ALGORITHMS = {}
 
 CUSTOM_ALGOS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'custom_algos'))
 
-def execute_custom_cpp(algo_name, nodes, edges):
+def execute_custom_cpp(algo_name, nodes, edges, is_directed=False):
     so_path = os.path.join(CUSTOM_ALGOS_DIR, f"{algo_name}.so")
     if not os.path.exists(so_path):
         raise FileNotFoundError(f"Custom algo {algo_name} not found at {so_path}")
@@ -158,7 +157,7 @@ class BenchmarkRunner:
         else:
             return statistics.mean(times)
 
-    def run_suite(self, algo_names, start_n, end_n, step_n, density, graph_count, iterations, aggregations=['mean']):
+    def run_suite(self, algo_names, start_n, end_n, step_n, density, graph_count, iterations, aggregations=['mean'], dspn_options='', base_timeout=None):
         """
         Runs a benchmark suite.
         Returns a dict structure suitable for Chart.js, keyed by aggregation method.
@@ -189,19 +188,19 @@ class BenchmarkRunner:
 
             for algo_name in algo_names:
                 is_custom = False
+                is_dspn = False
                 func = None
                 
-                if algo_name in ALGORITHMS:
+                if algo_name == 'DSPN-Tool':
+                    is_dspn = True
+                elif algo_name in ALGORITHMS:
                     func = ALGORITHMS[algo_name]
-                elif algo_name == 'cpp_solve':
-                    func = CppAdapter.solve
                 else:
                     # Check if custom
                     if os.path.exists(os.path.join(CUSTOM_ALGOS_DIR, f"{algo_name}.so")):
                         is_custom = True
                     else:
                         print(f"Skipping unknown algo: {algo_name}")
-                        algo_data[algo_name].append(0)  # append numeric 0 instead of None
                         continue
                 
                 times = []
@@ -210,20 +209,25 @@ class BenchmarkRunner:
                     nodes, edges = test_graphs[g_idx]
                     
                     for i in range(iterations):
-                    
                         # Execution Logic
-                        if is_custom:
+                        if is_dspn:
+                            if i == 0 and g_idx == 0:
+                                for agg in aggregations:
+                                    if "logs" not in results[agg]: results[agg]["logs"] = []
+                                    results[agg]["logs"].append(f"[{algo_name}] Skipped: DSPN-Tool only supports Petri Nets, not Random Graphs.")
+                            times.append(0)
+                        elif is_custom:
                             with CaptureOutput() as capture:
-                                result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges)
+                                result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges, is_directed=False)
                             
                             times.append(exec_time)
-    
+                            
                             if capture.output:
                                 for agg in aggregations:
                                     if "logs" not in results[agg]: results[agg]["logs"] = []
                                     results[agg]["logs"].append(capture.output)
                             
-                            # Add result info for the first iteration of specific N
+                            # Log result info for the first iteration
                             if i == 0 and result_colors:
                                 counts = {}
                                 for c in result_colors:
@@ -232,29 +236,17 @@ class BenchmarkRunner:
                                 unique_colors = sorted(counts.keys())
                                 chrom_num = len(unique_colors)
                                 dist_str = ", ".join([f"C{c}:{counts[c]}" for c in unique_colors])
-                                
                                 for agg in aggregations:
                                     if "logs" not in results[agg]: results[agg]["logs"] = []
                                     results[agg]["logs"].append(f"[{algo_name}] Result (N={n}): Chromatic Number = {chrom_num} (Dist: {dist_str})")
-                        elif algo_name == 'cpp_solve':
-                            # C++: Add artificial delay + Use Python Timer
-                            start_time = time.perf_counter() * 1000 # ms
-                            time.sleep(0.01) # 10ms artificial delay
-                            with CaptureOutput() as capture:
-                                func(nodes, edges) 
-                            end_time = time.perf_counter() * 1000 # ms
-                            times.append(end_time - start_time)
-                            if capture.output:
-                                for agg in aggregations:
-                                    if "logs" not in results[agg]: results[agg]["logs"] = []
-                                    results[agg]["logs"].append(capture.output)
                         else:
-                            # Python External Timer
-                            start_time = time.perf_counter() * 1000 # ms
+                            # Python Internal (from ALGORITHMS registry)
+                            start_time = time.perf_counter() * 1000
                             with CaptureOutput() as capture:
-                                func(nodes, edges) # Output ignored
-                            end_time = time.perf_counter() * 1000 # ms
+                                func(nodes, edges)
+                            end_time = time.perf_counter() * 1000
                             times.append(end_time - start_time)
+                            
                             if capture.output:
                                 for agg in aggregations:
                                     if "logs" not in results[agg]: results[agg]["logs"] = []
@@ -284,7 +276,7 @@ class BenchmarkRunner:
 
         return results
 
-    def run_specific(self, algo_names, graphs, iterations, aggregations=['mean']):
+    def run_specific(self, algo_names, graphs, iterations, aggregations=['mean'], dspn_options='', base_timeout=None):
         """
         Runs benchmark on specific graphs.
         graphs: list of dicts {'id': int, 'name': str, 'nodes': [], 'edges': []}
@@ -306,31 +298,95 @@ class BenchmarkRunner:
             nodes = graph['nodes']
             edges = graph['edges']
             name = graph['name']
-            print(f"  > Testing Graph: {name} (V={len(nodes)}, E={len(edges)})...")
+            is_directed = graph.get('is_directed', False)
+            print(f"  > Testing Graph: {name} (V={len(nodes)}, E={len(edges)}, Dir={is_directed})...")
 
             for algo_name in algo_names:
                 is_custom = False
+                is_dspn = False
                 func = None
                 
-                if algo_name in ALGORITHMS:
+                if algo_name == 'DSPN-Tool':
+                    is_dspn = True
+                elif algo_name in ALGORITHMS:
                     func = ALGORITHMS[algo_name]
-                elif algo_name == 'cpp_solve':
-                    func = CppAdapter.solve
                 else:
-                     # Check if custom
+                    # Check if custom
                     if os.path.exists(os.path.join(CUSTOM_ALGOS_DIR, f"{algo_name}.so")):
                         is_custom = True
                     else:
                         print(f"Skipping unknown algo: {algo_name}")
                         for agg in aggregations:
-                            algo_data[agg][algo_name].append(None)
+                            algo_data[agg][algo_name].append(0)
                         continue
 
                 times = []
+                timed_out_in_iteration = False
 
-                for _ in range(iterations):
+                for i in range(iterations):
+                    if timed_out_in_iteration:
+                        break
+
                     # Execution Logic
-                    if is_custom:
+                    if is_dspn:
+                        success = False
+                        exec_time = 0
+                        if 'gspn_base' in graph:
+                            try:
+                                import subprocess
+                                cmd = ["/usr/local/GreatSPN/bin/DSPN-Tool", "-load", graph['gspn_base']]
+                                if dspn_options:
+                                    cmd.extend(dspn_options.split())
+                                if base_timeout:
+                                    cmd.extend(["-timeout", str(base_timeout)])
+                                
+                                start_time = time.perf_counter() * 1000
+                                try:
+                                    process = subprocess.run(cmd, capture_output=True, text=True, timeout=base_timeout if base_timeout else None)
+                                    end_time = time.perf_counter() * 1000
+                                    exec_time = end_time - start_time
+                                    success = True
+                                    raw_name = graph.get('raw_name', graph['name'])
+                                    output_text = f"--- [{raw_name}] DSPN-Tool Output ---\n{process.stdout}\n"
+                                    if process.stderr:
+                                        output_text += f"\n--- DSPN-Tool STDERR ---\n{process.stderr}\n"
+
+                                    for agg in aggregations:
+                                        if "logs" not in results[agg]: results[agg]["logs"] = []
+                                        results[agg]["logs"].append(output_text)
+                                        
+                                except subprocess.TimeoutExpired as e:
+                                    end_time = time.perf_counter() * 1000
+                                    exec_time = end_time - start_time
+                                    success = True
+                                    timed_out_in_iteration = True
+                                    raw_name = graph.get('raw_name', graph['name'])
+                                    output_text = f"--- [{raw_name}] DSPN-Tool Output ---\n"
+                                    output_text += f"TIMEOUT: Process killed by system after {base_timeout} seconds. Skipping remaining iterations.\n"
+                                    if e.stdout:
+                                        if isinstance(e.stdout, bytes):
+                                            output_text += f"\nPartial Output:\n{e.stdout.decode('utf-8', errors='ignore')}\n"
+                                        else:
+                                            output_text += f"\nPartial Output:\n{e.stdout}\n"
+                                    for agg in aggregations:
+                                        if "logs" not in results[agg]: results[agg]["logs"] = []
+                                        results[agg]["logs"].append(output_text)
+
+                            except Exception as e:
+                                print(f"  [Runner] DSPN-Tool Execution failed: {e}")
+                                for agg in aggregations:
+                                    if "logs" not in results[agg]: results[agg]["logs"] = []
+                                    results[agg]["logs"].append(f"DSPN-Tool Error: {e}")
+                        else:
+                            print(f"  [Runner] DSPN-Tool skipped: No GSPN format available for {name}.")
+                            for agg in aggregations:
+                                if "logs" not in results[agg]: results[agg]["logs"] = []
+                                results[agg]["logs"].append(f"DSPN-Tool skipped: No GSPN format available for {name}.")
+                        
+                        if success:
+                            times.append(exec_time)
+                            
+                    elif is_custom:
                         success = False
                         result_colors = None
                         exec_time = 0
@@ -340,31 +396,30 @@ class BenchmarkRunner:
                                 with CaptureOutput() as capture:
                                     execute_custom_cpp_petri(algo_name, graph['pnh_path'])
                                 success = True
-                                # It doesn't report time yet for PNH, put 0 or measure here?
-                                # (Left as standard python measure for PNH just as fallback for now...)
+                                # Measure externally? Or let custom reporter handle it
+                                # (Left 0 for now as previously, usually reported via logs)
                             except AttributeError:
                                 # Fallback to standard graph if Petri solver missing
-                                print(f"  [Runner] {algo_name} has no solve_petri. Falling back to graph solve.")
                                 with CaptureOutput() as capture:
-                                    result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges)
+                                    result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges, is_directed)
                                 success = True
                             except Exception as e:
                                 print(f"  [Runner] PNH Execution failed for {algo_name}: {e}")
-                                # Try fallback anyway? Or fail? Let's try fallback.
                                 with CaptureOutput() as capture:
-                                    result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges)
+                                    result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges, is_directed)
                                 success = True
                         else:
                             with CaptureOutput() as capture:
-                                result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges)
+                                result_colors, exec_time = execute_custom_cpp(algo_name, nodes, edges, is_directed)
                             success = True
+
                         if capture.output:
                             for agg in aggregations:
                                 if "logs" not in results[agg]: results[agg]["logs"] = []
                                 results[agg]["logs"].append(capture.output)
 
                         # Add result info
-                        if success and result_colors:
+                        if success and result_colors and i == 0:
                             counts = {}
                             for c in result_colors:
                                 if c > 0: counts[c] = counts.get(c, 0) + 1
@@ -379,20 +434,6 @@ class BenchmarkRunner:
 
                         if success:
                             times.append(exec_time)
-                    elif algo_name == 'cpp_solve':
-                        # Native execution time from C++ Module
-                        with CaptureOutput() as capture:
-                            res = func(nodes, edges) 
-                        
-                        if isinstance(res, dict) and "execution_time_ms" in res:
-                            times.append(res["execution_time_ms"])
-                        else:
-                            times.append(0)
-
-                        if capture.output:
-                            for agg in aggregations:
-                                if "logs" not in results[agg]: results[agg]["logs"] = []
-                                results[agg]["logs"].append(capture.output)
                     else:
                         # Python External Timer
                         start_time = time.perf_counter() * 1000 # ms

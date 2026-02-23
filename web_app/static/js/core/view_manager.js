@@ -63,19 +63,39 @@ function restoreCameraForContext(ctx) {
 }
 
 function updateTabButtons(ctx) {
-    const tabs = {
-        'MIS': 'tabContextGraph',
-        'PETRI': 'tabContextPetri',
-        'CONCURRENCY': 'tabContextConcurrency'
-    };
-    Object.values(tabs).forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.remove('active');
-    });
-    const activeId = tabs[ctx];
-    if (activeId) {
-        const el = document.getElementById(activeId);
-        if (el) el.classList.add('active');
+    const tabPetri = document.getElementById('tabContextPetri');
+    const tabGraph = document.getElementById('tabContextGraph');
+    const tabConcurrency = document.getElementById('tabContextConcurrency');
+    const tabStandardGraph = document.getElementById('tabContextStandardGraph');
+
+    if (state.activeDocumentType === 'MIS') {
+        if (tabPetri) tabPetri.style.display = 'none';
+        if (tabGraph) tabGraph.style.display = 'none';
+        if (tabConcurrency) tabConcurrency.style.display = 'none';
+        if (tabStandardGraph) {
+            tabStandardGraph.style.display = 'flex';
+            tabStandardGraph.classList.add('active');
+        }
+    } else {
+        if (tabStandardGraph) tabStandardGraph.style.display = 'none';
+        if (tabPetri) tabPetri.style.display = 'flex';
+        if (tabGraph) tabGraph.style.display = 'flex';
+        if (tabConcurrency) tabConcurrency.style.display = 'flex';
+
+        const tabs = {
+            'MIS': 'tabContextGraph',
+            'PETRI': 'tabContextPetri',
+            'CONCURRENCY': 'tabContextConcurrency'
+        };
+        Object.values(tabs).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
+        });
+        const activeId = tabs[ctx];
+        if (activeId) {
+            const el = document.getElementById(activeId);
+            if (el) el.classList.add('active');
+        }
     }
 }
 

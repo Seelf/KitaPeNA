@@ -3,7 +3,7 @@ import json
 from flask import Blueprint, jsonify, request, Response
 from flask_login import login_required
 from web_app.data import database as db
-from .utils import parse_pnh, export_pnh, export_pnml
+from .utils import parse_pnh, export_pnh, export_pnml, export_gspn
 
 petri_bp = Blueprint('petri', __name__)
 
@@ -263,3 +263,27 @@ def download_json(net_id):
         mimetype="application/json",
         headers={"Content-disposition": f"attachment; filename={net['name']}.json"}
     )
+
+@petri_bp.route('/download/gspn/<int:net_id>')
+@login_required
+def download_gspn(net_id):
+    """Downloads Petri net in GSPN format (returns JSON with net and def strings)."""
+    net = db.get_petri_net(net_id)
+    if not net:
+        return jsonify({'error': 'Net not found'}), 404
+        
+    if 'content' in net and net['content']:
+        content = net['content']
+    elif 'content_json' in net:
+         content = json.loads(net['content_json'])
+    else:
+        return jsonify({'error': 'Net content not found'}), 404
+         
+    gspn_data = export_gspn(content)
+    
+    return jsonify({
+        'net_filename': f"{net['name']}.net",
+        'net_content': gspn_data['net'],
+        'def_filename': f"{net['name']}.def",
+        'def_content': gspn_data['def']
+    })

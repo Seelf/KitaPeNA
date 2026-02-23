@@ -134,7 +134,7 @@ export function draw() {
                 ctx.stroke();
 
                 // --- Arrowhead ---
-                if (state.appContext !== 'CONCURRENCY') {
+                if (state.appContext !== 'CONCURRENCY' && state.isDirected) {
                     let arrowAngle;
                     if (Math.abs(curveHeight) < 1) {
                         const dx = v.x - u.x;

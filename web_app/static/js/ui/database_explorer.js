@@ -4,11 +4,11 @@ import { state } from '../core/state.js';
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content;
 }
-import { updateStats } from './ui.js';
+import { updateStats, showCustomModal } from './ui.js';
 import { savePetriNetDb, loadPetriNetFromDb } from '../core/storage.js';
 
 // DOM Elements
-let viewDatabaseExplorer, dbGrid, dbSearchInput, dbSortSelect, btnRefreshDb;
+let viewDatabaseExplorer, dbGrid, dbSearchInput, dbSortSelect, btnRefreshDb, dbViewSelect;
 let dbMinP, dbMinT, dbMinA, dbMinK;
 let importNetInput;
 let dbStats;
@@ -57,6 +57,11 @@ export function initDatabaseExplorer() {
 
     if (dbSortSelect) {
         dbSortSelect.addEventListener('change', () => loadDatabaseItems(true));
+    }
+
+    dbViewSelect = document.getElementById('dbViewSelect');
+    if (dbViewSelect) {
+        dbViewSelect.addEventListener('change', () => loadDatabaseItems(true));
     }
 
     [dbMinP, dbMinT, dbMinA, dbMinK].forEach(el => {
@@ -111,26 +116,60 @@ async function loadDatabaseItems(reset = false) {
 
     const query = dbSearchInput ? dbSearchInput.value : '';
     const sort = dbSortSelect ? dbSortSelect.value : 'date_desc';
+    const viewMode = dbViewSelect ? dbViewSelect.value : 'petri';
 
     try {
-        const params = new URLSearchParams({
-            page: currentPage,
-            per_page: itemsPerPage,
-            q: query,
-            sort: sort
-        });
+        let newNets = [];
+        let total = 0;
 
-        if (dbMinP && dbMinP.value) params.append('min_p', dbMinP.value);
-        if (dbMinT && dbMinT.value) params.append('min_t', dbMinT.value);
-        if (dbMinA && dbMinA.value) params.append('min_a', dbMinA.value);
-        if (dbMinK && dbMinK.value) params.append('min_k', dbMinK.value);
+        if (viewMode === 'petri') {
+            const params = new URLSearchParams({
+                page: currentPage,
+                per_page: itemsPerPage,
+                q: query,
+                sort: sort
+            });
 
-        const response = await fetch(`/api/petri/saved?${params.toString()}`);
-        if (!response.ok) throw new Error('Failed to fetch nets');
+            if (dbMinP && dbMinP.value) params.append('min_p', dbMinP.value);
+            if (dbMinT && dbMinT.value) params.append('min_t', dbMinT.value);
+            if (dbMinA && dbMinA.value) params.append('min_a', dbMinA.value);
+            if (dbMinK && dbMinK.value) params.append('min_k', dbMinK.value);
 
-        const data = await response.json();
-        const newNets = data.nets || [];
-        const total = data.total || 0;
+            const response = await fetch(`/api/petri/saved?${params.toString()}`);
+            if (!response.ok) throw new Error('Failed to fetch nets');
+
+            const data = await response.json();
+            newNets = data.nets || [];
+            total = data.total || 0;
+
+            // Re-enable petri filters
+            document.querySelectorAll('.filter-unit').forEach(el => el.style.opacity = '1');
+            document.querySelectorAll('.class-input-group').forEach(el => el.style.display = 'flex');
+        } else {
+            // Graphs view
+            // Disable petri filters visually
+            document.querySelectorAll('.filter-unit').forEach(el => el.style.opacity = '0.3');
+            document.querySelectorAll('.class-input-group').forEach(el => el.style.display = 'none');
+
+            const response = await fetch('/api/graphs');
+            if (!response.ok) throw new Error('Failed to fetch graphs');
+
+            const data = await response.json();
+            // Basic client-side search/sort for graphs since API handles all at once currently
+            let filtered = data;
+            if (query) {
+                filtered = filtered.filter(g => g.name.toLowerCase().includes(query.toLowerCase()));
+            }
+            if (sort === 'date_desc') filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            else if (sort === 'date_asc') filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            else if (sort === 'name_asc') filtered.sort((a, b) => a.name.localeCompare(b.name));
+
+            total = filtered.length;
+
+            // Manual pagination for graphs
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            newNets = filtered.slice(startIndex, startIndex + itemsPerPage);
+        }
 
         if (reset && dbGrid) dbGrid.innerHTML = '';
 
@@ -138,7 +177,7 @@ async function loadDatabaseItems(reset = false) {
         if (observer && sentinel) observer.unobserve(sentinel);
 
         currentNets = reset ? newNets : [...currentNets, ...newNets];
-        renderNewItems(newNets);
+        renderNewItems(newNets, viewMode);
 
         if (dbStats) {
             dbStats.textContent = `${currentNets.length} / ${total} nets`;
@@ -168,11 +207,11 @@ async function loadDatabaseItems(reset = false) {
     }
 }
 
-function renderNewItems(nets) {
+function renderNewItems(nets, viewMode) {
     if (!dbGrid) return;
 
     nets.forEach(net => {
-        const card = createNetCard(net);
+        const card = viewMode === 'petri' ? createNetCard(net) : createGraphCard(net);
         dbGrid.appendChild(card);
     });
 }
@@ -217,6 +256,7 @@ function createNetCard(net) {
             <button class="action-btn-small icon-only btn-download-pnh" title="Download PNH">PNH</button>
             <button class="action-btn-small icon-only btn-download-pnml" title="Download PNML">PNML</button>
             <button class="action-btn-small icon-only btn-download-json" title="Download JSON">JSON</button>
+            <button class="action-btn-small icon-only btn-download-gspn" title="Download GSPN">GSPN</button>
             <button class="action-btn-small icon-only danger btn-delete" title="Delete">🗑</button>
         </div>
     `;
@@ -236,6 +276,9 @@ function createNetCard(net) {
 
     const btnJson = card.querySelector('.btn-download-json');
     btnJson.addEventListener('click', () => handleAction(net, 'download-json'));
+
+    const btnGspn = card.querySelector('.btn-download-gspn');
+    btnGspn.addEventListener('click', () => handleAction(net, 'download-gspn'));
 
     const inputClass = card.querySelector('.class-input');
     inputClass.addEventListener('change', (e) => updateNetClass(net, e.target.value));
@@ -281,18 +324,170 @@ async function updateNetClass(netMetadata, newClass) {
     }
 }
 
+function createGraphCard(graph) {
+    const card = document.createElement('div');
+    card.className = 'net-card';
+
+    const dateStr = graph.created_at ? new Date(graph.created_at).toLocaleDateString() : 'Unknown';
+    const dirStr = graph.is_directed ? 'Directed' : 'Undirected';
+
+    // Parse nodes/edges to display counts if available
+    let vCount = '?';
+    let eCount = '?';
+    try {
+        const nodes = typeof graph.nodes === 'string' ? JSON.parse(graph.nodes) : graph.nodes;
+        const edges = typeof graph.edges === 'string' ? JSON.parse(graph.edges) : graph.edges;
+        vCount = nodes ? nodes.length : 0;
+        eCount = edges ? edges.length : 0;
+    } catch (e) { }
+
+    card.innerHTML = `
+        <div class="net-card-header">
+            <div class="net-info-group">
+                <div class="net-title" title="${graph.name}">${graph.name}</div>
+                <div class="net-id-badge">#${graph.id} • ${dateStr} • ${dirStr}</div>
+            </div>
+        </div>
+        
+        <div class="net-stats-row">
+            <div class="stat-badge" title="Vertices">
+                <span class="stat-label">Vertices:</span> <span>${vCount}</span>
+            </div>
+            <div class="stat-badge" title="Edges">
+                <span class="stat-label">Edges:</span> <span>${eCount}</span>
+            </div>
+        </div>
+
+        <div class="card-actions" style="margin-top: 20px;">
+            <button class="action-btn-small primary btn-open">Open in Editor</button>
+            <button class="action-btn-small icon-only btn-download-gml" title="Download GML">GML</button>
+            <button class="action-btn-small icon-only btn-download-graphml" title="Download GraphML">GraphML</button>
+            <button class="action-btn-small icon-only btn-download-json" title="Download JSON">JSON</button>
+            <button class="action-btn-small icon-only danger btn-delete" title="Delete">🗑</button>
+        </div>
+    `;
+
+    const btnOpen = card.querySelector('.btn-open');
+    btnOpen.addEventListener('click', () => loadGraphToEditor(graph));
+
+    const btnDelete = card.querySelector('.btn-delete');
+    btnDelete.addEventListener('click', () => handleGraphAction(graph, 'delete'));
+
+    // Export actions
+    card.querySelector('.btn-download-gml').addEventListener('click', () => handleGraphAction(graph, 'download-gml'));
+    card.querySelector('.btn-download-graphml').addEventListener('click', () => handleGraphAction(graph, 'download-graphml'));
+    card.querySelector('.btn-download-json').addEventListener('click', () => handleGraphAction(graph, 'download-json'));
+
+    return card;
+}
+
+async function handleGraphAction(graph, action) {
+    if (action === 'delete') {
+        showCustomModal(
+            "Delete Graph",
+            `Are you sure you want to delete the graph "${graph.name}"? This action cannot be undone.`,
+            true,
+            async () => {
+                try {
+                    const res = await fetch(`/api/graphs/${graph.id}`, { method: 'DELETE', headers: { 'X-CSRFToken': getCsrfToken() } });
+                    if (res.ok) {
+                        loadDatabaseItems(true);
+                    } else {
+                        showCustomModal("Error", "Failed to delete the graph.");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    showCustomModal("Error", "Delete failed due to a network or server error.");
+                }
+            }
+        );
+        return;
+    }
+
+    const graphId = graph.id;
+    switch (action) {
+        case 'download-gml':
+            window.location.href = `/api/graphs/download/gml/${graphId}`;
+            break;
+        case 'download-graphml':
+            window.location.href = `/api/graphs/download/graphml/${graphId}`;
+            break;
+        case 'download-json':
+            window.location.href = `/api/graphs/download/json/${graphId}`;
+            break;
+    }
+}
+
+function loadGraphToEditor(graphMetadata) {
+    async function doLoad() {
+        try {
+            const res = await fetch(`/api/graphs/${graphMetadata.id}`);
+            if (!res.ok) throw new Error("Fetch failed");
+            const graphData = await res.json();
+
+            let nodes = typeof graphData.nodes === 'string' ? JSON.parse(graphData.nodes) : graphData.nodes;
+            let edges = typeof graphData.edges === 'string' ? JSON.parse(graphData.edges) : graphData.edges;
+            let isDirected = !!graphData.is_directed;
+
+            import('../core/tabs.js').then(tabs => {
+                // createNewTab -> activateTab -> contextSwitcher('MIS') is already called internally
+                tabs.createNewTab('MIS', graphData.name, { nodes, edges });
+
+                // Now just set the directed flag and trigger UI update
+                import('../core/state.js').then(({ state }) => {
+                    state.isDirected = isDirected;
+                    const btnToggleDirected = document.getElementById('btnToggleDirected');
+                    if (btnToggleDirected) {
+                        btnToggleDirected.style.background = state.isDirected ? '#444' : 'transparent';
+                        btnToggleDirected.style.border = state.isDirected ? '1px solid #666' : '1px solid transparent';
+                    }
+                });
+
+                // Switch the sidebar panel to the editor view
+                const tabEditor = document.getElementById('tabEditor');
+                if (tabEditor) tabEditor.click();
+
+                // Trigger layout if all nodes are at origin (freshly imported)
+                setTimeout(() => {
+                    const allZero = nodes.every(n => n.x === 0 && n.y === 0);
+                    if (allZero && nodes.length > 0) {
+                        document.getElementById('btnGraphLayout')?.click();
+                    } else {
+                        import('../engine/rendering/render.js').then(r => r.draw());
+                    }
+                    updateStats();
+                }, 50);
+            });
+
+            closeExplorer();
+        } catch (e) {
+            console.error(e);
+            showCustomModal("Error", "Failed to open graph.");
+        }
+    }
+    doLoad();
+}
+
 async function handleAction(netMetadata, action) {
     if (action === 'delete') {
-        if (confirm(`Delete "${netMetadata.name}"?`)) {
-            try {
-                const res = await fetch(`/api/petri/saved/${netMetadata.id}`, { method: 'DELETE', headers: { 'X-CSRFToken': getCsrfToken() } });
-                if (res.ok) {
-                    loadDatabaseItems(true);
-                } else {
-                    alert("Failed to delete.");
+        showCustomModal(
+            "Delete Petri Net",
+            `Are you sure you want to delete "${netMetadata.name}"?`,
+            true,
+            async () => {
+                try {
+                    const res = await fetch(`/api/petri/saved/${netMetadata.id}`, { method: 'DELETE', headers: { 'X-CSRFToken': getCsrfToken() } });
+                    if (res.ok) {
+                        loadDatabaseItems(true);
+                    } else {
+                        showCustomModal("Error", "Failed to delete Petri net.");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    showCustomModal("Error", "Delete failed due to an error.");
                 }
-            } catch (e) { console.error(e); alert("Delete failed"); }
-        }
+            }
+        );
         return;
     }
 
@@ -307,6 +502,29 @@ async function handleAction(netMetadata, action) {
         case 'download-json':
             window.location.href = `/api/petri/download/json/${netId}`;
             break;
+        case 'download-gspn':
+            downloadGspn(netId);
+            break;
+    }
+}
+
+async function downloadGspn(netId) {
+    try {
+        const response = await fetch(`/api/petri/download/gspn/${netId}`);
+        if (!response.ok) throw new Error('Failed to export GSPN format');
+        const data = await response.json();
+
+        if (data.error) throw new Error(data.error);
+
+        downloadFile(data.net_filename, data.net_content);
+
+        setTimeout(() => {
+            downloadFile(data.def_filename, data.def_content);
+        }, 300);
+
+    } catch (err) {
+        console.error("Export error:", err);
+        alert("Error exporting GSPN: " + err.message);
     }
 }
 

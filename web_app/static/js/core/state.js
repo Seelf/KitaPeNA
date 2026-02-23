@@ -7,8 +7,10 @@ export const camera = { x: 0, y: 0, zoom: 1 };
 export const state = {
     // State Identifiers
     appContext: 'PETRI', // 'PETRI', 'MIS', 'CONCURRENCY'
+    activeDocumentType: 'PETRI', // 'PETRI', 'MIS'
     activeTabId: null, // Guard for async operations across tabs
     selectedNode: null,
+    isDirected: false, // For standard graphs
 
     // Mode
     mode: 'select', // 'select', 'node', 'edge'
