@@ -49,6 +49,124 @@
     padding-bottom: 5px;
 }
 
+.data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Selection and Bulk Actions */
+.net-card.selectable {
+    cursor: default;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.net-card.selected {
+    border-color: var(--accent);
+    background-color: rgba(91, 163, 255, 0.05);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.card-checkbox-wrapper {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 2;
+}
+
+.card-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+}
+
+.card-checkbox:hover {
+    border-color: var(--accent);
+    background: rgba(91, 163, 255, 0.1);
+}
+
+.card-checkbox:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(91, 163, 255, 0.4);
+}
+
+.card-checkbox:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.card-checkbox:focus {
+    box-shadow: 0 0 0 2px rgba(91, 163, 255, 0.3);
+}
+
+.net-card.selected .net-title {
+    color: var(--accent-light);
+}
+
+/* Bulk Actions Dropdown */
+.db-bulk-dropdown {
+    position: relative;
+    display: inline-block;
+    border-right: 1px solid #444;
+    padding-right: 15px;
+}
+
+.db-bulk-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    background: #252526;
+    border: 1px solid #444;
+    border-radius: 4px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    padding: 8px 0;
+    min-width: 180px;
+    margin-top: 5px;
+    user-select: none;
+}
+
+.db-bulk-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 18px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.2s, color 0.2s;
+    user-select: none;
+}
+
+.db-bulk-item:hover {
+    background: #37373d;
+    color: var(--accent-light);
+}
+
+.db-bulk-item.danger:hover {
+    background: #4b1f1f;
+    color: #ff6b6b;
+}
+
+.db-bulk-divider {
+    height: 1px;
+    background: #444;
+    margin: 4px 10px;
+}
+
 .detail-section {
     margin-bottom: 30px;
 }

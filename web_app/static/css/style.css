@@ -14,6 +14,7 @@
 @import "components/tabs.css";
 @import "components/modals.css";
 @import "components/badges.css";
+@import "components/regex_pipeline.css";
 
 /* Views */
 @import "views/editor/canvas.css";

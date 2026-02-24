@@ -24,9 +24,9 @@
 <style>
     /* Critical render path styles */
     body {
-        background-color: #222;
-        color: #f00;
-        font-family: sans-serif;
+        background-color: #1e1e1e;
+        color: var(--text-color, #ccc);
+        font-family: 'Inter', sans-serif;
     }
 </style>
 
@@ -64,21 +64,24 @@
                         style="display: none; position: absolute; top: 100%; right: 0; margin-top: 5px; background: #222; border: 1px solid #555; padding: 10px; z-index: 10001; box-shadow: 0 4px 10px rgba(0,0,0,0.5); min-width: 150px;">
                         <div style="font-size: 11px; color: #fff; margin-bottom: 5px; font-weight: bold;">VIEW SETTINGS
                         </div>
-                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                        <label class="custom-checkbox-row" style="font-size: 11px;">
                             <input type="checkbox" id="chkShowSidebar" checked> Show Sidebar
                         </label>
-                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                        <label class="custom-checkbox-row" style="font-size: 11px;">
                             <input type="checkbox" id="chkShowToolbar" checked> Show Toolbar
                         </label>
                         <hr style="border: none; border-top: 1px solid #444; margin: 8px 0;">
-                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                        <label class="custom-checkbox-row" style="font-size: 11px;">
                             <input type="checkbox" id="chkSnapReachability"> Snap Reachability
                         </label>
-                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                        <label class="custom-checkbox-row" style="font-size: 11px;">
                             <input type="checkbox" id="chkSnapConcurrency"> Snap Concurrency
                         </label>
-                        <label style="display: block; color: #ccc; font-size: 11px; margin-bottom: 3px;">
+                        <label class="custom-checkbox-row" style="font-size: 11px;">
                             <input type="checkbox" id="chkSnapToGrid" checked> Snap Petri Net
+                        </label>
+                        <label class="custom-checkbox-row" style="font-size: 11px;">
+                            <input type="checkbox" id="chkShowDbBulk" checked> Show Bulk Actions (DB)
                         </label>
                     </div>
                 </div>
@@ -249,6 +252,51 @@
             </div>
         </div>
 
+        <!-- REGEX MANAGER MODAL -->
+        <div id="regexModal" class="modal">
+            <div class="modal-content" style="width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
+                <div class="modal-header">
+                    <span class="title">Regex Manager</span>
+                    <button id="closeRegexModal" class="close-btn">✕</button>
+                </div>
+                <div class="modal-body modal-padding" style="flex: 1; overflow-y: auto;">
+                    <input type="hidden" id="modalRegexId">
+                    <div class="input-row">
+                        <label>Regex Name</label>
+                        <input type="text" id="modalRegexName" placeholder="e.g. Metric X Extractor">
+                    </div>
+                    <div class="input-row"
+                        style="background: rgba(177, 128, 255, 0.05); padding: 10px; border-radius: 4px; border: 1px solid rgba(177, 128, 255, 0.2); margin-bottom: 20px;">
+                        <label style="color: #b180ff;">Stage 0 (Input / Sample Output)</label>
+                        <textarea id="modalRegexTestInput" placeholder="Paste tool output here to start building..."
+                            style="width: 100%; height: 80px; font-family: monospace; font-size: 11px; margin-bottom: 8px; background: #111; color: #eee; border: 1px solid #333; padding: 5px; resize: vertical;"></textarea>
+
+                        <div style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase;">Stage
+                            0 Result (Select text to auto-extract):</div>
+                        <div id="stage0Result" class="regex-stage-result"
+                            style="background: #000; padding: 8px; border: 1px solid #222; font-family: monospace; font-size: 11px; color: #ccc; min-height: 20px; max-height: 150px; overflow: auto; white-space: pre-wrap;">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <label style="margin-bottom: 0;">Extraction Pipeline (Stages)</label>
+                            <button type="button" class="btn-xs" onclick="window.addRegexStage()"
+                                style="padding: 2px 6px;">+ Add Custom Stage</button>
+                        </div>
+                        <div id="regexStagesContainer" style="display: flex; flex-direction: column; gap: 15px;">
+                            <!-- Stages with inline results added dynamically -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div style="flex: 1;"></div>
+                    <button id="btnSaveRegex" class="btn primary">Save Regex</button>
+                </div>
+            </div>
+        </div>
+
         <!-- DSPN TOOL CONFIG MODAL -->
         <div id="dspnModal" class="modal">
             <div class="modal-content" style="width: 750px; max-height: 90vh;">
@@ -270,7 +318,7 @@
                     <div class="modal-main modal-padding" style="flex: 1; overflow-y: auto; background: #1e1e1e;">
                         <div id="dspn-general" class="dspn-section">
                             <h4
-                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
                                 General Settings</h4>
                             <div class="input-row">
                                 <label>Verbosity</label>
@@ -283,32 +331,33 @@
                             </div>
                             <div class="input-row">
                                 <label>Load Type</label>
-                                <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_pt"> <span>Load as P/T
-                                        net (ignore delays) [-pt]</span></div>
+                                <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_pt"> <span>Load as P/T
+                                        net (ignore delays) [-pt]</span></label>
                             </div>
                         </div>
 
                         <div id="dspn-analysis" class="dspn-section" style="display:none;">
                             <h4
-                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
                                 Analysis Type</h4>
                             <div class="input-col-group"
                                 style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                 <div>
                                     <label style="font-size:10px; color:#888;">State Space</label>
-                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_trg"> <span>Build TRG
-                                            [-trg]</span></div>
+                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_trg"> <span>Build
+                                            TRG
+                                            [-trg]</span></label>
                                     <small class="hint-text">Tangible Reachability Graph.</small>
-                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_rg"> <span>Build RG
-                                            [-rg]</span></div>
+                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_rg"> <span>Build RG
+                                            [-rg]</span></label>
                                     <small class="hint-text">Reachability Graph with vanishings.</small>
-                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_novpaths"> <span>No
-                                            vanishing paths [-no-vpaths]</span></div>
+                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_novpaths"> <span>No
+                                            vanishing paths [-no-vpaths]</span></label>
                                 </div>
                                 <div>
                                     <label style="font-size:10px; color:#888;">Solution</label>
-                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_s"> <span>Steady
-                                            State [-s]</span></div>
+                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_s"> <span>Steady
+                                            State [-s]</span></label>
                                     <small class="hint-text">Compute stationary distribution.</small>
                                     <div class="input-row" style="margin-top:5px;">
                                         <label>Transient Time [-t]</label>
@@ -330,7 +379,7 @@
 
                         <div id="dspn-solver" class="dspn-section" style="display:none;">
                             <h4
-                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
                                 Solver & Preconditioner</h4>
                             <div class="input-row">
                                 <label>Iterative Solver</label>
@@ -359,7 +408,7 @@
 
                         <div id="dspn-params" class="dspn-section" style="display:none;">
                             <h4
-                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
                                 Numerical Parameters</h4>
                             <div class="input-row">
                                 <label>Residual Error (Epsilon) [-epsilon]</label>
@@ -378,28 +427,29 @@
 
                         <div id="dspn-exports" class="dspn-section" style="display:none;">
                             <h4
-                                style="color: #ff9f40; margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
                                 Output & Invariants</h4>
                             <div class="input-col-group"
                                 style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                 <div>
-                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_pinv">
+                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_pinv">
                                         <span>P-Invariants [-pinv]</span>
-                                    </div>
-                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_tinv">
+                                    </label>
+                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_tinv">
                                         <span>T-Invariants [-tinv]</span>
-                                    </div>
-                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_traps">
+                                    </label>
+                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_traps">
                                         <span>Traps/Siphons [-traps]</span>
-                                    </div>
+                                    </label>
                                     <small class="hint-text">Structural analysis of the net.</small>
                                 </div>
                                 <div>
-                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_dot"> <span>Save as
-                                            Dot [-dot]</span></div>
+                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_dot"> <span>Save as
+                                            Dot [-dot]</span></label>
                                     <small class="hint-text">Exports graph to GraphViz format.</small>
-                                    <div class="algo-checkbox"><input type="checkbox" id="dspn_opt_allmeas"> <span>Print
-                                            All Measures [-all-measures]</span></div>
+                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_allmeas">
+                                        <span>Print
+                                            All Measures [-all-measures]</span></label>
                                     <small class="hint-text">Prints all basic measures (avg tokens, throughput,
                                         etc).</small>
                                 </div>
@@ -413,7 +463,7 @@
                         style="font-size: 10px; color: #888; margin-bottom: 5px; text-transform: uppercase; font-weight:bold;">
                         Live Command Preview:</div>
                     <div class="cmd-preview"
-                        style="background:#000; padding:10px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #ff9f40; border: 1px solid #444; word-break: break-all;">
+                        style="background:#000; padding:10px; border-radius: 4px; font-family: monospace; font-size: 12px; color: var(--accent); border: 1px solid #444; word-break: break-all;">
                         DSPN-Tool -load {net} <span id="dspnCmdPreviewText" style="color:#fff;"></span>
                     </div>
                     <div style="display:flex; justify-content: flex-end; margin-top:10px;">
@@ -651,10 +701,22 @@
                                     </select>
                                 </div>
                                 <div class="input-group">
-                                    <label>Select Petri Nets</label>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <label>Select Petri Nets</label>
+                                        <button id="btnPetriFilters" class="btn-xs" title="Filter Petri Nets"
+                                            style="padding: 2px 6px; display: inline-flex; align-items: center; justify-content: center;">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round">
+                                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                                            </svg>
+                                        </button>
+                                    </div>
                                     <div class="list-controls">
                                         <span onclick="window.selectListItems('benchPetriList', true)">All</span> |
-                                        <span onclick="window.selectListItems('benchPetriList', false)">None</span>
+                                        <span onclick="window.selectListItems('benchPetriList', false)">None</span> |
+                                        <span id="btnClearPetriFilters" title="Clear applied filters"
+                                            style="cursor: pointer;">Clear Filters</span>
                                     </div>
                                     <input type="text" id="searchBenchPetri" placeholder="Search...">
                                     <div id="benchPetriList">
@@ -708,14 +770,11 @@
                                     placeholder="Empty for default (60s)">
                             </div>
 
-                            <div
-                                style="display: flex; align-items: center; gap: 8px; margin-top: 15px; margin-bottom: 5px; padding: 10px; background: rgba(0, 0, 0, 0.2); border-radius: 4px; border: 1px solid #333;">
-                                <input type="checkbox" id="benchLogScale"
-                                    style="margin: 0; cursor: pointer; width: 16px; height: 16px;">
-                                <label for="benchLogScale"
-                                    style="margin: 0; cursor: pointer; font-weight: normal; font-size: 13px; color: #ccc;">Enable
-                                    Logarithmic Y-Axis</label>
-                            </div>
+                            <label class="algo-checkbox"
+                                style="margin-top: 15px; background: rgba(0, 0, 0, 0.2); border: 1px solid #333; padding: 10px;">
+                                <input type="checkbox" id="benchLogScale">
+                                <span style="font-size: 13px; color: #ccc;">Enable Logarithmic Y-Axis</span>
+                            </label>
 
                             <h4
                                 style="margin-top: 15px; margin-bottom: 5px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 5px;">
@@ -732,6 +791,7 @@
                                             <option value="p95">95th Percentile</option>
                                         </select>
                                     </div>
+
                                     <button type="button" class="btn btn-sm btn-primary btn-add-agg"
                                         style="height: 38px; padding: 0 15px;"
                                         onclick="window.addAggregationSelector()">+</button>
@@ -753,6 +813,26 @@
                                 <!-- Dynamic Algos Here -->
                             </div>
                         </div>
+
+                        <div class="config-section">
+                            <div class="section-header">
+                                <h4>Data Extraction Regex</h4>
+                                <button id="btnManageRegex" class="btn-xs">MANAGE</button>
+                            </div>
+                            <div class="list-controls">
+                                <span onclick="window.selectListItems('regexListContainer', true)">All</span> |
+                                <span onclick="window.selectListItems('regexListContainer', false)">None</span> |
+                                <span onclick="window.exportSelectedRegexes()">Export Selected</span> |
+                                <span onclick="document.getElementById('importRegexInput').click()">Import</span>
+                                <input type="file" id="importRegexInput" style="display: none;" accept=".json">
+                            </div>
+                            <input type="text" id="searchRegexes" placeholder="Search regexes...">
+                            <div id="regexListContainer" class="algo-list" style="max-height: 150px; overflow-y: auto;">
+                                <!-- Dynamic Regexes Here -->
+                            </div>
+                        </div>
+
+
 
                         <div class="config-section run-section">
                             <h4>Actions</h4>
@@ -781,8 +861,44 @@
                     </div>
 
                     <!-- Main Chart Area -->
-                    <div class="perf-main" id="perfChartsContainer" style="overflow-y: auto;">
+                    <div class="perf-main" id="perfChartsContainer">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0; color: var(--accent); font-size: 16px;">Charts</h3>
+                        </div>
                         <canvas id="perfChart_0" style="min-height: 400px;"></canvas>
+                    </div>
+
+                    <!-- Results Table Area -->
+                    <div id="benchmarkResultsTableContainer"
+                        style="display: none; padding: 20px; background: var(--panel-bg); border-radius: 6px; border: 1px solid var(--border-color); margin-top: 20px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0; color: var(--accent); font-size: 16px;">Detailed Results</h3>
+                            <div style="display: flex; gap: 5px; align-items: center;">
+                                <button id="btnExportBenchmarkCsv" class="btn secondary" style="font-size: 11px;">Export
+                                    CSV</button>
+                                <button id="btnExportBenchmarkLatex" class="btn secondary"
+                                    style="font-size: 11px;">Export LaTeX</button>
+                            </div>
+                        </div>
+                        <div id="tableSettingsPanel"
+                            style="display: block; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; padding: 10px; margin-bottom: 15px; font-size: 11px;">
+                            <div id="dynamicColsContainer"
+                                style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+                                <!-- Created dynamically in JS: Context, Algorithm, Aggregations, Regexes -->
+                            </div>
+                        </div>
+                        <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                            <table class="data-table" id="benchmarkResultsTable">
+                                <thead>
+                                    <!-- Dynamic Headers -->
+                                </thead>
+                                <tbody>
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -798,6 +914,36 @@
                             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                         </svg>
                         <input type="text" id="dbSearchInput" placeholder="Search nets by name...">
+                    </div>
+
+                    <div class="db-bulk-dropdown" id="dbBulkDropdown">
+                        <button id="btnDbBulkMenu" class="btn secondary btn-xs" title="Bulk Management">
+                            Bulk ▾
+                        </button>
+                        <div id="dbBulkMenu" class="db-bulk-dropdown-menu" style="display: none;">
+                            <div class="db-bulk-item" id="btnDbSelectAll">
+                                Select All
+                            </div>
+                            <div class="db-bulk-item" id="btnDbSelectDuplicates">
+                                Duplicates
+                            </div>
+                            <div class="db-bulk-item" id="btnDbClearSelection" style="display: none;">
+                                Clear Selection
+                            </div>
+                            <div class="db-bulk-divider" id="dbBulkExportDivider" style="display: none;"></div>
+                            <div class="db-bulk-item danger" id="btnDbDeleteSelected" style="display: none;">
+                                Delete Selected (<span id="dbSelectedCount">0</span>)
+                            </div>
+                            <div class="db-bulk-item" id="btnDbExportPnh" style="display: none;">
+                                Export to PNH
+                            </div>
+                            <div class="db-bulk-item" id="btnDbExportPnml" style="display: none;">
+                                Export to PNML
+                            </div>
+                            <div class="db-bulk-item" id="btnDbExportJson" style="display: none;">
+                                Export to JSON
+                            </div>
+                        </div>
                     </div>
 
                     <div class="db-actions">
@@ -826,6 +972,10 @@
                                 <span style="font-size: 10px; color: #666;">K≥</span>
                                 <input type="number" id="dbMinK" class="db-input-small" min="0" style="width: 40px;">
                             </div>
+                            <div class="filter-unit" title="Graph Class">
+                                <input type="text" id="dbModelClass" class="db-input-small" placeholder="Class"
+                                    style="width: 60px;">
+                            </div>
                         </div>
 
                         <select id="dbSortSelect" class="db-select">
@@ -842,10 +992,27 @@
                             <option value="tokens_asc">Least Tokens</option>
                         </select>
 
-                        <label for="importNetInput" class="btn primary">
-                            Import Net
-                        </label>
-                        <input type="file" id="importNetInput" accept=".pnh,.json,.pnml,.xml" style="display: none;">
+                        <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
+                            <button id="btnImportDropdown" class="btn primary"
+                                onclick="const m = document.getElementById('importDropdownMenu'); m.style.display = m.style.display === 'none' ? 'block' : 'none';">
+                                Import ▼
+                            </button>
+                            <div id="importDropdownMenu"
+                                style="display: none; position: absolute; top: 100%; left: 0; background-color: #2a2a2a; border: 1px solid #444; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 9999; min-width: 140px; margin-top: 5px;">
+                                <label for="importNetInput"
+                                    style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left; border-bottom: 1px solid #444;"
+                                    onmouseover="this.style.backgroundColor='#444'"
+                                    onmouseout="this.style.backgroundColor='transparent'">Select Files</label>
+                                <label for="importFolderInput"
+                                    style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left;"
+                                    onmouseover="this.style.backgroundColor='#444'"
+                                    onmouseout="this.style.backgroundColor='transparent'">Select Folder</label>
+                            </div>
+                        </div>
+                        <input type="file" id="importNetInput" accept=".pnh,.json,.pnml,.xml" multiple
+                            style="display: none;">
+                        <input type="file" id="importFolderInput" webkitdirectory directory multiple
+                            style="display: none;">
 
                         <button id="btnRefreshDb" class="btn secondary">
                             Refresh
@@ -904,6 +1071,76 @@
     </div>
 
 
+
+    <!-- Petri Net Filter Modal -->
+    <div id="petriFilterModal" class="modal">
+        <div class="modal-content" style="width: 420px; max-height: 80vh;">
+            <div class="modal-header">
+                <span class="title">Petri Net Filters</span>
+                <button id="closePetriFilterModal" class="close-btn">✕</button>
+            </div>
+            <div class="modal-body modal-padding" style="background: #1e1e1e;">
+                <h4
+                    style="color: var(--accent); margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                    Minimum Values
+                </h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                    <div class="input-row">
+                        <label>Places (P≥)</label>
+                        <input type="number" id="benchPetriMinP" min="0" placeholder="Any"
+                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                    </div>
+                    <div class="input-row">
+                        <label>Transitions (T≥)</label>
+                        <input type="number" id="benchPetriMinT" min="0" placeholder="Any"
+                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                    </div>
+                    <div class="input-row">
+                        <label>Arcs (A≥)</label>
+                        <input type="number" id="benchPetriMinA" min="0" placeholder="Any"
+                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                    </div>
+                    <div class="input-row">
+                        <label>Tokens (K≥)</label>
+                        <input type="number" id="benchPetriMinK" min="0" placeholder="Any"
+                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                    </div>
+                    <div class="input-row" style="grid-column: span 2;">
+                        <label>Graph Class</label>
+                        <input type="text" id="benchPetriModelClass"
+                            placeholder="e.g. PT, SPN (matches exact or partial)"
+                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                    </div>
+                </div>
+
+                <h4
+                    style="color: var(--accent); margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                    Sort Order
+                </h4>
+                <div class="input-row" style="margin-bottom: 10px;">
+                    <select id="benchPetriSort"
+                        style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                        <option value="date_desc">Newest First</option>
+                        <option value="date_asc">Oldest First</option>
+                        <option value="name_asc">Name A-Z</option>
+                        <option value="places_desc">Most Places</option>
+                        <option value="places_asc">Least Places</option>
+                        <option value="transitions_desc">Most Transitions</option>
+                        <option value="transitions_asc">Least Transitions</option>
+                        <option value="arcs_desc">Most Arcs</option>
+                        <option value="arcs_asc">Least Arcs</option>
+                        <option value="tokens_desc">Most Tokens</option>
+                        <option value="tokens_asc">Least Tokens</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer"
+                style="display: flex; justify-content: space-between; padding: 12px 20px; border-top: 1px solid #333;">
+                <button id="btnResetPetriFilters" class="btn secondary" style="font-size: 12px;">Reset</button>
+                <button id="btnApplyPetriFilters" class="btn-primary" style="font-size: 12px;">Apply Filters</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Universal Custom Modal -->
     <div id="universalModal" class="modal" style="display: none; z-index: 999999;">

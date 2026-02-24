@@ -4,6 +4,7 @@ import subprocess
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from web_app.data.database import get_user_cmds, create_user_cmd, update_user_cmd, delete_user_cmd
+from web_app.data.database import get_user_regexes, create_user_regex, update_user_regex, delete_user_regex
 
 algos_bp = Blueprint('algorithms', __name__)
 
@@ -192,3 +193,52 @@ def delete_cmd(cmd_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# --- Regex Settings ---
+
+@algos_bp.route('/regex', methods=['GET'])
+@login_required
+def get_custom_regexes():
+    """Get all custom regexes for the current user."""
+    try:
+        regexes = get_user_regexes(current_user.id)
+        return jsonify([dict(r) for r in regexes])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@algos_bp.route('/regex', methods=['POST'])
+@login_required
+def save_custom_regex():
+    try:
+        data = request.json
+        regex_id = data.get('id')
+        name = data.get('name')
+        pattern = data.get('pattern')
+        stage0 = data.get('stage0')
+        
+        if not name or not pattern:
+            return jsonify({'error': 'Name and pattern are required'}), 400
+            
+        # Try compiling the regex to validate it
+        # Handle multi-stage join of patterns with \n implicitly by testing them individually or as one
+        try:
+            for p in pattern.split('\n'):
+                if p.strip(): re.compile(p)
+        except re.error as e:
+            return jsonify({'error': f'Invalid regex pattern: {str(e)}'}), 400
+            
+        if regex_id:
+            update_user_regex(regex_id, current_user.id, name, pattern, stage0)
+        else:
+            create_user_regex(current_user.id, name, pattern, stage0)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@algos_bp.route('/regex/<int:regex_id>', methods=['DELETE'])
+@login_required
+def delete_regex(regex_id):
+    try:
+        delete_user_regex(regex_id, current_user.id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

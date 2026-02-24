@@ -125,6 +125,7 @@ def get_saved_petri_nets():
         min_t = get_int_param('min_t')
         min_a = get_int_param('min_a')
         min_k = get_int_param('min_k')
+        model_class = request.args.get('class')
         
         data = db.get_all_petri_nets(
             limit=per_page, 
@@ -135,7 +136,8 @@ def get_saved_petri_nets():
             min_places=min_p,
             min_transitions=min_t,
             min_arcs=min_a,
-            min_tokens=min_k
+            min_tokens=min_k,
+            filter_model_class=model_class
         )
         
         return jsonify({

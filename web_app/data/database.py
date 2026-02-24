@@ -126,6 +126,34 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     ''', commit=True)
+    
+    execute_query(conn, '''
+        CREATE TABLE IF NOT EXISTS regex_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            name TEXT NOT NULL,
+            pattern TEXT NOT NULL,
+            stage0 TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''', commit=True)
+
+    # Migration for regex_settings (stage0)
+    try:
+        execute_query(conn, 'ALTER TABLE regex_settings ADD COLUMN stage0 TEXT', commit=True)
+    except Exception:
+        if IS_POSTGRES: conn.rollback()
+        pass
+
+    execute_query(conn, '''
+        CREATE TABLE IF NOT EXISTS benchmark_state (
+            user_id INTEGER PRIMARY KEY,
+            state_json TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''', commit=True)
     conn.close()
 
 # --- Users ---
@@ -201,6 +229,55 @@ def delete_user_cmd(cmd_id, user_id):
     execute_query(conn, 'DELETE FROM custom_cmds WHERE id=? AND user_id=?', (cmd_id, user_id), commit=True)
     conn.close()
 
+# --- Regex Settings ---
+
+def get_user_regexes(user_id):
+    conn = get_db_connection()
+    regexes = execute_query(conn, 'SELECT * FROM regex_settings WHERE user_id = ? ORDER BY created_at ASC', (user_id,), fetchall=True)
+    conn.close()
+    return regexes
+
+def create_user_regex(user_id, name, pattern, stage0=None):
+    conn = get_db_connection()
+    execute_query(conn, 'INSERT INTO regex_settings (user_id, name, pattern, stage0) VALUES (?, ?, ?, ?)',
+                 (user_id, name, pattern, stage0), commit=True)
+    conn.close()
+
+def update_user_regex(regex_id, user_id, name, pattern, stage0=None):
+    conn = get_db_connection()
+    execute_query(conn, 'UPDATE regex_settings SET name=?, pattern=?, stage0=? WHERE id=? AND user_id=?',
+                 (name, pattern, stage0, regex_id, user_id), commit=True)
+    conn.close()
+
+def delete_user_regex(regex_id, user_id):
+    conn = get_db_connection()
+    execute_query(conn, 'DELETE FROM regex_settings WHERE id=? AND user_id=?', (regex_id, user_id), commit=True)
+    conn.close()
+
+# --- Benchmark State ---
+
+def get_benchmark_state(user_id):
+    conn = get_db_connection()
+    row = execute_query(conn, 'SELECT state_json FROM benchmark_state WHERE user_id = ?', (user_id,), fetchone=True)
+    conn.close()
+    if row:
+        return json.loads(row['state_json'])
+    return None
+
+def save_benchmark_state(user_id, state):
+    conn = get_db_connection()
+    state_str = json.dumps(state)
+    if IS_POSTGRES:
+        execute_query(conn,
+            'INSERT INTO benchmark_state (user_id, state_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) '
+            'ON CONFLICT (user_id) DO UPDATE SET state_json = EXCLUDED.state_json, updated_at = CURRENT_TIMESTAMP',
+            (user_id, state_str), commit=True)
+    else:
+        execute_query(conn,
+            'INSERT OR REPLACE INTO benchmark_state (user_id, state_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+            (user_id, state_str), commit=True)
+    conn.close()
+
 # --- Graphs (Standard) ---
 
 def get_all_graphs():
@@ -231,11 +308,11 @@ def delete_graph(graph_id):
 # --- Petri Nets ---
 
 def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created_at', order='DESC', 
-                        min_places=None, min_transitions=None, min_arcs=None, min_tokens=None):
+                        min_places=None, min_transitions=None, min_arcs=None, min_tokens=None, filter_model_class=None):
     conn = get_db_connection()
     
     stat_sort = sort_by in ['places', 'transitions', 'arcs', 'tokens']
-    has_advanced_filters = any(v is not None for v in [min_places, min_transitions, min_arcs, min_tokens])
+    has_advanced_filters = any(v is not None for v in [min_places, min_transitions, min_arcs, min_tokens, filter_model_class])
     use_python_logic = has_advanced_filters or stat_sort
     
     query = 'SELECT id, name, content_json, created_at FROM petri_nets'
@@ -284,6 +361,7 @@ def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created
             if min_transitions is not None and stats['transitions'] < min_transitions: continue
             if min_arcs is not None and stats['arcs'] < min_arcs: continue
             if min_tokens is not None and stats['tokens'] < min_tokens: continue
+            if filter_model_class and filter_model_class.lower() not in str(stats.get('class', '')).lower(): continue
             
             net['stats'] = stats
             del net['content_json']

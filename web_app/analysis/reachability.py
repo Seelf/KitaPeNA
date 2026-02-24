@@ -33,16 +33,22 @@ def calculate_reachability_graph(places, transitions, arcs, max_states=100):
         
     for arc in arcs:
         weight = arc.get('weight', 1)
-        if arc['type'] == 'place_to_transition':
-            t_id = arc['targetId']
-            p_id = arc['sourceId']
-            if t_id in trans_map and p_id in p_id_to_idx:
-                trans_map[t_id]['inputs'][p_id_to_idx[p_id]] += weight
-        elif arc['type'] == 'transition_to_place':
-            t_id = arc['sourceId']
-            p_id = arc['targetId']
-            if t_id in trans_map and p_id in p_id_to_idx:
-                trans_map[t_id]['outputs'][p_id_to_idx[p_id]] += weight
+        arc_type = arc.get('type')
+        src = arc.get('sourceId', arc.get('source'))
+        tgt = arc.get('targetId', arc.get('target'))
+        
+        if not arc_type:
+            if src in p_id_to_idx and tgt in trans_map:
+                arc_type = 'place_to_transition'
+            elif src in trans_map and tgt in p_id_to_idx:
+                arc_type = 'transition_to_place'
+                
+        if arc_type == 'place_to_transition':
+            if tgt in trans_map and src in p_id_to_idx:
+                trans_map[tgt]['inputs'][p_id_to_idx[src]] += weight
+        elif arc_type == 'transition_to_place':
+            if src in trans_map and tgt in p_id_to_idx:
+                trans_map[src]['outputs'][p_id_to_idx[tgt]] += weight
 
     # 2. BFS Exploration
     queue = collections.deque([initial_marking])
