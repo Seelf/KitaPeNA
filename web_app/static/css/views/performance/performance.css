@@ -48,13 +48,12 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    min-height: 500px;
     min-width: 0;
 }
 
 .config-section {
-    flex: 1;
-    min-width: 250px;
+    flex: 0 0 calc(25% - 15px);
+    min-width: 0;
     display: flex;
     flex-direction: column;
     margin-bottom: 0;
@@ -62,6 +61,8 @@
     border-bottom: none;
     border-right: 1px solid var(--border-color);
     padding-right: 20px;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .config-section:last-of-type {
@@ -71,6 +72,22 @@
 
 .config-section:last-child {
     border-bottom: none;
+}
+
+@media (max-width: 1180px) {
+    .config-section {
+        flex: 0 0 calc(50% - 10px);
+    }
+
+    .config-section:nth-child(2) {
+        border-right: none;
+        padding-right: 0;
+    }
+
+    .config-section:nth-child(3) {
+        border-right: 1px solid var(--border-color);
+        padding-right: 20px;
+    }
 }
 
 .config-section h4 {
@@ -95,7 +112,6 @@
 }
 
 .run-section {
-    max-width: 250px;
     display: flex;
     flex-direction: column;
 }
@@ -183,4 +199,81 @@
 #btnRunBenchmark {
     transition: background-color 0.2s, color 0.2s;
     min-width: 120px;
+}
+
+/* Interactive Benchmarking Table */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--bg-color);
+    border-radius: 6px;
+    overflow: hidden;
+    table-layout: auto;
+}
+
+.data-table th {
+    background-color: #2a2a2b;
+    color: var(--accent);
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s;
+    border-bottom: 2px solid #444;
+    position: relative;
+    white-space: nowrap;
+}
+
+.data-table th:hover {
+    background-color: #38383a;
+}
+
+.data-table th::after {
+    content: ' \21C5';
+    font-size: 0.8em;
+    opacity: 0.4;
+    margin-left: 5px;
+}
+
+.data-table th[data-sort="asc"]::after {
+    content: ' \25B2';
+    opacity: 1;
+}
+
+.data-table th[data-sort="desc"]::after {
+    content: ' \25BC';
+    opacity: 1;
+}
+
+.data-table td {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+    color: #ddd;
+    font-size: 13px;
+    transition: background-color 0.2s;
+}
+
+.data-table td:first-child {
+    white-space: nowrap;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.data-table tbody tr {
+    transition: background-color 0.15s;
+}
+
+.data-table tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.data-table tbody tr:hover {
+    background-color: rgba(91, 163, 255, 0.08);
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: none;
 }

@@ -59,6 +59,7 @@ export const state = {
     snapConcurrency: false,
     showSidebar: true,
     showToolbar: true,
+    showDbBulk: true,
     activeActivityTab: 'tabEditor',
     activeDbTab: 'btnDbPetri'
 };

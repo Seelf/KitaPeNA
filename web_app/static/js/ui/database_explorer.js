@@ -9,8 +9,8 @@ import { savePetriNetDb, loadPetriNetFromDb } from '../core/storage.js';
 
 // DOM Elements
 let viewDatabaseExplorer, dbGrid, dbSearchInput, dbSortSelect, btnRefreshDb, dbViewSelect;
-let dbMinP, dbMinT, dbMinA, dbMinK;
-let importNetInput;
+let dbMinP, dbMinT, dbMinA, dbMinK, dbModelClass;
+let importNetInput, importFolderInput;
 let dbStats;
 
 // Pagination state
@@ -18,9 +18,11 @@ let currentPage = 1;
 const itemsPerPage = 20;
 let isLoading = false;
 let hasMore = true;
-let currentNets = [];
 let observer = null;
 let sentinel = null;
+let selectedNetIds = new Set();
+let allLoadedNets = []; // Keep track of all current objects for duplicate detection
+let currentNets = [];
 
 export function initDatabaseExplorer() {
     viewDatabaseExplorer = document.getElementById('viewDatabaseExplorer');
@@ -29,12 +31,14 @@ export function initDatabaseExplorer() {
     dbSortSelect = document.getElementById('dbSortSelect');
     btnRefreshDb = document.getElementById('btnRefreshDb');
     importNetInput = document.getElementById('importNetInput');
+    importFolderInput = document.getElementById('importFolderInput');
     dbStats = document.getElementById('dbStats');
 
     dbMinP = document.getElementById('dbMinP');
     dbMinT = document.getElementById('dbMinT');
     dbMinA = document.getElementById('dbMinA');
     dbMinK = document.getElementById('dbMinK');
+    dbModelClass = document.getElementById('dbModelClass');
 
     if (!viewDatabaseExplorer || !dbGrid) return;
 
@@ -64,12 +68,41 @@ export function initDatabaseExplorer() {
         dbViewSelect.addEventListener('change', () => loadDatabaseItems(true));
     }
 
-    [dbMinP, dbMinT, dbMinA, dbMinK].forEach(el => {
+    [dbMinP, dbMinT, dbMinA, dbMinK, dbModelClass].forEach(el => {
         if (el) el.addEventListener('change', () => loadDatabaseItems(true));
     });
 
     if (importNetInput) {
         importNetInput.addEventListener('change', handleImport);
+    }
+    if (importFolderInput) {
+        importFolderInput.addEventListener('change', handleImport);
+    }
+
+    // Close dropdown when clicking outside
+    window.addEventListener('click', function (e) {
+        const btn = document.getElementById('btnImportDropdown');
+        const menu = document.getElementById('importDropdownMenu');
+        if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    });
+
+    // Drag and Drop support
+    if (viewDatabaseExplorer) {
+        viewDatabaseExplorer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            viewDatabaseExplorer.classList.add('drag-active');
+            if (dbStats) dbStats.textContent = "Drop files or folders to import...";
+        });
+        viewDatabaseExplorer.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            viewDatabaseExplorer.classList.remove('drag-active');
+            if (dbStats) dbStats.textContent = "";
+        });
+        viewDatabaseExplorer.addEventListener('drop', handleDrop);
     }
 
     // Use dbGrid itself as scroll root
@@ -84,7 +117,230 @@ export function initDatabaseExplorer() {
         rootMargin: '200px',
         threshold: 0
     });
+
+    // Bulk action listeners
+    const btnBulkMenu = document.getElementById('btnDbBulkMenu');
+    const menuBulk = document.getElementById('dbBulkMenu');
+
+    if (btnBulkMenu && menuBulk) {
+        btnBulkMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+            menuBulk.style.display = menuBulk.style.display === 'none' ? 'block' : 'none';
+        });
+    }
+
+    const btnSelectAll = document.getElementById('btnDbSelectAll');
+    const btnSelectDupes = document.getElementById('btnDbSelectDuplicates');
+    const btnDeleteSelected = document.getElementById('btnDbDeleteSelected');
+
+    const btnClearSelection = document.getElementById('btnDbClearSelection');
+
+    if (btnSelectAll) {
+        btnSelectAll.addEventListener('click', () => {
+            toggleSelectAll();
+            if (menuBulk) menuBulk.style.display = 'none';
+        });
+    }
+    if (btnClearSelection) {
+        btnClearSelection.addEventListener('click', () => {
+            clearSelection();
+            if (menuBulk) menuBulk.style.display = 'none';
+        });
+    }
+    if (btnSelectDupes) {
+        btnSelectDupes.addEventListener('click', () => {
+            selectDuplicates();
+            if (menuBulk) menuBulk.style.display = 'none';
+        });
+    }
+    if (btnDeleteSelected) {
+        btnDeleteSelected.addEventListener('click', () => {
+            deleteSelectedNets();
+            if (menuBulk) menuBulk.style.display = 'none';
+        });
+    }
+
+    const btnExportPnh = document.getElementById('btnDbExportPnh');
+    const btnExportPnml = document.getElementById('btnDbExportPnml');
+    const btnExportJson = document.getElementById('btnDbExportJson');
+
+    if (btnExportPnh) {
+        btnExportPnh.addEventListener('click', () => {
+            bulkExport('pnh');
+            if (menuBulk) menuBulk.style.display = 'none';
+        });
+    }
+    if (btnExportPnml) {
+        btnExportPnml.addEventListener('click', () => {
+            bulkExport('pnml');
+            if (menuBulk) menuBulk.style.display = 'none';
+        });
+    }
+    if (btnExportJson) {
+        btnExportJson.addEventListener('click', () => {
+            bulkExport('json');
+            if (menuBulk) menuBulk.style.display = 'none';
+        });
+    }
+
+    // Global click listener for dropdowns
+    window.addEventListener('click', (e) => {
+        if (menuBulk && !btnBulkMenu.contains(e.target) && !menuBulk.contains(e.target)) {
+            menuBulk.style.display = 'none';
+        }
+    });
 }
+
+function updateBulkDeleteButton() {
+    const btn = document.getElementById('btnDbDeleteSelected');
+    const countSpan = document.getElementById('dbSelectedCount');
+    const bulkBtn = document.getElementById('btnDbBulkMenu');
+    if (!btn || !countSpan) return;
+
+    const count = selectedNetIds.size;
+    countSpan.textContent = count;
+    // Show/hide the delete option in the dropdown
+    btn.style.display = count > 0 ? 'flex' : 'none';
+
+    // Export options visibility
+    const divider = document.getElementById('dbBulkExportDivider');
+    const pnh = document.getElementById('btnDbExportPnh');
+    const pnml = document.getElementById('btnDbExportPnml');
+    const json = document.getElementById('btnDbExportJson');
+    const clearBtn = document.getElementById('btnDbClearSelection');
+    const viewMode = dbViewSelect ? dbViewSelect.value : 'petri';
+
+    if (divider) divider.style.display = count > 0 ? 'block' : 'none';
+    if (clearBtn) clearBtn.style.display = count > 0 ? 'flex' : 'none';
+    if (pnh) pnh.style.display = (count > 0 && viewMode === 'petri') ? 'flex' : 'none';
+    if (pnml) pnml.style.display = (count > 0 && viewMode === 'petri') ? 'flex' : 'none';
+    if (json) json.style.display = count > 0 ? 'flex' : 'none';
+
+    // Update the main menu button
+    if (bulkBtn) {
+        if (count > 0) {
+            bulkBtn.innerHTML = `Bulk (${count}) ▾`;
+            bulkBtn.style.borderColor = 'var(--accent)';
+            bulkBtn.style.color = 'var(--accent-light)';
+        } else {
+            bulkBtn.innerHTML = `Bulk ▾`;
+            bulkBtn.style.borderColor = '';
+            bulkBtn.style.color = '';
+        }
+    }
+}
+
+function toggleSelectAll() {
+    if (selectedNetIds.size === allLoadedNets.length && allLoadedNets.length > 0) {
+        selectedNetIds.clear();
+    } else {
+        allLoadedNets.forEach(net => selectedNetIds.add(net.id));
+    }
+
+    // Sync UI
+    document.querySelectorAll('.card-checkbox').forEach(cb => {
+        cb.checked = selectedNetIds.has(parseInt(cb.dataset.id));
+        cb.closest('.net-card').classList.toggle('selected', cb.checked);
+    });
+    updateBulkDeleteButton();
+}
+
+function clearSelection() {
+    selectedNetIds.clear();
+    // Sync UI
+    document.querySelectorAll('.card-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.closest('.net-card').classList.remove('selected');
+    });
+    updateBulkDeleteButton();
+}
+
+function selectDuplicates() {
+    // Definition of duplicate for this tool: Same Name AND (if petri) same stats
+    const seen = new Map();
+    const dupes = [];
+
+    allLoadedNets.forEach(net => {
+        const stats = net.stats || {};
+        const key = `${net.name}|${stats.places || 0}|${stats.transitions || 0}|${stats.arcs || 0}|${stats.tokens || 0}`;
+        if (seen.has(key)) {
+            // It's a duplicate of something we've already seen
+            dupes.push(net.id);
+        } else {
+            seen.set(key, net.id);
+        }
+    });
+
+    if (dupes.length === 0) {
+        showCustomModal("Duplicates", "No duplicates found among currently loaded items.");
+        return;
+    }
+
+    dupes.forEach(id => selectedNetIds.add(id));
+
+    // Sync UI
+    document.querySelectorAll('.card-checkbox').forEach(cb => {
+        cb.checked = selectedNetIds.has(parseInt(cb.dataset.id));
+        cb.closest('.net-card').classList.toggle('selected', cb.checked);
+    });
+    updateBulkDeleteButton();
+    showCustomModal("Duplicates", `Identified and selected ${dupes.length} duplicates.`);
+}
+
+async function deleteSelectedNets() {
+    const count = selectedNetIds.size;
+    if (count === 0) return;
+
+    showCustomModal(
+        "Bulk Delete",
+        `Are you sure you want to delete ${count} selected items? This action cannot be undone.`,
+        true,
+        async () => {
+            const ids = Array.from(selectedNetIds);
+            const viewMode = dbViewSelect ? dbViewSelect.value : 'petri';
+            const endpoint = viewMode === 'petri' ? '/api/petri/saved' : '/api/graphs';
+
+            let successCount = 0;
+            for (const id of ids) {
+                try {
+                    const res = await fetch(`${endpoint}/${id}`, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRFToken': getCsrfToken() }
+                    });
+                    if (res.ok) successCount++;
+                } catch (e) {
+                    console.error(`Failed to delete ID ${id}`, e);
+                }
+            }
+
+            selectedNetIds.clear();
+            updateBulkDeleteButton();
+            loadDatabaseItems(true);
+            showCustomModal("Success", `Successfully deleted ${successCount} items.`);
+        }
+    );
+}
+
+async function bulkExport(format) {
+    const ids = Array.from(selectedNetIds);
+    if (ids.length === 0) return;
+
+    const viewMode = dbViewSelect ? dbViewSelect.value : 'petri';
+    const baseUrl = viewMode === 'petri' ? '/api/petri/download' : '/api/graphs/download';
+
+    for (let i = 0; i < ids.length; i++) {
+        // Stagger downloads to prevent browser blocking
+        setTimeout(() => {
+            const link = document.createElement('a');
+            link.href = `${baseUrl}/${format}/${ids[i]}`;
+            link.download = ''; // Let browser/server decide
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }, i * 300);
+    }
+}
+
 
 export function openDatabaseExplorer() {
     if (!viewDatabaseExplorer) return;
@@ -103,6 +359,9 @@ async function loadDatabaseItems(reset = false) {
     if (reset) {
         currentPage = 1;
         currentNets = [];
+        allLoadedNets = [];
+        selectedNetIds.clear();
+        updateBulkDeleteButton();
         hasMore = true;
         // Detach sentinel and observer
         if (observer && sentinel) observer.unobserve(sentinel);
@@ -134,6 +393,7 @@ async function loadDatabaseItems(reset = false) {
             if (dbMinT && dbMinT.value) params.append('min_t', dbMinT.value);
             if (dbMinA && dbMinA.value) params.append('min_a', dbMinA.value);
             if (dbMinK && dbMinK.value) params.append('min_k', dbMinK.value);
+            if (dbModelClass && dbModelClass.value) params.append('class', dbModelClass.value);
 
             const response = await fetch(`/api/petri/saved?${params.toString()}`);
             if (!response.ok) throw new Error('Failed to fetch nets');
@@ -177,6 +437,7 @@ async function loadDatabaseItems(reset = false) {
         if (observer && sentinel) observer.unobserve(sentinel);
 
         currentNets = reset ? newNets : [...currentNets, ...newNets];
+        allLoadedNets = currentNets;
         renderNewItems(newNets, viewMode);
 
         if (dbStats) {
@@ -222,8 +483,12 @@ function createNetCard(net) {
 
     const stats = net.stats || { places: 0, transitions: 0, arcs: 0, class: '' };
     const dateStr = net.created_at ? new Date(net.created_at).toLocaleDateString() : 'Unknown';
+    const isSelected = selectedNetIds.has(net.id);
 
     card.innerHTML = `
+        <div class="card-checkbox-wrapper">
+            <input type="checkbox" class="card-checkbox" data-id="${net.id}" ${isSelected ? 'checked' : ''}>
+        </div>
         <div class="net-card-header">
             <div class="net-info-group">
                 <div class="net-title" title="${net.name}">${net.name}</div>
@@ -283,6 +548,31 @@ function createNetCard(net) {
     const inputClass = card.querySelector('.class-input');
     inputClass.addEventListener('change', (e) => updateNetClass(net, e.target.value));
 
+    // Selection UI
+    const checkbox = card.querySelector('.card-checkbox');
+    checkbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            selectedNetIds.add(net.id);
+            card.classList.add('selected');
+        } else {
+            selectedNetIds.delete(net.id);
+            card.classList.remove('selected');
+        }
+        updateBulkDeleteButton();
+    });
+
+    if (isSelected) card.classList.add('selected');
+
+    // Entire card click selects checkbox
+    card.addEventListener('click', (e) => {
+        // Skip if clicking buttons, links, or inputs
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) {
+            return;
+        }
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change'));
+    });
+
     return card;
 }
 
@@ -330,6 +620,7 @@ function createGraphCard(graph) {
 
     const dateStr = graph.created_at ? new Date(graph.created_at).toLocaleDateString() : 'Unknown';
     const dirStr = graph.is_directed ? 'Directed' : 'Undirected';
+    const isSelected = selectedNetIds.has(graph.id);
 
     // Parse nodes/edges to display counts if available
     let vCount = '?';
@@ -342,6 +633,9 @@ function createGraphCard(graph) {
     } catch (e) { }
 
     card.innerHTML = `
+        <div class="card-checkbox-wrapper">
+            <input type="checkbox" class="card-checkbox" data-id="${graph.id}" ${isSelected ? 'checked' : ''}>
+        </div>
         <div class="net-card-header">
             <div class="net-info-group">
                 <div class="net-title" title="${graph.name}">${graph.name}</div>
@@ -377,6 +671,31 @@ function createGraphCard(graph) {
     card.querySelector('.btn-download-gml').addEventListener('click', () => handleGraphAction(graph, 'download-gml'));
     card.querySelector('.btn-download-graphml').addEventListener('click', () => handleGraphAction(graph, 'download-graphml'));
     card.querySelector('.btn-download-json').addEventListener('click', () => handleGraphAction(graph, 'download-json'));
+
+    // Selection UI
+    const checkbox = card.querySelector('.card-checkbox');
+    checkbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            selectedNetIds.add(graph.id);
+            card.classList.add('selected');
+        } else {
+            selectedNetIds.delete(graph.id);
+            card.classList.remove('selected');
+        }
+        updateBulkDeleteButton();
+    });
+
+    if (isSelected) card.classList.add('selected');
+
+    // Entire card click selects checkbox
+    card.addEventListener('click', (e) => {
+        // Skip if clicking buttons, links, or inputs
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) {
+            return;
+        }
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change'));
+    });
 
     return card;
 }
@@ -555,37 +874,116 @@ function loadNetToEditor(netMetadata) {
 }
 
 async function handleImport(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await processFiles(Array.from(files));
+    e.target.value = ''; // Reset input
+}
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-        const content = event.target.result;
-        const name = file.name.split('.')[0];
+async function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (viewDatabaseExplorer) viewDatabaseExplorer.classList.remove('drag-active');
+
+    const items = e.dataTransfer.items;
+    if (!items || items.length === 0) return;
+
+    let allFiles = [];
+    if (dbStats) dbStats.textContent = "Scanning directory tree...";
+
+    async function traverseFileTree(item, path = '') {
+        if (item.isFile) {
+            return new Promise((resolve) => {
+                item.file(file => {
+                    allFiles.push(file);
+                    resolve();
+                });
+            });
+        } else if (item.isDirectory) {
+            const dirReader = item.createReader();
+            const entries = await new Promise((resolve) => {
+                dirReader.readEntries(resolve);
+            });
+            for (let i = 0; i < entries.length; i++) {
+                await traverseFileTree(entries[i], path + item.name + "/");
+            }
+        }
+    }
+
+    for (let i = 0; i < items.length; i++) {
+        // webkitGetAsEntry handles folders seamlessly
+        const item = items[i].webkitGetAsEntry();
+        if (item) {
+            await traverseFileTree(item);
+        }
+    }
+
+    if (allFiles.length > 0) {
+        await processFiles(allFiles);
+    } else {
+        if (dbStats) dbStats.textContent = "";
+    }
+}
+
+async function processFiles(files) {
+    let successCount = 0;
+    let failCount = 0;
+
+    // Disable inputs during import
+    if (importNetInput) importNetInput.disabled = true;
+    if (importFolderInput) importFolderInput.disabled = true;
+
+    // Give user UI feedback
+    if (dbStats) dbStats.textContent = `Importing ${files.length} file(s)...`;
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+
+        // Skip irrelevant files
+        const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+        if (!['.json', '.pnh', '.pnml', '.xml'].includes(ext)) {
+            continue;
+        }
 
         try {
+            const content = await file.text();
+            const name = file.name.split('.')[0];
             let netContent;
-            if (file.name.endsWith('.json')) {
+
+            if (ext === '.json') {
                 netContent = JSON.parse(content);
-            } else if (file.name.endsWith('.pnh')) {
+            } else if (ext === '.pnh') {
                 netContent = parsePnh(content);
-            } else {
-                alert("Only .json and .pnh files are currently supported for browser import.");
-                return;
+            } else if (ext === '.pnml' || ext === '.xml') {
+                netContent = parsePnml(content);
             }
 
             if (netContent) {
                 await savePetriNetDb(name, netContent);
-                loadDatabaseItems(true); // Refresh list
-                alert(`Import successful: ${name}`);
+                successCount++;
+            } else {
+                failCount++;
             }
         } catch (err) {
-            console.error("Import error:", err);
-            alert("Error importing file: " + err.message);
+            console.error(`Error importing file ${file.name}:`, err);
+            failCount++;
         }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+    }
+
+    // Restore UI
+    if (importNetInput) importNetInput.disabled = false;
+    if (importFolderInput) importFolderInput.disabled = false;
+
+    const menu = document.getElementById('importDropdownMenu');
+    if (menu) menu.style.display = 'none';
+
+    loadDatabaseItems(true); // Refresh list
+
+    if (files.length === 1 && failCount === 0) {
+        alert(`Import successful: ${files[0].name.split('.')[0]}`);
+    } else if (files.length > 0) {
+        alert(`Bulk Import Complete:\nSuccessfully stored: ${successCount}\nFailed/Ignored: ${failCount}`);
+    }
 }
 
 // Converters
@@ -641,6 +1039,86 @@ function parsePnh(content) {
         tokens = markingLine.split('').map(Number);
     }
     tokens.forEach((t, i) => { if (places[i]) places[i].tokens = t; });
+
+    return { places, transitions, arcs };
+}
+
+function parsePnml(content) {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(content, "text/xml");
+
+    const places = [];
+    const transitions = [];
+    const arcs = [];
+
+    const placeNodes = xmlDoc.getElementsByTagName("place");
+    for (let i = 0; i < placeNodes.length; i++) {
+        const p = placeNodes[i];
+        let pIdStr = p.getAttribute("id");
+        // Extract numeric ID if prefixed
+        let pId = parseInt(pIdStr.replace(/[^0-9]/g, '')) || i;
+
+        let label = pIdStr;
+        const nameNode = p.querySelector("name text");
+        if (nameNode) label = nameNode.textContent;
+
+        let tokens = 0;
+        const initMarkNode = p.querySelector("initialMarking text");
+        if (initMarkNode) tokens = parseInt(initMarkNode.textContent) || 0;
+
+        // Optionally extract x/y
+        let x = undefined, y = undefined;
+        const posNode = p.querySelector("graphics position");
+        if (posNode) {
+            x = parseFloat(posNode.getAttribute("x"));
+            y = parseFloat(posNode.getAttribute("y"));
+        }
+
+        places.push({ id: pId, label: label, tokens: tokens, x: x, y: y });
+    }
+
+    const transNodes = xmlDoc.getElementsByTagName("transition");
+    for (let i = 0; i < transNodes.length; i++) {
+        const t = transNodes[i];
+        let tIdStr = t.getAttribute("id");
+        let tId = parseInt(tIdStr.replace(/[^0-9]/g, '')) || i;
+
+        let label = tIdStr;
+        const nameNode = t.querySelector("name text");
+        if (nameNode) label = nameNode.textContent;
+
+        let x = undefined, y = undefined;
+        const posNode = t.querySelector("graphics position");
+        if (posNode) {
+            x = parseFloat(posNode.getAttribute("x"));
+            y = parseFloat(posNode.getAttribute("y"));
+        }
+
+        transitions.push({ id: tId, label: label, x: x, y: y });
+    }
+
+    const arcNodes = xmlDoc.getElementsByTagName("arc");
+    for (let i = 0; i < arcNodes.length; i++) {
+        const a = arcNodes[i];
+        const srcStr = a.getAttribute("source");
+        const tgtStr = a.getAttribute("target");
+
+        const srcId = parseInt(srcStr.replace(/[^0-9]/g, ''));
+        const tgtId = parseInt(tgtStr.replace(/[^0-9]/g, ''));
+
+        let weight = 1;
+        const inscriptNode = a.querySelector("inscription text");
+        if (inscriptNode) weight = parseInt(inscriptNode.textContent) || 1;
+
+        // Determine direction by checking if src is in places
+        const isSrcPlace = places.some(p => p.id === srcId);
+
+        if (isSrcPlace) {
+            arcs.push({ source: srcId, target: tgtId, type: 'place_to_transition', weight: weight });
+        } else {
+            arcs.push({ source: srcId, target: tgtId, type: 'transition_to_place', weight: weight });
+        }
+    }
 
     return { places, transitions, arcs };
 }

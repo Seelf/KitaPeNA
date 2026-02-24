@@ -4,7 +4,7 @@ import time
 import os
 import json
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from web_app.data import database as db
 from web_app.analysis import reachability as petri_reachability
@@ -16,6 +16,25 @@ from .petri.utils import export_pnh
 from web_app.analysis.benchmarking.generator import generate_atlas_graphs
 
 benchmark_bp = Blueprint('benchmark', __name__)
+
+
+@benchmark_bp.route('/state', methods=['GET'])
+@login_required
+def get_benchmark_state():
+    """Returns the saved benchmark state for the current user."""
+    state = db.get_benchmark_state(current_user.id)
+    return jsonify(state or {})
+
+
+@benchmark_bp.route('/state', methods=['PUT'])
+@login_required
+def save_benchmark_state():
+    """Saves the benchmark state for the current user."""
+    state = request.json
+    if not state:
+        return jsonify({'error': 'No state provided'}), 400
+    db.save_benchmark_state(current_user.id, state)
+    return jsonify({'status': 'ok'})
 
 active_benchmark_process = None
 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -87,7 +106,7 @@ def run_benchmark():
             conn = db.get_db_connection()
             placeholders = ','.join('?' for _ in graph_ids)
             query = f'SELECT id, name, nodes, edges, is_directed FROM graphs WHERE id IN ({placeholders})'
-            rows = conn.execute(query, graph_ids).fetchall()
+            rows = db.execute_query(conn, query, graph_ids, fetchall=True)
             conn.close()
             
             graphs = []
@@ -128,7 +147,7 @@ def run_benchmark():
             conn = db.get_db_connection()
             placeholders = ','.join('?' for _ in petri_ids)
             query = f'SELECT id, name, content_json FROM petri_nets WHERE id IN ({placeholders})'
-            rows = conn.execute(query, petri_ids).fetchall()
+            rows = db.execute_query(conn, query, petri_ids, fetchall=True)
             conn.close()
 
             petri_graph_type = data.get('petri_graph_type', 'concurrency')
@@ -164,7 +183,12 @@ def run_benchmark():
                     edges = []
                     name_prefix = ""
                     
-                    if petri_graph_type == 'reachability':
+                    # If DSPN-Tool is the only algorithm, we don't need a graph topology
+                    needs_graph = any(a != 'DSPN-Tool' for a in algo_names)
+                    
+                    if not needs_graph:
+                        name_prefix = ""
+                    elif petri_graph_type == 'reachability':
                         name_prefix = "RG"
                         r_nodes, r_edges, _ = petri_reachability.calculate_reachability_graph(
                             content.get('places', []),
@@ -186,22 +210,27 @@ def run_benchmark():
                         continue 
                     else:
                         # Default: Concurrency Graph
-                        name_prefix = "CG"
-                        if petri_analysis:
-                            c_nodes, c_edges = petri_analysis.build_concurrency_graph(
-                                content.get('places', []),
-                                content.get('transitions', []),
-                                content.get('arcs', [])
-                            )
-                            nodes = c_nodes
+                        if not needs_graph: # If only DSPN-Tool is selected, skip CG generation
+                            name_prefix = ""
+                            nodes = []
                             edges = []
-                            for e in c_edges:
-                                if isinstance(e, dict):
-                                    edges.append([e['source'], e['target']])
-                                elif isinstance(e, list):
-                                    edges.append([e[0], e[1]])
                         else:
-                             print("Petri analysis module missing.")
+                            name_prefix = "CG"
+                            if petri_analysis:
+                                c_nodes, c_edges = petri_analysis.build_concurrency_graph(
+                                    content.get('places', []),
+                                    content.get('transitions', []),
+                                    content.get('arcs', [])
+                                )
+                                nodes = c_nodes
+                                edges = []
+                                for e in c_edges:
+                                    if isinstance(e, dict):
+                                        edges.append([e['source'], e['target']])
+                                    elif isinstance(e, list):
+                                        edges.append([e[0], e[1]])
+                            else:
+                                 print("Petri analysis module missing.")
 
                     graphs.append({
                         'id': r['id'], 
@@ -280,6 +309,7 @@ def run_benchmark():
         exec_args['aggregations'] = data.get('aggregations', ['mean'])
         exec_args['dspn_options'] = data.get('dspnOptions', '')
         exec_args['custom_cmds'] = data.get('customCmds', {})
+        exec_args['regexes'] = data.get('regexes', [])
         exec_args['base_timeout'] = data.get('baseTimeout', None)
 
         p = multiprocessing.Process(target=benchmark_worker, args=(mode, algo_names, iterations, exec_args, q))

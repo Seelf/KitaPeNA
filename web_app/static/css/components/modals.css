@@ -217,9 +217,9 @@
 }
 
 .dspn-cat.active {
-    color: #ff9f40;
+    color: var(--accent);
     background: #1e1e1e;
-    border-left: 3px solid #ff9f40;
+    border-left: 3px solid var(--accent);
 }
 
 .dspn-section {
@@ -250,7 +250,7 @@
 .algo-checkbox input[type="checkbox"] {
     width: 14px;
     height: 14px;
-    accent-color: #ff9f40;
+    accent-color: var(--accent);
 }
 
 .algo-checkbox span {

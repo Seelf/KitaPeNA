@@ -2,6 +2,7 @@ import time
 import statistics
 import os
 import ctypes
+import re
 from .generator import generate_random_graph
 # Import algorithms
 from ..coloring import get_optimal_coloring
@@ -72,7 +73,7 @@ def execute_custom_cpp(algo_name, nodes, edges, is_directed=False):
             ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), 
             ctypes.POINTER(ctypes.c_int)
         ]
-        lib.solve.restype = ctypes.c_double
+        lib.solve.restype = None
 
         n = len(nodes)
         m = len(edges)
@@ -99,8 +100,11 @@ def execute_custom_cpp(algo_name, nodes, edges, is_directed=False):
                 
         colors_arr = (ctypes.c_int * n)()
         
-        # Call
-        exec_time = lib.solve(n, m, u_arr, v_arr, colors_arr)
+        # Call with Python-side timing
+        start_t = time.perf_counter()
+        lib.solve(n, m, u_arr, v_arr, colors_arr)
+        end_t = time.perf_counter()
+        exec_time = (end_t - start_t) * 1000 # to ms
         
         # Return colors as list
         return list(colors_arr), exec_time
@@ -124,9 +128,11 @@ def execute_custom_cpp_petri(algo_name, pnh_path):
         # Convert to C string
         c_path = pnh_path.encode('utf-8')
         
+        start_t = time.perf_counter()
         solve_func(c_path)
+        end_t = time.perf_counter()
         
-        return True
+        return (end_t - start_t) * 1000 # ms
     except AttributeError:
         # Crucial for fallback logic
         raise AttributeError(f"Function 'solve_petri' not found in {algo_name}")
@@ -157,14 +163,56 @@ class BenchmarkRunner:
         else:
             return statistics.mean(times)
 
-    def run_suite(self, algo_names, start_n, end_n, step_n, density, graph_count, iterations, aggregations=['mean'], dspn_options='', custom_cmds=None, base_timeout=None):
+    def _apply_regexes(self, text, regexes):
+        """Applies a list of regexes to the text and returns a dict of extracted values."""
+        extracted = {}
+        if not text or not regexes:
+            return extracted
+            
+        for r_def in regexes:
+            name = r_def.get('name', 'Unknown')
+            pattern = r_def.get('pattern', '')
+            try:
+                # Split pattern into stages (joined by \n in JS)
+                stages = [s.strip() for s in pattern.split('\n') if s.strip()]
+                current_text = text
+                match_found = False
+
+                for stage_pattern in stages:
+                    # Use DOTALL so '.' matches newlines, and MULTILINE for ^/$ on lines
+                    match = re.search(stage_pattern, current_text, re.DOTALL | re.MULTILINE)
+                    if match:
+                        match_found = True
+                        # Extract first group if available, else the entire match
+                        if match.groups():
+                            current_text = match.group(1)
+                        else:
+                            current_text = match.group(0)
+                    else:
+                        match_found = False
+                        break
+                
+                if match_found:
+                    extracted[name] = current_text
+                    print(f"  [Regex] Extracted '{name}': {current_text[:50]}{'...' if len(current_text) > 50 else ''}")
+            except Exception as e:
+                print(f"Regex error for pattern {pattern}: {e}")
+                
+        return extracted
+
+    def run_suite(self, algo_names, start_n, end_n, step_n, density, graph_count, iterations, aggregations=['mean'], dspn_options='', custom_cmds=None, base_timeout=None, regexes=None):
         """
         Runs a benchmark suite.
         Returns a dict structure suitable for Chart.js, keyed by aggregation method.
         """
+        if regexes is None:
+            regexes = []
+            
         results = {agg: {
             "labels": [],
-            "datasets": []
+            "datasets": [],
+            "extracted_data": [],
+            "timeouts": []
         } for agg in aggregations}
 
         # Prepare datasets structure
@@ -185,6 +233,10 @@ class BenchmarkRunner:
             
             # Pre-calculate graphs for this batch to ensure all algos run on SAME data
             test_graphs = [generate_random_graph(n, density) for _ in range(graph_count)]
+            
+            # Prepare extraction and timeout dictionary for this N
+            n_extractions = {name: {} for name in algo_names}
+            n_timeouts = {name: False for name in algo_names}
 
             for algo_name in algo_names:
                 is_custom = False
@@ -235,6 +287,10 @@ class BenchmarkRunner:
                                 for agg in aggregations:
                                     if "logs" not in results[agg]: results[agg]["logs"] = []
                                     results[agg]["logs"].append(capture.output)
+                                
+                                # Apply regex extraction for the very first iteration to represent this graph size/generation
+                                if i == 0 and g_idx == 0 and regexes:
+                                    n_extractions[algo_name] = self._apply_regexes(capture.output, regexes)
                             
                             # Log result info for the first iteration
                             if i == 0 and result_colors:
@@ -260,6 +316,9 @@ class BenchmarkRunner:
                                 for agg in aggregations:
                                     if "logs" not in results[agg]: results[agg]["logs"] = []
                                     results[agg]["logs"].append(capture.output)
+                                
+                                if i == 0 and g_idx == 0 and regexes:
+                                    n_extractions[algo_name] = self._apply_regexes(capture.output, regexes)
 
                 # Aggregate
                 if times:
@@ -269,6 +328,11 @@ class BenchmarkRunner:
                 else:
                     for agg in aggregations:
                         algo_data[agg][algo_name].append(0)
+
+            # Append extraction and timeout data for this step (N)
+            for agg in aggregations:
+                results[agg]["extracted_data"].append(n_extractions)
+                results[agg]["timeouts"].append(n_timeouts)
 
         # Build Final Structure
         colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
@@ -285,14 +349,19 @@ class BenchmarkRunner:
 
         return results
 
-    def run_specific(self, algo_names, graphs, iterations, aggregations=['mean'], dspn_options='', custom_cmds=None, base_timeout=None):
+    def run_specific(self, algo_names, graphs, iterations, aggregations=['mean'], dspn_options='', custom_cmds=None, base_timeout=None, regexes=None):
         """
         Runs benchmark on specific graphs.
         graphs: list of dicts {'id': int, 'name': str, 'nodes': [], 'edges': []}
         """
+        if regexes is None:
+            regexes = []
+        
         results = {agg: {
             "labels": [], # Graph Names
-            "datasets": []
+            "datasets": [],
+            "extracted_data": [],
+            "timeouts": [] # list of dicts mapping algo_name -> bool
         } for agg in aggregations}
 
         # Use Graph Names as labels
@@ -309,6 +378,9 @@ class BenchmarkRunner:
             name = graph['name']
             is_directed = graph.get('is_directed', False)
             print(f"  > Testing Graph: {name} (V={len(nodes)}, E={len(edges)}, Dir={is_directed})...")
+            
+            g_extractions = {name: {} for name in algo_names}
+            g_timeouts = {name: False for name in algo_names}
 
             for algo_name in algo_names:
                 is_custom = False
@@ -354,7 +426,7 @@ class BenchmarkRunner:
                                 
                                 start_time = time.perf_counter() * 1000
                                 try:
-                                    process = subprocess.run(cmd, capture_output=True, text=True, timeout=base_timeout if base_timeout else None)
+                                    process = subprocess.run(cmd, capture_output=True, text=True, timeout=base_timeout if base_timeout else 115)
                                     end_time = time.perf_counter() * 1000
                                     exec_time = end_time - start_time
                                     success = True
@@ -367,11 +439,16 @@ class BenchmarkRunner:
                                         if "logs" not in results[agg]: results[agg]["logs"] = []
                                         results[agg]["logs"].append(output_text)
                                         
+                                    if i == 0 and regexes:
+                                        combined = process.stdout + (f"\n{process.stderr}" if process.stderr else "")
+                                        g_extractions[algo_name] = self._apply_regexes(combined, regexes)
+                                        
                                 except subprocess.TimeoutExpired as e:
                                     end_time = time.perf_counter() * 1000
                                     exec_time = end_time - start_time
                                     success = True
                                     timed_out_in_iteration = True
+                                    g_timeouts[algo_name] = True
                                     raw_name = graph.get('raw_name', graph['name'])
                                     output_text = f"--- [{raw_name}] DSPN-Tool Output ---\n"
                                     output_text += f"TIMEOUT: Process killed by system after {base_timeout} seconds. Skipping remaining iterations.\n"
@@ -438,11 +515,16 @@ class BenchmarkRunner:
                                     if "logs" not in results[agg]: results[agg]["logs"] = []
                                     results[agg]["logs"].append(output_text)
                                     
+                                if i == 0 and regexes:
+                                    combined = process.stdout + (f"\n{process.stderr}" if process.stderr else "")
+                                    g_extractions[algo_name] = self._apply_regexes(combined, regexes)
+                                    
                             except subprocess.TimeoutExpired as e:
                                 end_time = time.perf_counter() * 1000
                                 exec_time = end_time - start_time
                                 success = True
                                 timed_out_in_iteration = True
+                                g_timeouts[algo_name] = True
                                 
                                 output_text = f"--- [{raw_name}] CMD Output ---\n"
                                 output_text += f"TIMEOUT: Process killed by system after {base_timeout} seconds. Skipping remaining iterations.\n"
@@ -472,10 +554,8 @@ class BenchmarkRunner:
                         if 'pnh_path' in graph:
                             try:
                                 with CaptureOutput() as capture:
-                                    execute_custom_cpp_petri(algo_name, graph['pnh_path'])
+                                    exec_time = execute_custom_cpp_petri(algo_name, graph['pnh_path'])
                                 success = True
-                                # Measure externally? Or let custom reporter handle it
-                                # (Left 0 for now as previously, usually reported via logs)
                             except AttributeError:
                                 # Fallback to standard graph if Petri solver missing
                                 with CaptureOutput() as capture:
@@ -495,6 +575,9 @@ class BenchmarkRunner:
                             for agg in aggregations:
                                 if "logs" not in results[agg]: results[agg]["logs"] = []
                                 results[agg]["logs"].append(capture.output)
+                                
+                            if i == 0 and regexes:
+                                g_extractions[algo_name] = self._apply_regexes(capture.output, regexes)
 
                         # Add result info
                         if success and result_colors and i == 0:
@@ -523,6 +606,9 @@ class BenchmarkRunner:
                             for agg in aggregations:
                                 if "logs" not in results[agg]: results[agg]["logs"] = []
                                 results[agg]["logs"].append(capture.output)
+                            
+                            if i == 0 and regexes:
+                                g_extractions[algo_name] = self._apply_regexes(capture.output, regexes)
 
                 # Aggregate
                 if times:
@@ -532,6 +618,11 @@ class BenchmarkRunner:
                 else:
                     for agg in aggregations:
                         algo_data[agg][algo_name].append(0)
+            
+            # Append extractions and timeouts for this graph
+            for agg in aggregations:
+                results[agg]["extracted_data"].append(g_extractions)
+                results[agg]["timeouts"].append(g_timeouts)
 
         # Build Final Structure
         colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']

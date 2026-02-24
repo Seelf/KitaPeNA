@@ -1,0 +1,47 @@
+/* Regex Pipeline Styles */
+.regex-stage-item {
+    position: relative;
+    border-left: 2px solid #b180ff !important;
+    transition: all 0.2s ease;
+    margin-bottom: 5px;
+}
+
+.regex-stage-item:hover {
+    border-left-color: #d1b3ff !important;
+    background: rgba(177, 128, 255, 0.04) !important;
+}
+
+.regex-stage-item::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 15px;
+    width: 10px;
+    height: 10px;
+    background: #b180ff;
+    border-radius: 50%;
+    box-shadow: 0 0 5px rgba(177, 128, 255, 0.5);
+    z-index: 1;
+}
+
+.regex-stage-result {
+    user-select: text;
+    cursor: text;
+}
+
+.regex-stage-result::selection,
+.stage-result-text::selection {
+    background: rgba(177, 128, 255, 0.5) !important;
+    color: #fff !important;
+}
+
+.regex-stage-item input:focus {
+    border-color: #b180ff !important;
+    box-shadow: 0 0 8px rgba(177, 128, 255, 0.2);
+    outline: none;
+}
+
+.stage-result-text {
+    user-select: text;
+    cursor: copy;
+}

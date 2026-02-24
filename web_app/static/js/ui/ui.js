@@ -421,6 +421,30 @@ export function initViewSettings() {
             applyToolbar(state.showToolbar);
         });
     }
+
+    const chkShowDbBulk = document.getElementById('chkShowDbBulk');
+    if (chkShowDbBulk) {
+        const savedShowBulk = localStorage.getItem('kitapena_showDbBulk');
+        if (savedShowBulk !== null) {
+            state.showDbBulk = savedShowBulk === 'true';
+        }
+        chkShowDbBulk.checked = state.showDbBulk;
+
+        const applyDbBulk = (show) => {
+            const bulkDropdown = document.getElementById('dbBulkDropdown');
+            if (bulkDropdown) {
+                bulkDropdown.style.display = show ? 'inline-block' : 'none';
+            }
+        };
+
+        applyDbBulk(state.showDbBulk);
+
+        chkShowDbBulk.addEventListener('change', (e) => {
+            state.showDbBulk = e.target.checked;
+            localStorage.setItem('kitapena_showDbBulk', state.showDbBulk);
+            applyDbBulk(state.showDbBulk);
+        });
+    }
 }
 
 export function showCustomModal(title, message, isConfirm = false, onConfirm = null, onCancel = null) {

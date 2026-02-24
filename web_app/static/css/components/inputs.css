@@ -60,24 +60,111 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .algo-checkbox {
-    margin-bottom: 10px;
     display: flex;
     align-items: center;
     cursor: pointer;
     font-size: 13px;
-    color: #ddd;
-    padding: 5px;
+    color: #bbb;
+    padding: 6px 10px;
     border-radius: 4px;
-    transition: background 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    gap: 10px;
 }
 
 .algo-checkbox:hover {
-    background-color: var(--hover-bg);
+    background-color: var(--hover-bg, rgba(255, 255, 255, 0.05));
+    color: var(--text-bright, #fff);
 }
 
-.algo-checkbox input {
+/* Premium Checkbox Core */
+.algo-checkbox input[type="checkbox"],
+.custom-checkbox-row input[type="checkbox"],
+.saved-item input[type="checkbox"],
+.regex-item input[type="checkbox"],
+.algo-item input[type="checkbox"],
+input[type="checkbox"].premium {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    flex-shrink: 0;
+}
+
+.algo-checkbox input[type="checkbox"]:hover,
+.custom-checkbox-row input[type="checkbox"]:hover,
+.saved-item input[type="checkbox"]:hover,
+.regex-item input[type="checkbox"]:hover,
+.algo-item input[type="checkbox"]:hover,
+input[type="checkbox"].premium:hover {
+    border-color: var(--accent);
+    background: rgba(91, 163, 255, 0.1);
+}
+
+.algo-checkbox input[type="checkbox"]:checked,
+.custom-checkbox-row input[type="checkbox"]:checked,
+.saved-item input[type="checkbox"]:checked,
+.regex-item input[type="checkbox"]:checked,
+.algo-item input[type="checkbox"]:checked,
+input[type="checkbox"].premium:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(91, 163, 255, 0.3);
+}
+
+.algo-checkbox input[type="checkbox"]:checked::after,
+.custom-checkbox-row input[type="checkbox"]:checked::after,
+.saved-item input[type="checkbox"]:checked::after,
+.regex-item input[type="checkbox"]:checked::after,
+.algo-item input[type="checkbox"]:checked::after,
+input[type="checkbox"].premium:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 48%;
+    /* Optical adjustment */
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.algo-checkbox input[type="checkbox"]:focus,
+.custom-checkbox-row input[type="checkbox"]:focus,
+.saved-item input[type="checkbox"]:focus,
+.regex-item input[type="checkbox"]:focus,
+.algo-item input[type="checkbox"]:focus,
+input[type="checkbox"].premium:focus {
+    box-shadow: 0 0 0 2px rgba(91, 163, 255, 0.2);
+}
+
+.custom-checkbox-row {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 6px 8px;
+    margin: 2px -8px;
+    /* Offset padding for hover effect */
+    border-radius: 4px;
+    user-select: none;
+    transition: all 0.2s;
+    color: #ccc;
+}
+
+.custom-checkbox-row:hover {
+    color: var(--text-bright, #fff);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.custom-checkbox-row input {
     margin-right: 10px;
-    accent-color: var(--accent);
 }
 
 .db-search {
@@ -159,3 +246,5 @@ input[type=range]::-webkit-slider-runnable-track {
     background: rgba(0, 122, 204, 0.1);
     outline: none;
 }
+
+/* Custom checkbox system markers removed, unified above */
