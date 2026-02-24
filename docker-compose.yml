@@ -1,0 +1,39 @@
+name: kitapena
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: kitapena_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  kitapena:
+    build: .
+    container_name: kitapena_instance
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-5002}:${PORT:-5002}"
+    volumes:
+      - .:/app # Sync local code with container
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=db
+
+volumes:
+  postgres_data:

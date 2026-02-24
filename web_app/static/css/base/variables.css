@@ -1,0 +1,16 @@
+:root {
+    --bg-color: #1e1e1e;
+    --panel-bg: #252526;
+    --sidebar-bg: #333333;
+    --accent: #5ba3ff;
+    /* Lighter, more modern blue */
+    --accent-light: #8ec3ff;
+    --text-color: #cccccc;
+    --text-bright: #ffffff;
+    --border-color: #3e3e42;
+    --hover-bg: rgba(255, 255, 255, 0.05);
+    --selection-bg: #094771;
+    --input-bg: #3c3c3c;
+    --danger: #d44c47;
+    --success: #89d185;
+}

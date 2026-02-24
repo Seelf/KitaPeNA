@@ -1,0 +1,25 @@
+/* Base Styles */
+@import "base/variables.css";
+@import "base/reset.css";
+@import "base/typography.css";
+
+/* Layout Shell */
+@import "layout/shell.css";
+@import "layout/header.css";
+@import "layout/footer.css";
+
+/* Generic Components */
+@import "components/buttons.css";
+@import "components/inputs.css";
+@import "components/tabs.css";
+@import "components/modals.css";
+@import "components/badges.css";
+@import "components/regex_pipeline.css";
+
+/* Views */
+@import "views/editor/canvas.css";
+@import "views/editor/results.css";
+@import "views/editor/console.css";
+@import "views/database/sidebar.css";
+@import "views/database/explorer.css";
+@import "views/performance/performance.css";

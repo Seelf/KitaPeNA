@@ -1,0 +1,36 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv
+venv/
+env/
+.env
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# C/C++ Extensions (Keep .c/.cpp, ignore binaries)
+*.so
+*.dylib
+*.o
+*.obj
+
+# MacOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# Web app
+web_app/temp_pnh/

@@ -1,0 +1,330 @@
+.db-list-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.db-list-item {
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+
+.db-list-item:hover {
+    background: #333;
+}
+
+.db-list-item.selected {
+    background: #2b3b2b;
+    /* Subtle green highlight */
+    border-left: 3px solid var(--accent);
+}
+
+.db-item-title {
+    font-weight: 500;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.db-item-meta {
+    font-size: 11px;
+    color: #888;
+    margin-top: 3px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.db-detail-content h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 14px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Selection and Bulk Actions */
+.net-card.selectable {
+    cursor: default;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.net-card.selected {
+    border-color: var(--accent);
+    background-color: rgba(91, 163, 255, 0.05);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.card-checkbox-wrapper {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 2;
+}
+
+.card-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+}
+
+.card-checkbox:hover {
+    border-color: var(--accent);
+    background: rgba(91, 163, 255, 0.1);
+}
+
+.card-checkbox:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(91, 163, 255, 0.4);
+}
+
+.card-checkbox:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.card-checkbox:focus {
+    box-shadow: 0 0 0 2px rgba(91, 163, 255, 0.3);
+}
+
+.net-card.selected .net-title {
+    color: var(--accent-light);
+}
+
+/* Bulk Actions Dropdown */
+.db-bulk-dropdown {
+    position: relative;
+    display: inline-block;
+    border-right: 1px solid #444;
+    padding-right: 15px;
+}
+
+.db-bulk-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    background: #252526;
+    border: 1px solid #444;
+    border-radius: 4px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    padding: 8px 0;
+    min-width: 180px;
+    margin-top: 5px;
+    user-select: none;
+}
+
+.db-bulk-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 18px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.2s, color 0.2s;
+    user-select: none;
+}
+
+.db-bulk-item:hover {
+    background: #37373d;
+    color: var(--accent-light);
+}
+
+.db-bulk-item.danger:hover {
+    background: #4b1f1f;
+    color: #ff6b6b;
+}
+
+.db-bulk-divider {
+    height: 1px;
+    background: #444;
+    margin: 4px 10px;
+}
+
+.detail-section {
+    margin-bottom: 30px;
+}
+
+.properties-grid {
+    font-size: 13px;
+    color: #ccc;
+}
+
+.prop-item {
+    background: #333;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #444;
+}
+
+.prop-label {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 2px;
+}
+
+.prop-value {
+    font-weight: 600;
+}
+
+.download-tabs button {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+}
+
+.db-explorer-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-color);
+    overflow: hidden;
+    height: 100%;
+}
+
+.db-toolbars-wrapper {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--panel-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.db-toolbar {
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 20px;
+}
+
+.explorer-tabs {
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+}
+
+.explorer-tabs .db-view-tab {
+    padding: 8px 15px;
+    margin-right: 2px;
+    background-color: #2d2d2d;
+    color: #999;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-size: 13px;
+    user-select: none;
+    transition: background 0.2s, color 0.2s;
+}
+
+.explorer-tabs .db-view-tab:hover {
+    background-color: #333;
+    color: #ddd;
+}
+
+.explorer-tabs .db-view-tab.active {
+    background-color: var(--bg-color);
+    color: var(--text-bright);
+    border-top: 2px solid var(--accent);
+}
+
+.db-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.db-grid {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    align-content: start;
+}
+
+/* NET CARD */
+.net-card {
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    position: relative;
+}
+
+.net-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border-color: #555;
+    background-color: #2a2d2e;
+}
+
+.net-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.net-info-group {
+    flex: 1;
+    overflow: hidden;
+}
+
+.net-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-bright);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.net-stats-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-bottom: 15px;
+    font-size: 12px;
+    color: #bbb;
+}
+
+.card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 12px;
+}

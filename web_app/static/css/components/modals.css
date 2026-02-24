@@ -1,0 +1,263 @@
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 20000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: #252526;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+}
+
+.modal-header {
+    padding: 10px 15px;
+    background: #333;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header .title {
+    font-weight: 600;
+    color: #ddd;
+    font-size: 13px;
+}
+
+.modal-header .close-btn {
+    background: none;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.modal-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.modal-sidebar {
+    width: 250px;
+    border-right: 1px solid var(--border-color);
+    padding: 15px;
+    background: #1e1e1e;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #1e1e1e;
+}
+
+.modal-small {
+    width: 100%;
+    max-width: 500px;
+    height: auto;
+    max-height: 90vh;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.modal-padding {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.input-row {
+    width: 100%;
+}
+
+.input-row label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.input-row input {
+    width: 100%;
+    background: #111;
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 10px;
+    border-radius: 3px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.input-row input:focus {
+    border-color: var(--accent);
+}
+
+.hint-text {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+    display: block;
+}
+
+.macro-hint {
+    margin-top: 8px;
+    padding: 8px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #aaa;
+    line-height: 1.4;
+}
+
+.macro-hint strong {
+    color: var(--accent);
+}
+
+.modal-footer {
+    padding: 10px 15px;
+    border-top: 1px solid var(--border-color);
+    background: #252526;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-small {
+    width: 450px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.modal-padding {
+    padding: 20px;
+}
+
+.input-row {
+    margin-bottom: 15px;
+}
+
+.input-row label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.input-row input {
+    width: 100%;
+    background: #111;
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 8px;
+    border-radius: 3px;
+    font-size: 13px;
+    outline: none;
+}
+
+.input-row input:focus {
+    border-color: var(--accent);
+}
+
+.hint-text {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+    display: block;
+}
+
+.macro-hint {
+    margin-top: 8px;
+    padding: 8px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #aaa;
+}
+
+.macro-hint strong {
+    color: var(--accent);
+}
+
+/* DSPN Configurator Styles */
+.dspn-cat {
+    padding: 12px 15px;
+    font-size: 11px;
+    text-transform: uppercase;
+    font-weight: 600;
+    cursor: pointer;
+    color: #888;
+    border-bottom: 1px solid #333;
+    transition: all 0.2s;
+}
+
+.dspn-cat:hover {
+    color: #fff;
+    background: #333;
+}
+
+.dspn-cat.active {
+    color: var(--accent);
+    background: #1e1e1e;
+    border-left: 3px solid var(--accent);
+}
+
+.dspn-section {
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.algo-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.algo-checkbox input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--accent);
+}
+
+.algo-checkbox span {
+    font-size: 12px;
+    color: #ccc;
+}
+
+.algo-checkbox:hover span {
+    color: #fff;
+}

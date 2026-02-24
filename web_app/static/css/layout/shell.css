@@ -1,0 +1,132 @@
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.main-split {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.activity-bar {
+    width: 48px;
+    background-color: #333333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 10px;
+}
+
+.activity-bar .icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #666;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+}
+
+.activity-bar .icon.active {
+    color: var(--text-bright);
+    border-left-color: var(--text-bright);
+}
+
+.editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-color);
+    border-right: 1px solid var(--border-color);
+    min-width: 0;
+    /* Critical for flex child overflow */
+}
+
+.editor-header {
+    height: 28px;
+    background-color: #1e1e1e;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #2d2d2d;
+}
+
+.tab {
+    height: 100%;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    background-color: transparent;
+    color: #666;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    color: #ccc;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.tab.active {
+    background-color: transparent;
+    border-bottom: 2px solid var(--accent);
+    color: var(--text-bright);
+    font-weight: 600;
+    opacity: 1;
+}
+
+.resizer {
+    width: 4px;
+    cursor: col-resize;
+    background-color: var(--border-color);
+    transition: background-color 0.2s;
+    z-index: 100;
+}
+
+.resizer:hover,
+.resizer.resizing {
+    background-color: var(--accent);
+}
+
+/* Universal Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999999;
+    backdrop-filter: blur(2px);
+}
+
+.modal-content {
+    background-color: #252526;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    min-width: 300px;
+}
+
+.modal-header h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    color: #fff;
+}
+
+.modal-actions {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}

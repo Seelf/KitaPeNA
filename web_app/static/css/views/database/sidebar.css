@@ -1,0 +1,88 @@
+.sidebar-actions {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background-color: #252526;
+    border-bottom: 1px solid #3c3c3c;
+}
+
+.saved-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.saved-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #2d2d2d;
+    cursor: pointer;
+    font-size: 12px;
+    color: #cccccc;
+    transition: background-color 0.2s;
+}
+
+.saved-item:hover {
+    background-color: #2a2d2e;
+}
+
+.saved-item.selected {
+    background-color: var(--selection-bg);
+    color: var(--text-bright);
+}
+
+.saved-item .name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+.saved-item input[type="checkbox"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+}
+
+.saved-item .date {
+    font-size: 10px;
+    color: #666;
+    margin-right: 8px;
+}
+
+.saved-item .btn-delete {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 14px;
+    padding: 0;
+    line-height: 1;
+}
+
+.saved-item .btn-delete:hover {
+    background-color: #d44c47;
+    color: white;
+}
+
+.graph-item {
+    padding: 8px 10px;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.graph-item:hover {
+    background-color: var(--hover-bg);
+}
