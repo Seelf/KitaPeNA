@@ -1,0 +1,125 @@
+            <!-- Center: Canvas Editor + Sidebar Wrapper -->
+            <div id="mainEditorContainer" style="display: flex; flex: 1; overflow: hidden;">
+                <div class="editor-area" id="mainEditorArea">
+                    <!-- ... (existing canvas content) ... -->
+                    <!-- Custom Tab Bar Wrapper (Active Files) -->
+                    <div class="tabs-wrapper">
+                        <button id="btnTabScrollLeft" class="tab-scroll-btn" title="Scroll Left">‹</button>
+                        <div class="editor-tabs-bar" id="editorTabBar">
+                            <!-- Tabs injected by tabs.js -->
+                        </div>
+                        <button id="btnTabScrollRight" class="tab-scroll-btn" title="Scroll Right">›</button>
+                    </div>
+
+                    <!-- Context Wrapper (Model/Analysis) -->
+                    <div class="editor-header">
+                        <span class="tab active" id="tabContextPetri">Petri Net (Model)</span>
+                        <span class="tab" id="tabContextGraph">Reachability Graph (Analysis)</span>
+                        <span class="tab" id="tabContextConcurrency">Concurrency Graph (Structural)</span>
+                        <span class="tab" id="tabContextStandardGraph" style="display:none;">Graph</span>
+                    </div>
+                    <div class="canvas-container" id="canvasContainer">
+                        <div id="graphStats" class="graph-stats">Nodes: 0 | Edges: 0</div>
+                        <!-- Toolbars ... -->
+                        <div class="floating-toolbar" id="toolbarGraph">
+                            <button class="tool-btn" id="btnModeView" title="Move / Pan">✋</button>
+                            <button class="tool-btn" id="btnModeNode" title="Add Node">
+                                <svg width="20" height="20" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" />
+                                    <text x="12" y="16" text-anchor="middle" fill="currentColor" font-size="12"
+                                        font-family="monospace" id="iconNodeNum">1</text>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnModeEdge" title="Add Edge">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="5" cy="19" r="3"></circle>
+                                    <circle cx="19" cy="5" r="3"></circle>
+                                    <line x1="7.5" y1="16.5" x2="16.5" y2="7.5"></line>
+                                </svg>
+                            </button>
+                            <div class="tool-separator"></div>
+                            <button class="tool-btn" id="btnToggleDirected" title="Toggle Directed (On/Off)">↔️</button>
+                            <button class="tool-btn" id="btnGraphImport" title="Import Graph">📂</button>
+                            <input type="file" id="fileInputGraph" accept=".json,.gml,.graphml,.edgelist"
+                                style="display: none;">
+                            <button class="tool-btn" id="btnGraphExport" title="Export Graph">💾*</button>
+                            <button class="tool-btn" id="btnSaveGraph" title="Save Graph">💾</button>
+                            <button class="tool-btn" id="btnGraphLayout" title="Auto Layout">✨</button>
+                            <button class="tool-btn" id="btnDelete" title="Delete Selected">🗑️</button>
+                            <button class="tool-btn danger" id="btnClear" title="Clear All">❌</button>
+                            <div class="tool-separator" id="concurrencySeparator" style="display: none;"></div>
+                            <button class="tool-btn" id="btnCheckTransitive" title="Check Transitive Orientability"
+                                style="display: none;">🔀</button>
+                        </div>
+
+                        <!-- Petri Net Toolbar (Hidden by default) -->
+                        <div class="floating-toolbar" id="toolbarPetri" style="display: none;">
+                            <button class="tool-btn" id="btnPetriPan" title="Move / Pan">✋</button>
+                            <button class="tool-btn" id="btnPetriPlace" title="Add Place (O)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="8"></circle>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriTransition" title="Add Transition ([ ])">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="8" y="4" width="8" height="16"></rect>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriArc" title="Add Arc (->)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M5 12h14m-4-4l4 4-4 4"></path>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriToken" title="Add/Remove Token">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriRename" title="Rename Element (Text)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                            <button class="tool-btn" id="btnPetriDelete" title="Delete Element (Eraser)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M3 6h18"></path>
+                                    <path
+                                        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                    </path>
+                                </svg>
+                            </button>
+                            <div class="tool-separator"></div>
+                            <button class="tool-btn" id="btnPetriSave" title="Save Petri Net">💾</button>
+                            <button class="tool-btn" id="btnPetriImport" title="Import .pnh">📂</button>
+                            <button class="tool-btn highlight" id="btnPetriReachability"
+                                title="Generate Reachability Graph">🕸️</button>
+                            <button class="tool-btn" id="btnPetriLayout" title="Auto Layout">✨</button>
+                            <button class="tool-btn danger" id="btnPetriClear" title="Clear All">❌</button>
+
+                            <!-- Hidden File Input -->
+                            <input type="file" id="fileInputPnh" accept=".pnh" style="display: none;">
+                        </div>
+
+                        <canvas id="graphCanvas"></canvas>
+                    </div>
+                </div>
+                <!-- Moved Resizer and Sidebar Here -->
+                <div id="resizer" class="resizer"></div>
+                <!-- Right: Results Panel -->
+                <div class="sidebar-panel">
+                    <!-- RESULTS VIEW -->
+                    <div id="viewResults" style="display: flex; flex-direction: column; height: 100%;">
+                        <div class="panel-header">EXPLORER: RESULTS</div>
+                        <div class="results-list" id="resultsList">
+                            <div class="empty-state">No MIS found yet. Draw graph and click Start.</div>
+                        </div>
+                    </div>
+                </div>
+        </div>

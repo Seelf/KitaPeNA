@@ -1,0 +1,274 @@
+            <!-- Performance View (Hidden by default) -->
+            <!-- Performance View (Hidden by default) -->
+            <div id="viewPerformance" class="performance-view">
+                <div class="performance-header">
+                    <div class="icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </div>
+                    Algorithm Benchmarks
+                </div>
+
+                <div class="perf-container">
+                    <!-- Sidebar Config -->
+                    <div class="perf-sidebar">
+                        <div class="config-section">
+                            <h4>Graph Source</h4>
+                            <div class="input-group">
+                                <select id="benchSourceSelect">
+                                    <option value="random">Random Graphs</option>
+                                    <option value="saved">Saved Graphs</option>
+                                    <option value="petri" selected>Petri Nets</option>
+                                    <option value="pnh">PNH Files (Local)</option>
+                                    <option value="atlas">NetworkX Atlas Graphs</option>
+                                </select>
+                            </div>
+
+                            <!-- Random Config -->
+                            <div id="configRandom">
+                                <div class="input-group">
+                                    <label>Node Count (N) Range</label>
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="number" id="benchStartN" value="10" placeholder="Start">
+                                        <input type="number" id="benchEndN" value="100" placeholder="End">
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>Step Size</label>
+                                    <input type="number" id="benchStepN" value="10">
+                                </div>
+                                <div class="input-group">
+                                    <label>Density (0.0 - 1.0)</label>
+                                    <input type="number" id="benchDensity" value="0.5" step="0.1" max="1.0" min="0.0">
+                                </div>
+                            </div>
+
+                            <!-- Saved Config -->
+                            <div id="configSaved" style="display: none;">
+                                <div class="input-group">
+                                    <label>Select Graphs</label>
+                                    <div class="list-controls">
+                                        <span onclick="window.selectListItems('benchSavedList', true)">All</span> |
+                                        <span onclick="window.selectListItems('benchSavedList', false)">None</span>
+                                    </div>
+                                    <input type="text" id="searchBenchGraphs" placeholder="Search Graphs...">
+                                    <div id="benchSavedList">
+                                        <div style="padding: 5px; color: #888; font-style: italic;">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="configPetri" style="display: none;">
+                                <div class="input-group">
+                                    <label>Graph Representation</label>
+                                    <select id="benchPetriGraphType">
+                                        <option value="concurrency" selected>Concurrency Graph (Default)</option>
+                                        <option value="reachability">Reachability Graph</option>
+                                        <option value="pnh">PNH File (Direct)</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <label>Select Petri Nets</label>
+                                        <button id="btnPetriFilters" class="btn-xs" title="Filter Petri Nets"
+                                            style="padding: 2px 6px; display: inline-flex; align-items: center; justify-content: center;">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round">
+                                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div class="list-controls">
+                                        <span onclick="window.selectListItems('benchPetriList', true)">All</span> |
+                                        <span onclick="window.selectListItems('benchPetriList', false)">None</span> |
+                                        <span id="btnClearPetriFilters" title="Clear applied filters"
+                                            style="cursor: pointer;">Clear Filters</span>
+                                    </div>
+                                    <input type="text" id="searchBenchPetri" placeholder="Search...">
+                                    <div id="benchPetriList">
+                                        <div style="padding: 5px; color: #888; font-style: italic;">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="configPnh" style="display: none;">
+                                <div class="input-group">
+                                    <label>Select PNH Files</label>
+                                    <div class="list-controls">
+                                        <span onclick="window.selectListItems('benchPnhFileList', true)">All</span> |
+                                        <span onclick="window.selectListItems('benchPnhFileList', false)">None</span>
+                                    </div>
+                                    <input type="text" id="searchBenchPnh" placeholder="Search filenames...">
+                                    <div id="benchPnhFileList">
+                                        <div style="padding: 5px; color: #888; font-style: italic;">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="configAtlas" style="display: none;">
+                                <div class="input-group">
+                                    <label>Vertex Count (N)</label>
+                                    <select id="benchAtlasN">
+                                        <option value="2">Up to 2 Vertices (3 graphs total)</option>
+                                        <option value="3">Up to 3 Vertices (7 graphs total)</option>
+                                        <option value="4">Up to 4 Vertices (18 graphs total)</option>
+                                        <option value="5">Up to 5 Vertices (52 graphs total)</option>
+                                        <option value="6">Up to 6 Vertices (208 graphs total)</option>
+                                        <option value="7" selected>Up to 7 Vertices (1252 graphs total)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="configRandomCount">
+                                <div class="input-group">
+                                    <label>Number of Graphs to Generate</label>
+                                    <input type="number" id="benchGraphCount" value="5">
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>Iterations per benchmark</label>
+                                <input type="number" id="benchIterations" value="5" min="1">
+                            </div>
+
+                            <div class="input-group">
+                                <label>Timeout (seconds)</label>
+                                <input type="number" id="benchTimeout" value="" min="1"
+                                    placeholder="Empty for default (60s)">
+                            </div>
+
+                            <label class="algo-checkbox"
+                                style="margin-top: 15px; background: rgba(0, 0, 0, 0.2); border: 1px solid #333; padding: 10px;">
+                                <input type="checkbox" id="benchLogScale">
+                                <span style="font-size: 13px; color: #ccc;">Enable Logarithmic Y-Axis</span>
+                            </label>
+
+                            <h4
+                                style="margin-top: 15px; margin-bottom: 5px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                                Results Aggregation</h4>
+                            <div id="aggregationContainer">
+                                <div class="input-group aggregation-item"
+                                    style="display: flex; gap: 5px; align-items: flex-end;">
+                                    <div style="flex: 1;">
+                                        <select class="benchAggregationSelect">
+                                            <option value="mean" selected>Mean (Average)</option>
+                                            <option value="median">Median (Middle Value)</option>
+                                            <option value="min">Minimum (Best Time)</option>
+                                            <option value="max">Maximum (Worst Time)</option>
+                                            <option value="p95">95th Percentile</option>
+                                        </select>
+                                    </div>
+
+                                    <button type="button" class="btn btn-sm btn-primary btn-add-agg"
+                                        style="height: 38px; padding: 0 15px;"
+                                        onclick="window.addAggregationSelector()">+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="config-section">
+                            <div class="section-header">
+                                <h4>Algorithms</h4>
+                                <button id="btnManageAlgos" class="btn-xs">Manage</button>
+                            </div>
+                            <div class="list-controls">
+                                <span onclick="window.selectListItems('algoListContainer', true)">All</span> |
+                                <span onclick="window.selectListItems('algoListContainer', false)">None</span>
+                            </div>
+                            <input type="text" id="searchAlgos" placeholder="Search algorithms...">
+                            <div id="algoListContainer" class="algo-list">
+                                <!-- Dynamic Algos Here -->
+                            </div>
+                        </div>
+
+                        <div class="config-section">
+                            <div class="section-header">
+                                <h4>Data Extraction Regex</h4>
+                                <button id="btnManageRegex" class="btn-xs">MANAGE</button>
+                            </div>
+                            <div class="list-controls">
+                                <span onclick="window.selectListItems('regexListContainer', true)">All</span> |
+                                <span onclick="window.selectListItems('regexListContainer', false)">None</span> |
+                                <span onclick="window.exportSelectedRegexes()">Export Selected</span> |
+                                <span onclick="document.getElementById('importRegexInput').click()">Import</span>
+                                <input type="file" id="importRegexInput" style="display: none;" accept=".json">
+                            </div>
+                            <input type="text" id="searchRegexes" placeholder="Search regexes...">
+                            <div id="regexListContainer" class="algo-list" style="max-height: 150px; overflow-y: auto;">
+                                <!-- Dynamic Regexes Here -->
+                            </div>
+                        </div>
+
+
+
+                        <div class="config-section run-section">
+                            <h4>Actions</h4>
+                            <button id="btnRunBenchmark" class="btn-run-bench">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                Run Benchmark
+                            </button>
+                            <div id="benchmarkStatus" class="perf-status">Ready</div>
+
+                            <div class="console-wrapper">
+                                <div class="console-header">
+                                    <span>Execution Console</span>
+                                    <div class="header-actions">
+                                        <button id="btnClearConsole" class="btn-xs" title="Clear Console">🗑️</button>
+                                        <button id="btnExpandConsole" class="btn-xs" title="Fullscreen">⛶</button>
+                                    </div>
+                                </div>
+                                <div id="benchConsole" class="bench-console">
+                                    <div class="console-line system">Console initialized. Ready for benchmark...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Chart Area -->
+                    <div class="perf-main" id="perfChartsContainer">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0; color: var(--accent); font-size: 16px;">Charts</h3>
+                        </div>
+                        <canvas id="perfChart_0" style="min-height: 400px;"></canvas>
+                    </div>
+
+                    <!-- Results Table Area -->
+                    <div id="benchmarkResultsTableContainer"
+                        style="display: none; padding: 20px; background: var(--panel-bg); border-radius: 6px; border: 1px solid var(--border-color); margin-top: 20px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0; color: var(--accent); font-size: 16px;">Detailed Results</h3>
+                            <div style="display: flex; gap: 5px; align-items: center;">
+                                <button id="btnExportBenchmarkCsv" class="btn secondary" style="font-size: 11px;">Export
+                                    CSV</button>
+                                <button id="btnExportBenchmarkLatex" class="btn secondary"
+                                    style="font-size: 11px;">Export LaTeX</button>
+                            </div>
+                        </div>
+                        <div id="tableSettingsPanel"
+                            style="display: block; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; padding: 10px; margin-bottom: 15px; font-size: 11px;">
+                            <div id="dynamicColsContainer"
+                                style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+                                <!-- Created dynamically in JS: Context, Algorithm, Aggregations, Regexes -->
+                            </div>
+                        </div>
+                        <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                            <table class="data-table" id="benchmarkResultsTable">
+                                <thead>
+                                    <!-- Dynamic Headers -->
+                                </thead>
+                                <tbody>
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
