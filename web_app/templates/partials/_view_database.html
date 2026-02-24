@@ -1,125 +1,178 @@
 <!-- Database Explorer View -->
 <div id="viewDatabaseExplorer" class="db-explorer-view" style="display: none;">
     <!-- Toolbar -->
-    <div class="db-toolbar">
-        <div class="db-search">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                style="margin-right: 8px; color: #666;">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input type="text" id="dbSearchInput" placeholder="Search nets by name...">
+    <!-- Toolbars Wrapper -->
+    <div class="db-toolbars-wrapper">
+        <!-- Top Tabs Bar -->
+        <div class="db-tabs-bar"
+            style="display: flex; height: 35px; padding: 0; align-items: flex-end; border-bottom: 1px solid var(--border-color); background-color: #1e1e1e;">
+            <div class="explorer-tabs">
+                <div class="db-view-tab active" data-view="petri">Petri Nets</div>
+                <div class="db-view-tab" data-view="graphs">Graphs</div>
+            </div>
+            <input type="hidden" id="dbViewSelect" value="petri">
         </div>
 
-        <div class="db-bulk-dropdown" id="dbBulkDropdown">
-            <button id="btnDbBulkMenu" class="btn secondary btn-xs" title="Bulk Management">
-                Bulk ▾
-            </button>
-            <div id="dbBulkMenu" class="db-bulk-dropdown-menu" style="display: none;">
-                <div class="db-bulk-item" id="btnDbSelectAll">
-                    Select All
-                </div>
-                <div class="db-bulk-item" id="btnDbSelectDuplicates">
-                    Duplicates
-                </div>
-                <div class="db-bulk-item" id="btnDbClearSelection" style="display: none;">
-                    Clear Selection
-                </div>
-                <div class="db-bulk-divider" id="dbBulkExportDivider" style="display: none;"></div>
-                <div class="db-bulk-item danger" id="btnDbDeleteSelected" style="display: none;">
-                    Delete Selected (<span id="dbSelectedCount">0</span>)
-                </div>
-                <div class="db-bulk-item" id="btnDbExportPnh" style="display: none;">
-                    Export to PNH
-                </div>
-                <div class="db-bulk-item" id="btnDbExportPnml" style="display: none;">
-                    Export to PNML
-                </div>
-                <div class="db-bulk-item" id="btnDbExportJson" style="display: none;">
-                    Export to JSON
-                </div>
-            </div>
-        </div>
-
-        <div class="db-actions">
-            <select id="dbViewSelect" class="db-select"
-                style="margin-right: 15px; background: #333; color: #fff; border: 1px solid #555; padding: 5px; border-radius: 4px;">
-                <option value="petri" selected>View: Petri Nets</option>
-                <option value="graphs">View: Standard Graphs</option>
-            </select>
-            <span id="dbStats" style="margin-right: 15px; font-size: 12px; color: #888;"></span>
-
-            <div class="db-filters-advanced" style="display: flex; gap: 8px; margin-right: 15px; align-items: center;">
-                <div class="filter-unit" title="Min Places">
-                    <span style="font-size: 10px; color: #666;">P≥</span>
-                    <input type="number" id="dbMinP" class="db-input-small" min="0" style="width: 40px;">
-                </div>
-                <div class="filter-unit" title="Min Transitions">
-                    <span style="font-size: 10px; color: #666;">T≥</span>
-                    <input type="number" id="dbMinT" class="db-input-small" min="0" style="width: 40px;">
-                </div>
-                <div class="filter-unit" title="Min Arcs">
-                    <span style="font-size: 10px; color: #666;">A≥</span>
-                    <input type="number" id="dbMinA" class="db-input-small" min="0" style="width: 40px;">
-                </div>
-                <div class="filter-unit" title="Min Tokens">
-                    <span style="font-size: 10px; color: #666;">K≥</span>
-                    <input type="number" id="dbMinK" class="db-input-small" min="0" style="width: 40px;">
-                </div>
-                <div class="filter-unit" title="Graph Class">
-                    <input type="text" id="dbModelClass" class="db-input-small" placeholder="Class"
-                        style="width: 60px;">
-                </div>
+        <!-- Main Action Bar: Search, Stats, Bulk, Import, Refresh -->
+        <div class="db-toolbar" style="height: 50px; border-bottom: 1px solid var(--border-color);">
+            <div class="db-search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    style="margin-right: 8px; color: #666;">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="dbSearchInput" placeholder="Search nets by name...">
             </div>
 
-            <select id="dbSortSelect" class="db-select">
-                <option value="date_desc">Newest First</option>
-                <option value="date_asc">Oldest First</option>
-                <option value="name_asc">Name A-Z</option>
-                <option value="places_desc">Most Places</option>
-                <option value="places_asc">Least Places</option>
-                <option value="transitions_desc">Most Transitions</option>
-                <option value="transitions_asc">Least Transitions</option>
-                <option value="arcs_desc">Most Arcs</option>
-                <option value="arcs_asc">Least Arcs</option>
-                <option value="tokens_desc">Most Tokens</option>
-                <option value="tokens_asc">Least Tokens</option>
-            </select>
-
-            <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
-                <button id="btnImportDropdown" class="btn primary"
-                    onclick="const m = document.getElementById('importDropdownMenu'); m.style.display = m.style.display === 'none' ? 'block' : 'none';">
-                    Import ▼
+            <div id="dbFilterStatusRow" style="margin-left: 20px; display: flex; align-items: center; gap: 10px;">
+                <button id="btnDbFilters" class="btn secondary btn-xs" title="Advanced Filters"
+                    style="height: 30px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid #444;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
+                    <span style="font-weight: 600;">Filters</span>
                 </button>
-                <div id="importDropdownMenu"
-                    style="display: none; position: absolute; top: 100%; left: 0; background-color: #2a2a2a; border: 1px solid #444; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 9999; min-width: 160px; margin-top: 5px;">
-                    <div style="padding: 10px 15px; border-bottom: 1px solid #444;">
-                        <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 5px;">Format:</label>
-                        <select id="importFormatSelect" class="db-select"
-                            style="width: 100%; background: #222; border: 1px solid #555; color: #ddd; padding: 4px; border-radius: 3px; font-size: 12px;">
-                            <option value="all">Wszystkie dozwolone</option>
-                            <option value=".pnh">Tylko .pnh</option>
-                            <option value=".pnml">Tylko .pnml / .xml</option>
-                            <option value=".json">Tylko .json</option>
-                        </select>
+                <div id="dbActiveFiltersIndicator"
+                    style="display: none; font-size: 10px; background: var(--accent); color: white; border-radius: 12px; padding: 2px 8px; font-weight: bold;">
+                    <span id="dbActiveFiltersCount">0</span>
+                </div>
+                <button id="btnDbClearFiltersToolbar" class="btn-xs"
+                    style="display: none; background: none; border: none; color: #f66; cursor: pointer; font-size: 11px;"
+                    title="Clear all filters">Clear All</button>
+                <span id="dbStats" style="font-size: 13px; color: #888;"></span>
+            </div>
+
+            <div class="db-actions" style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+                <div class="db-bulk-dropdown" id="dbBulkDropdown"
+                    style="border-right: 1px solid #444; padding-right: 15px;">
+                    <button id="btnDbBulkMenu" class="btn secondary btn-xs" title="Bulk Management">
+                        Bulk
+                    </button>
+                    <div id="dbBulkMenu" class="db-bulk-dropdown-menu" style="display: none;">
+                        <div class="db-bulk-item" id="btnDbSelectAll">Select All</div>
+                        <div class="db-bulk-item" id="btnDbSelectDuplicates">Duplicates</div>
+                        <div class="db-bulk-item" id="btnDbClearSelection" style="display: none;">Clear Selection</div>
+                        <div class="db-bulk-divider" id="dbBulkExportDivider" style="display: none;"></div>
+                        <div class="db-bulk-item danger" id="btnDbDeleteSelected" style="display: none;">
+                            Delete Selected (<span id="dbSelectedCount">0</span>)
+                        </div>
+                        <div class="db-bulk-item" id="btnDbExportPnh" style="display: none;">Export to PNH</div>
+                        <div class="db-bulk-item" id="btnDbExportPnml" style="display: none;">Export to PNML</div>
+                        <div class="db-bulk-item" id="btnDbExportJson" style="display: none;">Export to JSON</div>
                     </div>
-                    <label for="importNetInput"
-                        style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left; border-bottom: 1px solid #444;"
-                        onmouseover="this.style.backgroundColor='#444'"
-                        onmouseout="this.style.backgroundColor='transparent'">Select Files</label>
-                    <label for="importFolderInput"
-                        style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left;"
-                        onmouseover="this.style.backgroundColor='#444'"
-                        onmouseout="this.style.backgroundColor='transparent'">Select Folder</label>
+                </div>
+
+                <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
+                    <button id="btnImportDropdown" class="btn primary btn-xs" style="height: 30px;"
+                        onclick="const m = document.getElementById('importDropdownMenu'); m.style.display = m.style.display === 'none' ? 'block' : 'none';">
+                        Import ▼
+                    </button>
+                    <div id="importDropdownMenu"
+                        style="display: none; position: absolute; top: 100%; right: 0; background-color: #2a2a2a; border: 1px solid #444; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 9999; min-width: 160px; margin-top: 5px;">
+                        <div style="padding: 10px 15px; border-bottom: 1px solid #444;">
+                            <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 5px;">Format /
+                                Parser:</label>
+                            <select id="importFormatSelect" class="db-select"
+                                style="width: 100%; background: #222; border: 1px solid #555; color: #ddd; padding: 4px; border-radius: 3px; font-size: 12px; margin-bottom: 8px;">
+                                <option value="all">All Supported</option>
+                                <option value=".pnh">Only .pnh (Built-in)</option>
+                                <option value=".pnml">Only .pnml / .xml (Built-in)</option>
+                                <option value=".json">Only .json (Built-in)</option>
+                            </select>
+                            <button id="btnOpenParserModal" class="btn-xs highlight"
+                                style="width: 100%; padding: 4px;">Parser Builder</button>
+                        </div>
+                        <label for="importNetInput"
+                            style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left; border-bottom: 1px solid #444;"
+                            onmouseover="this.style.backgroundColor='#444'"
+                            onmouseout="this.style.backgroundColor='transparent'">Select Files</label>
+                        <label for="importFolderInput"
+                            style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left;"
+                            onmouseover="this.style.backgroundColor='#444'"
+                            onmouseout="this.style.backgroundColor='transparent'">Select Folder</label>
+                    </div>
+                </div>
+                <input type="file" id="importNetInput" multiple style="display: none;">
+                <input type="file" id="importFolderInput" webkitdirectory directory multiple style="display: none;">
+
+                <button id="btnRefreshDb" class="btn secondary btn-xs" style="height: 30px;">
+                    Refresh
+                </button>
+            </div>
+        </div>
+        <div id="dbAdvancedFiltersPanel"
+            style="display: none; background: #1a1a1a; border-bottom: 1px solid var(--border-color); padding: 15px 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                <!-- Left Column: Properties -->
+                <div>
+                    <h4
+                        style="color: var(--accent); margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <span>Property Filters</span>
+                        <button id="btnAddDbPropFilter" class="btn primary btn-xs"
+                            style="font-size: 9px; padding: 2px 6px;">+ Add condition</button>
+                    </h4>
+                    <div id="dbPropFiltersContainer"
+                        style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px; max-height: 150px; overflow-y: auto; padding: 10px 5px 5px 0;">
+                        <div id="dbPropFiltersEmpty"
+                            style="color: #666; font-size: 11px; font-style: italic; text-align: center; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 4px; border: 1px dashed #333;">
+                            No property filters applied.
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">Graph
+                            Class</label>
+                        <input type="text" id="dbFilterModelClass" placeholder="e.g. MG, SM, SPN..."
+                            style="width: 100%; padding: 6px; background: #111; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px;">
+                    </div>
+                </div>
+
+                <!-- Right Column: Metadata & Sort -->
+                <div>
+                    <h4
+                        style="color: var(--accent); margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Metadata & Sorting
+                    </h4>
+                    <div class="input-row" style="margin-bottom: 10px;">
+                        <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">Keyword
+                            Search</label>
+                        <input type="text" id="dbFilterMetaSearch" placeholder="Search in raw metadata..."
+                            style="width: 100%; padding: 6px; background: #111; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px;">
+                    </div>
+                    <div class="input-row" style="margin-bottom: 15px;">
+                        <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">Regex
+                            Filter</label>
+                        <input type="text" id="dbFilterMetaRegex" placeholder="Regex..."
+                            style="width: 100%; padding: 6px; background: #111; border: 1px solid #333; color: #acf; border-radius: 4px; font-family: monospace; font-size: 11px;">
+                    </div>
+
+                    <div style="display: flex; gap: 15px; align-items: flex-end;">
+                        <div style="flex: 1;">
+                            <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">Sort
+                                Order</label>
+                            <select id="dbSortSelect"
+                                style="width: 100%; padding: 6px; background: #111; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px;">
+                                <option value="date_desc">Newest First</option>
+                                <option value="date_asc">Oldest First</option>
+                                <option value="name_asc">Name A-Z</option>
+                                <option value="places_desc">Most Places</option>
+                                <option value="places_asc">Least Places</option>
+                                <option value="transitions_desc">Most Transitions</option>
+                                <option value="transitions_asc">Least Transitions</option>
+                                <option value="arcs_desc">Most Arcs</option>
+                                <option value="arcs_asc">Least Arcs</option>
+                                <option value="tokens_desc">Most Tokens</option>
+                                <option value="tokens_asc">Least Tokens</option>
+                            </select>
+                        </div>
+                        <button id="btnResetDbFilters" class="btn secondary btn-xs" style="height: 32px;">Reset</button>
+                        <button id="btnApplyDbFilters" class="btn primary btn-xs" style="height: 32px;">Apply</button>
+                    </div>
                 </div>
             </div>
-            <input type="file" id="importNetInput" accept=".pnh,.json,.pnml,.xml" multiple style="display: none;">
-            <input type="file" id="importFolderInput" webkitdirectory directory multiple style="display: none;">
-
-            <button id="btnRefreshDb" class="btn secondary">
-                Refresh
-            </button>
         </div>
+
     </div>
 
     <!-- Grid Container -->
@@ -127,4 +180,6 @@
         <!-- Cards will be injected here -->
         <div class="empty-state">Loading saved nets...</div>
     </div>
+
+
 </div>

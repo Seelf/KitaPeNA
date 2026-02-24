@@ -116,16 +116,18 @@ def get_saved_petri_nets():
         offset = (page - 1) * per_page
         
         # 3. Advanced Filters
-        def get_int_param(name):
-            val = request.args.get(name)
-            try: return int(val) if val is not None else None
-            except: return None
-
-        min_p = get_int_param('min_p')
-        min_t = get_int_param('min_t')
-        min_a = get_int_param('min_a')
-        min_k = get_int_param('min_k')
+        prop_filters_str = request.args.get('prop_filters')
+        prop_filters = []
+        if prop_filters_str:
+            try:
+                import json
+                prop_filters = json.loads(prop_filters_str)
+            except Exception as e:
+                print(f"Error parsing prop_filters: {e}")
+                
         model_class = request.args.get('class')
+        metadata_search = request.args.get('meta_search', '').strip()
+        metadata_regex = request.args.get('meta_regex', '').strip()
         
         data = db.get_all_petri_nets(
             limit=per_page, 
@@ -133,16 +135,22 @@ def get_saved_petri_nets():
             search_query=search_query, 
             sort_by=sort_key, 
             order=order,
-            min_places=min_p,
-            min_transitions=min_t,
-            min_arcs=min_a,
-            min_tokens=min_k,
-            filter_model_class=model_class
+            prop_filters=prop_filters,
+            filter_model_class=model_class,
+            metadata_search=metadata_search if metadata_search else None,
+            metadata_regex=metadata_regex if metadata_regex else None
         )
+        
+        # 4. Get total absolute count (no filters)
+        conn = db.get_db_connection()
+        res_abs = db.execute_query(conn, 'SELECT COUNT(*) FROM petri_nets', fetchone=True)
+        total_db = list(res_abs.values())[0] if res_abs else 0
+        conn.close()
         
         return jsonify({
             'nets': data['nets'],
             'total': data['total'],
+            'total_db': total_db,
             'page': page,
             'per_page': per_page
         })
@@ -289,3 +297,173 @@ def download_gspn(net_id):
         'def_filename': f"{net['name']}.def",
         'def_content': gspn_data['def']
     })
+
+# --- Custom Parsers ---
+
+@petri_bp.route('/parsers', methods=['GET'])
+@login_required
+def get_parsers():
+    parsers = db.get_all_parsers()
+    return jsonify(parsers)
+
+@petri_bp.route('/parsers', methods=['POST'])
+@login_required
+def create_parser():
+    data = request.json
+    name = data.get('name')
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    
+    desc = data.get('description', '')
+    rules = data.get('rules', [])
+    sample = data.get('sample_input', '')
+    
+    db.save_parser(name, desc, rules, sample)
+    return jsonify({'status': 'success'}), 201
+
+@petri_bp.route('/parsers/<int:parser_id>', methods=['PUT'])
+@login_required
+def update_parser(parser_id):
+    data = request.json
+    name = data.get('name')
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+        
+    desc = data.get('description', '')
+    rules = data.get('rules', [])
+    sample = data.get('sample_input', '')
+    
+    db.update_parser(parser_id, name, desc, rules, sample)
+    return jsonify({'status': 'success'})
+
+@petri_bp.route('/parsers/<int:parser_id>', methods=['DELETE'])
+@login_required
+def delete_parser(parser_id):
+    db.delete_parser(parser_id)
+    return jsonify({'status': 'deleted'})
+
+@petri_bp.route('/parsers/test', methods=['POST'])
+@login_required
+def test_parser():
+    """Applies extraction rules to the provided sample_input and returns the parsed JSON."""
+    data = request.json
+    rules = data.get('rules', [])
+    text = data.get('sample_input', '')
+    
+    import re
+    
+    result = {
+        'places': [],
+        'transitions': [],
+        'arcs': [],
+        'metadata': {'raw': ''}
+    }
+    
+    try:
+        lines = text.splitlines()
+        
+        for rule in rules:
+            target = rule.get('target')
+            method = rule.get('method')
+            pattern = rule.get('pattern', '')
+            transform = rule.get('transform', '')
+            
+            extracted_text = ""
+            
+            # 1. Extract text based on method
+            if method == 'regex' and pattern:
+                flags = rule.get('flags', 'gm')
+                re_flags = 0
+                if 'i' in flags: re_flags |= re.IGNORECASE
+                if 'm' in flags: re_flags |= re.MULTILINE
+                
+                try:
+                    matches = re.finditer(pattern, text, re_flags)
+                    extracted_parts = []
+                    for m in matches:
+                        # If there are capture groups, use the first one, else the whole match
+                        if m.lastindex:
+                            extracted_parts.append(m.group(1).strip())
+                        else:
+                            extracted_parts.append(m.group(0).strip())
+                    extracted_text = "\n".join(extracted_parts)
+                except re.error as e:
+                    return jsonify({'error': f"Regex error in rule for {target}: {str(e)}"}), 400
+                    
+            elif method == 'lines':
+                start_line = int(rule.get('startLine', 1)) - 1
+                end_line = int(rule.get('endLine', len(lines)))
+                # Bounds check
+                start_line = max(0, start_line)
+                end_line = min(len(lines), end_line)
+                if start_line < end_line:
+                    extracted_text = "\n".join(lines[start_line:end_line])
+
+            if not extracted_text:
+                continue
+
+            # 2. Transform into target schema
+            if target == 'metadata':
+                if transform == 'join_newline':
+                    result['metadata']['raw'] += ("\n" + extracted_text) if result['metadata']['raw'] else extracted_text
+                else:
+                    result['metadata']['raw'] += ("\n" + extracted_text) if result['metadata']['raw'] else extracted_text
+
+            elif target in ['places', 'transitions']:
+                names = []
+                if transform == 'split_comma':
+                    names = [n.strip() for n in extracted_text.split(',') if n.strip()]
+                elif transform == 'split_newline':
+                    names = [n.strip() for n in extracted_text.splitlines() if n.strip()]
+                elif transform == 'split_semicolon':
+                    names = [n.strip() for n in extracted_text.split(';') if n.strip()]
+                else: 
+                    # fallback
+                    names = [n.strip() for n in extracted_text.splitlines() if n.strip()]
+                
+                # Append to existing
+                arr = result[target]
+                start_id = len(arr)
+                for i, name in enumerate(names):
+                    if target == 'places':
+                        arr.append({"id": start_id + i, "label": name, "tokens": 0})
+                    else:
+                        arr.append({"id": start_id + i, "label": name})
+
+            elif target == 'arcs':
+                if transform == 'arc_pairs':
+                    # Expects format like "p1->t1\nt1->p2" or regex capturing groups (src, tgt) earlier
+                    # If regex captured comma separated values e.g. "p1,t1"
+                    pairs = extracted_text.splitlines()
+                    for pair in pairs:
+                        parts = pair.replace('->', ',').split(',')
+                        if len(parts) >= 2:
+                            src = parts[0].strip()
+                            tgt = parts[1].strip()
+                            # Resolve IDs
+                            src_id = next((p['id'] for p in result['places'] if p['label'] == src), None)
+                            tgt_id = next((t['id'] for t in result['transitions'] if t['label'] == tgt), None)
+                            if src_id is not None and tgt_id is not None:
+                                result['arcs'].append({"sourceId": src_id, "targetId": tgt_id, "type": "place_to_transition", "weight": 1})
+                            else:
+                                src_id = next((t['id'] for t in result['transitions'] if t['label'] == src), None)
+                                tgt_id = next((p['id'] for p in result['places'] if p['label'] == tgt), None)
+                                if src_id is not None and tgt_id is not None:
+                                    result['arcs'].append({"sourceId": src_id, "targetId": tgt_id, "type": "transition_to_place", "weight": 1})
+
+            elif target == 'marking':
+                tokens = []
+                if transform == 'split_comma_int':
+                    tokens = [int(t.strip()) for t in extracted_text.split(',') if t.strip().isdigit()]
+                elif transform == 'split_space_int':
+                    tokens = [int(t.strip()) for t in extracted_text.split() if t.strip().isdigit()]
+                
+                for i, t_val in enumerate(tokens):
+                    if i < len(result['places']):
+                        result['places'][i]['tokens'] = t_val
+
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

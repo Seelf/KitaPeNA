@@ -21,6 +21,7 @@ from web_app.api.petri.analysis import petri_analysis_bp
 from web_app.api.analysis import analysis_bp
 from web_app.api.solve import solve_bp
 from web_app.api.benchmark import benchmark_bp
+from web_app.api.explorer import explorer_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -43,6 +44,7 @@ app.register_blueprint(petri_analysis_bp, url_prefix='/api/petri') # /api/petri/
 app.register_blueprint(analysis_bp, url_prefix='/api/analysis') # /api/analysis/transitivity, /coloring
 app.register_blueprint(solve_bp, url_prefix='/api/solve')
 app.register_blueprint(benchmark_bp, url_prefix='/api/benchmark')
+app.register_blueprint(explorer_bp, url_prefix='/api/explorer')
 
 @app.errorhandler(429)
 def ratelimit_handler(e):

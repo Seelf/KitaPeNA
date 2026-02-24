@@ -14,6 +14,7 @@ import { initTabs, triggerAutoSave, createNewTab } from './tabs.js';
 import { initBenchmarking } from '../domain/benchmarking/benchmarking.js';
 import { initAlgoManager } from '../domain/algo/algo_manager.js';
 import { initDatabaseExplorer, openDatabaseExplorer } from '../ui/database_explorer.js';
+import { initParserBuilder } from '../ui/database_explorer/parser_builder.js';
 
 // New Modules
 import { runForceDirectedLayout } from '../engine/layout/layout_engine.js';
@@ -31,6 +32,7 @@ initAdminConsole();
 initBenchmarking();
 initAlgoManager();
 initDatabaseExplorer();
+initParserBuilder();
 initResizer();
 
 // 2. Load State & Restore UI

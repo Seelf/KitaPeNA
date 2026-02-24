@@ -72,15 +72,27 @@ async function processFiles(files) {
     const isPetri = dbViewSelect && dbViewSelect.value === 'petri';
     const selectedFormat = (importFormatSelect && importFormatSelect.value !== 'all') ? importFormatSelect.value : null;
 
+    let customParser = null;
+    if (selectedFormat && selectedFormat.startsWith('custom_')) {
+        const parserId = parseInt(selectedFormat.replace('custom_', ''));
+        try {
+            const { getParserCache } = await import('./parser_builder.js');
+            const parsers = await getParserCache();
+            customParser = parsers.find(p => p.id === parserId);
+        } catch (err) {
+            console.error("Failed to load custom parser", err);
+        }
+    }
+
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
 
         // Skip if it doesn't match the explicitly selected format
-        if (selectedFormat) {
+        if (selectedFormat && !customParser) {
             if (selectedFormat === '.pnml' && !['.pnml', '.xml'].includes(ext)) continue;
             if (selectedFormat !== '.pnml' && ext !== selectedFormat) continue;
-        } else {
+        } else if (!customParser) {
             // General filtering by mode
             const allowed = isPetri ? PETRI_EXTENSIONS : GRAPH_EXTENSIONS;
             if (!allowed.includes(ext)) {
@@ -93,9 +105,20 @@ async function processFiles(files) {
             if (isPetri) {
                 const content = await file.text();
                 const name = file.name.split('.')[0];
-                let netContent;
+                let netContent = null;
 
-                if (ext === '.json') {
+                if (customParser) {
+                    const res = await fetch('/api/petri/parsers/test', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                        body: JSON.stringify({ rules: customParser.rules, sample_input: content })
+                    });
+                    if (res.ok) {
+                        netContent = await res.json();
+                    } else {
+                        console.error(`Custom parser failed for ${file.name}`);
+                    }
+                } else if (ext === '.json') {
                     netContent = JSON.parse(content);
                 } else if (ext === '.pnh') {
                     netContent = parsePnh(content);

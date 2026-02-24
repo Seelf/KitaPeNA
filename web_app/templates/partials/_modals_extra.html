@@ -1,106 +1,115 @@
-    <!-- Large Console Modal -->
-    <div id="largeConsoleModal" class="modal">
-        <div class="modal-content large-console-content">
-            <div class="modal-header">
-                <h3>Benchmark Execution Console</h3>
-                <span id="closeLargeConsole" class="close-btn">&times;</span>
-            </div>
-            <div class="large-console-wrapper">
-                <div class="console-header">
-                    <span>Live Output</span>
-                    <div class="header-actions">
-                        <button id="btnClearLargeConsole" class="btn-xs" title="Clear Console">🗑️</button>
-                    </div>
+<!-- Large Console Modal -->
+<div id="largeConsoleModal" class="modal">
+    <div class="modal-content large-console-content">
+        <div class="modal-header">
+            <h3>Benchmark Execution Console</h3>
+            <span id="closeLargeConsole" class="close-btn">&times;</span>
+        </div>
+        <div class="large-console-wrapper">
+            <div class="console-header">
+                <span>Live Output</span>
+                <div class="header-actions">
+                    <button id="btnClearLargeConsole" class="btn-xs" title="Clear Console">🗑️</button>
                 </div>
-                <div id="largeBenchConsole" class="bench-console large"></div>
             </div>
+            <div id="largeBenchConsole" class="bench-console large"></div>
         </div>
     </div>
+</div>
 
 
 
-    <!-- Petri Net Filter Modal -->
-    <div id="petriFilterModal" class="modal">
-        <div class="modal-content" style="width: 420px; max-height: 80vh;">
-            <div class="modal-header">
-                <span class="title">Petri Net Filters</span>
-                <button id="closePetriFilterModal" class="close-btn">✕</button>
-            </div>
-            <div class="modal-body modal-padding" style="background: #1e1e1e;">
-                <h4
-                    style="color: var(--accent); margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 5px;">
-                    Minimum Values
-                </h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
-                    <div class="input-row">
-                        <label>Places (P≥)</label>
-                        <input type="number" id="benchPetriMinP" min="0" placeholder="Any"
-                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
-                    </div>
-                    <div class="input-row">
-                        <label>Transitions (T≥)</label>
-                        <input type="number" id="benchPetriMinT" min="0" placeholder="Any"
-                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
-                    </div>
-                    <div class="input-row">
-                        <label>Arcs (A≥)</label>
-                        <input type="number" id="benchPetriMinA" min="0" placeholder="Any"
-                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
-                    </div>
-                    <div class="input-row">
-                        <label>Tokens (K≥)</label>
-                        <input type="number" id="benchPetriMinK" min="0" placeholder="Any"
-                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
-                    </div>
-                    <div class="input-row" style="grid-column: span 2;">
-                        <label>Graph Class</label>
-                        <input type="text" id="benchPetriModelClass"
-                            placeholder="e.g. PT, SPN (matches exact or partial)"
-                            style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
-                    </div>
+<!-- Petri Net Filter Modal -->
+<div id="petriFilterModal" class="modal">
+    <div class="modal-content"
+        style="width: 80vw; max-width: 80vw; height: 80vh; max-height: 80vh; display: flex; flex-direction: column;">
+        <div class="modal-header">
+            <span class="title">Petri Net Filters</span>
+            <button id="closePetriFilterModal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body modal-padding" style="background: #1e1e1e; flex: 1; overflow-y: auto;">
+            <h4
+                style="color: var(--accent); margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">
+                <span>Property Filters</span>
+                <button id="btnAddPetriPropFilter" class="btn js-add-filter"
+                    style="font-size: 10px; padding: 2px 6px;">+ Add Condition</button>
+            </h4>
+
+            <div id="benchPetriPropFiltersContainer"
+                style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+                <!-- Filter rows will be inserted here dynamically -->
+                <div id="benchPetriPropFiltersEmpty"
+                    style="color: #666; font-size: 12px; font-style: italic; text-align: center; padding: 10px;">
+                    No property filters applied.
                 </div>
+            </div>
 
-                <h4
-                    style="color: var(--accent); margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 5px;">
-                    Sort Order
-                </h4>
-                <div class="input-row" style="margin-bottom: 10px;">
-                    <select id="benchPetriSort"
+            <div style="margin-bottom: 20px;">
+                <div class="input-row">
+                    <label>Graph Class</label>
+                    <input type="text" id="benchPetriModelClass" placeholder="e.g. PT, SPN (matches exact or partial)"
                         style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
-                        <option value="date_desc">Newest First</option>
-                        <option value="date_asc">Oldest First</option>
-                        <option value="name_asc">Name A-Z</option>
-                        <option value="places_desc">Most Places</option>
-                        <option value="places_asc">Least Places</option>
-                        <option value="transitions_desc">Most Transitions</option>
-                        <option value="transitions_asc">Least Transitions</option>
-                        <option value="arcs_desc">Most Arcs</option>
-                        <option value="arcs_asc">Least Arcs</option>
-                        <option value="tokens_desc">Most Tokens</option>
-                        <option value="tokens_asc">Least Tokens</option>
-                    </select>
                 </div>
             </div>
-            <div class="modal-footer"
-                style="display: flex; justify-content: space-between; padding: 12px 20px; border-top: 1px solid #333;">
-                <button id="btnResetPetriFilters" class="btn secondary" style="font-size: 12px;">Reset</button>
-                <button id="btnApplyPetriFilters" class="btn-primary" style="font-size: 12px;">Apply Filters</button>
-            </div>
-        </div>
-    </div>
 
-    <!-- Universal Custom Modal -->
-    <div id="universalModal" class="modal" style="display: none; z-index: 999999;">
-        <div class="modal-content" style="max-width: 400px; text-align: center;">
-            <div class="modal-header">
-                <h3 id="universalModalTitle">Title</h3>
+            <h4 style="color: var(--accent); margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                Metadata Filters
+            </h4>
+            <div style="margin-bottom: 20px;">
+                <div class="input-row" style="margin-bottom: 10px;">
+                    <label>Search in metadata <span style="font-size:10px; color:#888;">(needle in
+                            haystack)</span></label>
+                    <input type="text" id="benchPetriMetaSearch" placeholder="e.g. Marked Graph, oil_separator, TRUE"
+                        style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                </div>
+                <div class="input-row">
+                    <label>Regex filter <span style="font-size:10px; color:#888;">(applied to raw metadata
+                            text)</span></label>
+                    <input type="text" id="benchPetriMetaRegex" placeholder="e.g. ;Classification:\s*Marked Graph"
+                        style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px; font-family: 'Courier New', monospace;">
+                </div>
             </div>
-            <div class="modal-body" style="padding: 20px 0; font-size: 14px; color: #ccc;">
-                <p id="universalModalMessage">Message goes here</p>
-            </div>
-            <div class="modal-actions" style="display: flex; justify-content: space-around; padding-top: 15px;">
-                <button id="btnUniversalCancel" class="btn secondary">Cancel</button>
-                <button id="btnUniversalConfirm" class="btn primary">Confirm</button>
+
+            <h4 style="color: var(--accent); margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                Sort Order
+            </h4>
+            <div class="input-row" style="margin-bottom: 10px;">
+                <select id="benchPetriSort"
+                    style="width: 100%; padding: 6px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                    <option value="date_desc">Newest First</option>
+                    <option value="date_asc">Oldest First</option>
+                    <option value="name_asc">Name A-Z</option>
+                    <option value="places_desc">Most Places</option>
+                    <option value="places_asc">Least Places</option>
+                    <option value="transitions_desc">Most Transitions</option>
+                    <option value="transitions_asc">Least Transitions</option>
+                    <option value="arcs_desc">Most Arcs</option>
+                    <option value="arcs_asc">Least Arcs</option>
+                    <option value="tokens_desc">Most Tokens</option>
+                    <option value="tokens_asc">Least Tokens</option>
+                </select>
             </div>
         </div>
+        <div class="modal-footer"
+            style="display: flex; justify-content: space-between; padding: 12px 20px; border-top: 1px solid #333;">
+            <button id="btnResetPetriFilters" class="btn secondary" style="font-size: 12px;">Reset</button>
+            <button id="btnApplyPetriFilters" class="btn-primary" style="font-size: 12px;">Apply Filters</button>
+        </div>
     </div>
+</div>
+
+<!-- Universal Custom Modal -->
+<div id="universalModal" class="modal" style="display: none; z-index: 999999;">
+    <div class="modal-content" style="max-width: 400px; text-align: center;">
+        <div class="modal-header">
+            <h3 id="universalModalTitle">Title</h3>
+        </div>
+        <div class="modal-body" style="padding: 20px 0; font-size: 14px; color: #ccc;">
+            <p id="universalModalMessage">Message goes here</p>
+        </div>
+        <div class="modal-actions" style="display: flex; justify-content: space-around; padding-top: 15px;">
+            <button id="btnUniversalCancel" class="btn secondary">Cancel</button>
+            <button id="btnUniversalConfirm" class="btn primary">Confirm</button>
+        </div>
+    </div>
+</div>

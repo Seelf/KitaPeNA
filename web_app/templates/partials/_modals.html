@@ -1,373 +1,463 @@
-        <!-- ADMIN MODAL -->
-        <div id="adminModal"
-            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 20000; justify-content: center; align-items: center;">
-            <div
-                style="background: #252526; width: 600px; max-height: 80vh; display: flex; flex-direction: column; border: 1px solid #444; box-shadow: 0 0 20px rgba(0,0,0,0.7);">
-                <div
-                    style="padding: 10px; background: #333; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: bold; color: #ddd;">🛡️ User Management Console</span>
-                    <button id="btnCloseAdmin"
-                        style="background: none; border: none; color: #ccc; cursor: pointer;">✕</button>
+<!-- ADMIN MODAL -->
+<div id="adminModal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 20000; justify-content: center; align-items: center;">
+    <div
+        style="background: #252526; width: 600px; max-height: 80vh; display: flex; flex-direction: column; border: 1px solid #444; box-shadow: 0 0 20px rgba(0,0,0,0.7);">
+        <div
+            style="padding: 10px; background: #333; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: bold; color: #ddd;">🛡️ User Management Console</span>
+            <button id="btnCloseAdmin" style="background: none; border: none; color: #ccc; cursor: pointer;">✕</button>
+        </div>
+
+        <div style="padding: 20px; overflow-y: auto;">
+            <!-- Change My Password -->
+            <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #333;">
+                <h4 style="color: #aaa; margin-bottom: 10px;">My Credentials</h4>
+                <div style="display: flex; gap: 10px;">
+                    <input type="password" id="inputNewAdminPass" placeholder="New Password"
+                        style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                    <button id="btnChangeAdminPass" class="btn primary">Update Password</button>
+                </div>
+            </div>
+
+            <!-- User List -->
+            <h4 style="color: #aaa; margin-bottom: 10px;">Users</h4>
+            <table style="width: 100%; text-align: left; font-size: 12px; color: #ccc; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid #444;">
+                        <th style="padding: 5px;">ID</th>
+                        <th style="padding: 5px;">Username</th>
+                        <th style="padding: 5px;">Role</th>
+                        <th style="padding: 5px;">Status</th>
+                        <th style="padding: 5px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+
+            <!-- Add User -->
+            <h4 style="color: #aaa; margin-top: 20px; margin-bottom: 10px;">Add New User</h4>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="inputNewUser" placeholder="Username"
+                    style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                <input type="password" id="inputNewPass" placeholder="Password"
+                    style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                <select id="selectNewRole"
+                    style="background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <button id="btnAddUser" class="btn primary">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ALGO MANAGER MODAL -->
+<div id="algoModal" class="modal">
+    <div class="modal-content algo-manager-modal">
+        <div class="modal-header">
+            <span class="title">Algorithm Manager (C++)</span>
+            <button id="closeAlgoModal" class="close-btn">✕</button>
+        </div>
+
+        <div class="modal-body algo-manager-body">
+            <!-- Left: List -->
+            <div class="modal-sidebar">
+                <div class="section-header">
+                    <h4>Algorithms</h4>
+                    <button id="btnNewAlgo" class="btn-xs highlight">+ New</button>
+                </div>
+                <div id="customAlgoList" class="standard-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Right: Editor -->
+            <div class="modal-main editor-panel">
+                <div class="editor-header-input"
+                    style="display: flex; background: #252526; border-bottom: 1px solid var(--border-color);">
+                    <input type="text" id="editAlgoName" placeholder="Algorithm Name (e.g. my_greedy_v2)"
+                        style="flex: 1; border: none; background: transparent;">
+                    <select id="algoLanguageSelect" class="btn-xs"
+                        style="margin: 5px; background: #333; border: 1px solid #444; color: #ccc;">
+                        <option value="cpp">C++</option>
+                        <option value="python">Python</option>
+                        <option value="php">PHP</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="plain">Plain Text</option>
+                    </select>
                 </div>
 
-                <div style="padding: 20px; overflow-y: auto;">
-                    <!-- Change My Password -->
-                    <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #333;">
-                        <h4 style="color: #aaa; margin-bottom: 10px;">My Credentials</h4>
-                        <div style="display: flex; gap: 10px;">
-                            <input type="password" id="inputNewAdminPass" placeholder="New Password"
-                                style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
-                            <button id="btnChangeAdminPass" class="btn primary">Update Password</button>
-                        </div>
+                <div id="monacoEditorContainer" style="flex: 1; min-height: 0;"></div>
+
+                <div class="modal-footer">
+                    <div id="compileStatus" class="status-text">Ready</div>
+                    <div class="actions">
+                        <button id="btnDeleteAlgo" class="btn-danger">Delete</button>
+                        <button id="btnSaveCompile" class="btn-primary">Save & Compile</button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-                    <!-- User List -->
-                    <h4 style="color: #aaa; margin-bottom: 10px;">Users</h4>
-                    <table
-                        style="width: 100%; text-align: left; font-size: 12px; color: #ccc; border-collapse: collapse;">
-                        <thead>
-                            <tr style="border-bottom: 1px solid #444;">
-                                <th style="padding: 5px;">ID</th>
-                                <th style="padding: 5px;">Username</th>
-                                <th style="padding: 5px;">Role</th>
-                                <th style="padding: 5px;">Status</th>
-                                <th style="padding: 5px;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="userTableBody">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+<!-- CMD MANAGER MODAL -->
+<div id="cmdModal" class="modal">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <span class="title">CLI Script Manager</span>
+            <button id="closeCmdModal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body modal-padding">
+            <input type="hidden" id="modalCmdId">
+            <div class="input-row">
+                <label>Script Name</label>
+                <input type="text" id="modalCmdName" placeholder="e.g. My Fast Solver">
+            </div>
+            <div class="input-row">
+                <label>Executable Path</label>
+                <input type="text" id="modalCmdPath" placeholder="/usr/bin/python3" style="font-family: monospace;">
+                <small class="hint-text">Absolute path to binary inside the Docker container.</small>
+            </div>
+            <div class="input-row">
+                <label>Args Template</label>
+                <input type="text" id="modalCmdArgs" placeholder="{pnh}" style="font-family: monospace;">
+                <div class="macro-hint">
+                    <strong style="display: block; margin-bottom: 5px;">Supported Macros:</strong>
+                    <ul
+                        style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+                        <li><code>{pnh}</code> — Full path to the generated <strong>.pnh</strong> file (Petri
+                            Net).</li>
+                        <li><code>{gspn}</code> — Path to <strong>.net</strong>/<strong>.def</strong> files
+                            (GreatSPN format).</li>
+                        <li><code>{id}</code> — The unique ID of the graph in the database.</li>
+                        <li><code>{name}</code> — The original name of the graph/net.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="btnExportCmd" class="btn secondary">Export JSON</button>
+            <div style="flex: 1;"></div>
+            <button id="btnSaveCmd" class="btn primary">Save Script</button>
+        </div>
+    </div>
+</div>
 
-                    <!-- Add User -->
-                    <h4 style="color: #aaa; margin-top: 20px; margin-bottom: 10px;">Add New User</h4>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <input type="text" id="inputNewUser" placeholder="Username"
-                            style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
-                        <input type="password" id="inputNewPass" placeholder="Password"
-                            style="flex: 1; background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
-                        <select id="selectNewRole"
-                            style="background: #1e1e1e; border: 1px solid #444; color: white; padding: 5px;">
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
+<!-- REGEX MANAGER MODAL -->
+<div id="regexModal" class="modal">
+    <div class="modal-content" style="width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
+        <div class="modal-header">
+            <span class="title">Regex Manager</span>
+            <button id="closeRegexModal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body modal-padding" style="flex: 1; overflow-y: auto;">
+            <input type="hidden" id="modalRegexId">
+            <div class="input-row">
+                <label>Regex Name</label>
+                <input type="text" id="modalRegexName" placeholder="e.g. Metric X Extractor">
+            </div>
+            <div class="input-row"
+                style="background: rgba(177, 128, 255, 0.05); padding: 10px; border-radius: 4px; border: 1px solid rgba(177, 128, 255, 0.2); margin-bottom: 20px;">
+                <label style="color: #b180ff;">Stage 0 (Input / Sample Output)</label>
+                <textarea id="modalRegexTestInput" placeholder="Paste tool output here to start building..."
+                    style="width: 100%; height: 80px; font-family: monospace; font-size: 11px; margin-bottom: 8px; background: #111; color: #eee; border: 1px solid #333; padding: 5px; resize: vertical;"></textarea>
+
+                <div style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase;">Stage
+                    0 Result (Select text to auto-extract):</div>
+                <div id="stage0Result" class="regex-stage-result"
+                    style="background: #000; padding: 8px; border: 1px solid #222; font-family: monospace; font-size: 11px; color: #ccc; min-height: 20px; max-height: 150px; overflow: auto; white-space: pre-wrap;">
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <label style="margin-bottom: 0;">Extraction Pipeline (Stages)</label>
+                    <button type="button" class="btn-xs" onclick="window.addRegexStage()" style="padding: 2px 6px;">+
+                        Add Custom Stage</button>
+                </div>
+                <div id="regexStagesContainer" style="display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Stages with inline results added dynamically -->
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div style="flex: 1;"></div>
+            <button id="btnSaveRegex" class="btn primary">Save Regex</button>
+        </div>
+    </div>
+</div>
+
+<!-- DSPN TOOL CONFIG MODAL -->
+<div id="dspnModal" class="modal">
+    <div class="modal-content" style="width: 750px; max-height: 90vh;">
+        <div class="modal-header">
+            <span class="title">DSPN-Tool Configurator</span>
+            <button id="closeDspnModal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body dspn-config-body"
+            style="padding:0; display: flex; flex-direction: row; overflow: hidden;">
+            <!-- Sidebar for Categories -->
+            <div class="modal-sidebar" style="width: 180px; background: #252526;">
+                <div class="dspn-cat active" data-target="dspn-general">General</div>
+                <div class="dspn-cat" data-target="dspn-analysis">Analysis Type</div>
+                <div class="dspn-cat" data-target="dspn-solver">Solver & Precond</div>
+                <div class="dspn-cat" data-target="dspn-params">Parameters</div>
+                <div class="dspn-cat" data-target="dspn-exports">Output & Invariants</div>
+            </div>
+            <!-- Main Content -->
+            <div class="modal-main modal-padding" style="flex: 1; overflow-y: auto; background: #1e1e1e;">
+                <div id="dspn-general" class="dspn-section">
+                    <h4
+                        style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                        General Settings</h4>
+                    <div class="input-row">
+                        <label>Verbosity</label>
+                        <select id="dspn_opt_verbose" style="width: 100%;">
+                            <option value="-nv">Basic Verbose (-nv)</option>
+                            <option value="-nnv">Quiet Mode (-nnv)</option>
+                            <option value="-v">Verbose (-v)</option>
+                            <option value="-vv">Very Verbose (-vv)</option>
                         </select>
-                        <button id="btnAddUser" class="btn primary">Create</button>
+                    </div>
+                    <div class="input-row">
+                        <label>Load Type</label>
+                        <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_pt"> <span>Load as P/T
+                                net (ignore delays) [-pt]</span></label>
+                    </div>
+                </div>
+
+                <div id="dspn-analysis" class="dspn-section" style="display:none;">
+                    <h4
+                        style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                        Analysis Type</h4>
+                    <div class="input-col-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size:10px; color:#888;">State Space</label>
+                            <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_trg"> <span>Build
+                                    TRG
+                                    [-trg]</span></label>
+                            <small class="hint-text">Tangible Reachability Graph.</small>
+                            <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_rg"> <span>Build RG
+                                    [-rg]</span></label>
+                            <small class="hint-text">Reachability Graph with vanishings.</small>
+                            <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_novpaths"> <span>No
+                                    vanishing paths [-no-vpaths]</span></label>
+                        </div>
+                        <div>
+                            <label style="font-size:10px; color:#888;">Solution</label>
+                            <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_s"> <span>Steady
+                                    State [-s]</span></label>
+                            <small class="hint-text">Compute stationary distribution.</small>
+                            <div class="input-row" style="margin-top:5px;">
+                                <label>Transient Time [-t]</label>
+                                <input type="number" id="dspn_val_t" step="0.1" placeholder="Time (sec)">
+                                <small class="hint-text">Compute transient solution at time T.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-row" style="margin-top:10px;">
+                        <label>Method</label>
+                        <select id="dspn_opt_method">
+                            <option value="">Default (Auto)</option>
+                            <option value="-i">Implicit MRP Method [-i]</option>
+                            <option value="-e">Explicit MRP Method [-e]</option>
+                        </select>
+                        <small class="hint-text">Implicit uses Power/GMRES, Explicit builds EMC.</small>
+                    </div>
+                </div>
+
+                <div id="dspn-solver" class="dspn-section" style="display:none;">
+                    <h4
+                        style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                        Solver & Preconditioner</h4>
+                    <div class="input-row">
+                        <label>Iterative Solver</label>
+                        <select id="dspn_opt_solver">
+                            <option value="">Default (Power method)</option>
+                            <option value="-gmres">GMRES [-gmres]</option>
+                            <option value="-bicgstab">BiCG-STAB [-bicgstab]</option>
+                            <option value="-cgs">CGS [-cgs]</option>
+                            <option value="-jor">JOR [-jor]</option>
+                            <option value="-forward-sor">Forward SOR [-forward-sor]</option>
+                            <option value="-backward-sor">Backward SOR [-backward-sor]</option>
+                            <option value="-ssor">Symmetric SOR [-ssor]</option>
+                        </select>
+                        <small class="hint-text">Select numerical method for solving the linear system.</small>
+                    </div>
+                    <div class="input-row">
+                        <label>Preconditioner</label>
+                        <select id="dspn_opt_prec">
+                            <option value="">No Preconditioner [-no-prec]</option>
+                            <option value="-diag-prec">Diagonal (Jacobi) [-diag-prec]</option>
+                            <option value="-ilu0-prec">ILU(0) Preconditioner [-ilu0-prec]</option>
+                        </select>
+                        <small class="hint-text">Speeds up convergence for GMRES/BiCG-STAB.</small>
+                    </div>
+                </div>
+
+                <div id="dspn-params" class="dspn-section" style="display:none;">
+                    <h4
+                        style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                        Numerical Parameters</h4>
+                    <div class="input-row">
+                        <label>Residual Error (Epsilon) [-epsilon]</label>
+                        <input type="text" id="dspn_val_epsilon" placeholder="1.0e-10">
+                        <small class="hint-text">Target accuracy for convergence.</small>
+                    </div>
+                    <div class="input-row">
+                        <label>Max Iterations [-max-iters]</label>
+                        <input type="number" id="dspn_val_maxiters" placeholder="1000">
+                    </div>
+                    <div class="input-row">
+                        <label>Timeout (seconds) [-timeout]</label>
+                        <input type="number" id="dspn_val_timeout" placeholder="60">
+                    </div>
+                </div>
+
+                <div id="dspn-exports" class="dspn-section" style="display:none;">
+                    <h4
+                        style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
+                        Output & Invariants</h4>
+                    <div class="input-col-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_pinv">
+                                <span>P-Invariants [-pinv]</span>
+                            </label>
+                            <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_tinv">
+                                <span>T-Invariants [-tinv]</span>
+                            </label>
+                            <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_traps">
+                                <span>Traps/Siphons [-traps]</span>
+                            </label>
+                            <small class="hint-text">Structural analysis of the net.</small>
+                        </div>
+                        <div>
+                            <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_dot"> <span>Save as
+                                    Dot [-dot]</span></label>
+                            <small class="hint-text">Exports graph to GraphViz format.</small>
+                            <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_allmeas">
+                                <span>Print
+                                    All Measures [-all-measures]</span></label>
+                            <small class="hint-text">Prints all basic measures (avg tokens, throughput,
+                                etc).</small>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- ALGO MANAGER MODAL -->
-        <div id="algoModal" class="modal">
-            <div class="modal-content algo-manager-modal">
-                <div class="modal-header">
-                    <span class="title">Algorithm Manager (C++)</span>
-                    <button id="closeAlgoModal" class="close-btn">✕</button>
-                </div>
-
-                <div class="modal-body algo-manager-body">
-                    <!-- Left: List -->
-                    <div class="modal-sidebar">
-                        <div class="section-header">
-                            <h4>Algorithms</h4>
-                            <button id="btnNewAlgo" class="btn-xs highlight">+ New</button>
-                        </div>
-                        <div id="customAlgoList" class="standard-list">
-                            <!-- Populated by JS -->
-                        </div>
-                    </div>
-
-                    <!-- Right: Editor -->
-                    <div class="modal-main editor-panel">
-                        <div class="editor-header-input"
-                            style="display: flex; background: #252526; border-bottom: 1px solid var(--border-color);">
-                            <input type="text" id="editAlgoName" placeholder="Algorithm Name (e.g. my_greedy_v2)"
-                                style="flex: 1; border: none; background: transparent;">
-                            <select id="algoLanguageSelect" class="btn-xs"
-                                style="margin: 5px; background: #333; border: 1px solid #444; color: #ccc;">
-                                <option value="cpp">C++</option>
-                                <option value="python">Python</option>
-                                <option value="php">PHP</option>
-                                <option value="javascript">JavaScript</option>
-                                <option value="plain">Plain Text</option>
-                            </select>
-                        </div>
-
-                        <div id="monacoEditorContainer" style="flex: 1; min-height: 0;"></div>
-
-                        <div class="modal-footer">
-                            <div id="compileStatus" class="status-text">Ready</div>
-                            <div class="actions">
-                                <button id="btnDeleteAlgo" class="btn-danger">Delete</button>
-                                <button id="btnSaveCompile" class="btn-primary">Save & Compile</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div class="modal-footer"
+            style="flex-direction: column; align-items: stretch; padding: 15px; background: #252526;">
+            <div style="font-size: 10px; color: #888; margin-bottom: 5px; text-transform: uppercase; font-weight:bold;">
+                Live Command Preview:</div>
+            <div class="cmd-preview"
+                style="background:#000; padding:10px; border-radius: 4px; font-family: monospace; font-size: 12px; color: var(--accent); border: 1px solid #444; word-break: break-all;">
+                DSPN-Tool -load {net} <span id="dspnCmdPreviewText" style="color:#fff;"></span>
+            </div>
+            <div style="display:flex; justify-content: flex-end; margin-top:10px;">
+                <button id="btnSaveDspnConfig" class="btn primary">Apply & Close</button>
             </div>
         </div>
-
-        <!-- CMD MANAGER MODAL -->
-        <div id="cmdModal" class="modal">
-            <div class="modal-content modal-small">
-                <div class="modal-header">
-                    <span class="title">CLI Script Manager</span>
-                    <button id="closeCmdModal" class="close-btn">✕</button>
-                </div>
-                <div class="modal-body modal-padding">
-                    <input type="hidden" id="modalCmdId">
-                    <div class="input-row">
-                        <label>Script Name</label>
-                        <input type="text" id="modalCmdName" placeholder="e.g. My Fast Solver">
-                    </div>
-                    <div class="input-row">
-                        <label>Executable Path</label>
-                        <input type="text" id="modalCmdPath" placeholder="/usr/bin/python3"
-                            style="font-family: monospace;">
-                        <small class="hint-text">Absolute path to binary inside the Docker container.</small>
-                    </div>
-                    <div class="input-row">
-                        <label>Args Template</label>
-                        <input type="text" id="modalCmdArgs" placeholder="{pnh}" style="font-family: monospace;">
-                        <div class="macro-hint">
-                            <strong style="display: block; margin-bottom: 5px;">Supported Macros:</strong>
-                            <ul
-                                style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px;">
-                                <li><code>{pnh}</code> — Full path to the generated <strong>.pnh</strong> file (Petri
-                                    Net).</li>
-                                <li><code>{gspn}</code> — Path to <strong>.net</strong>/<strong>.def</strong> files
-                                    (GreatSPN format).</li>
-                                <li><code>{id}</code> — The unique ID of the graph in the database.</li>
-                                <li><code>{name}</code> — The original name of the graph/net.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="btnExportCmd" class="btn secondary">Export JSON</button>
-                    <div style="flex: 1;"></div>
-                    <button id="btnSaveCmd" class="btn primary">Save Script</button>
-                </div>
-            </div>
+    </div>
+</div>
+<!-- PARSER BUILDER MODAL -->
+<div id="parserModal" class="modal">
+    <div class="modal-content algo-manager-modal" style="width: 80vw; height: 80vh; max-height: 80vh;">
+        <div class="modal-header">
+            <span class="title">Universal Parser Builder</span>
+            <button id="closeParserModal" class="close-btn">✕</button>
         </div>
 
-        <!-- REGEX MANAGER MODAL -->
-        <div id="regexModal" class="modal">
-            <div class="modal-content" style="width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
-                <div class="modal-header">
-                    <span class="title">Regex Manager</span>
-                    <button id="closeRegexModal" class="close-btn">✕</button>
-                </div>
-                <div class="modal-body modal-padding" style="flex: 1; overflow-y: auto;">
-                    <input type="hidden" id="modalRegexId">
-                    <div class="input-row">
-                        <label>Regex Name</label>
-                        <input type="text" id="modalRegexName" placeholder="e.g. Metric X Extractor">
-                    </div>
-                    <div class="input-row"
-                        style="background: rgba(177, 128, 255, 0.05); padding: 10px; border-radius: 4px; border: 1px solid rgba(177, 128, 255, 0.2); margin-bottom: 20px;">
-                        <label style="color: #b180ff;">Stage 0 (Input / Sample Output)</label>
-                        <textarea id="modalRegexTestInput" placeholder="Paste tool output here to start building..."
-                            style="width: 100%; height: 80px; font-family: monospace; font-size: 11px; margin-bottom: 8px; background: #111; color: #eee; border: 1px solid #333; padding: 5px; resize: vertical;"></textarea>
-
-                        <div style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase;">Stage
-                            0 Result (Select text to auto-extract):</div>
-                        <div id="stage0Result" class="regex-stage-result"
-                            style="background: #000; padding: 8px; border: 1px solid #222; font-family: monospace; font-size: 11px; color: #ccc; min-height: 20px; max-height: 150px; overflow: auto; white-space: pre-wrap;">
-                        </div>
-                    </div>
-
-                    <div class="input-row">
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <label style="margin-bottom: 0;">Extraction Pipeline (Stages)</label>
-                            <button type="button" class="btn-xs" onclick="window.addRegexStage()"
-                                style="padding: 2px 6px;">+ Add Custom Stage</button>
-                        </div>
-                        <div id="regexStagesContainer" style="display: flex; flex-direction: column; gap: 15px;">
-                            <!-- Stages with inline results added dynamically -->
-                        </div>
+        <div class="modal-body algo-manager-body">
+            <!-- Left: List of Parsers -->
+            <div class="modal-sidebar"
+                style="width: 250px; display: flex; flex-direction: column; overflow-y: auto; background: #1a1a1a; border-right: 1px solid var(--border-color);">
+                <div class="section-header">
+                    <h4>Saved Parsers</h4>
+                    <div style="display: flex; gap: 5px;">
+                        <button id="btnImportParserJson" class="btn-xs" title="Import JSON"
+                            style="background:none; border:none; padding: 2px; cursor: pointer;">📂</button>
+                        <input type="file" id="inputImportParser" accept=".json" style="display: none;">
+                        <button id="btnNewParser" class="btn-xs highlight">+ New</button>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <div style="flex: 1;"></div>
-                    <button id="btnSaveRegex" class="btn primary">Save Regex</button>
+                <div id="parserListContainer" class="standard-list">
+                    <!-- Populated by JS -->
                 </div>
             </div>
-        </div>
 
-        <!-- DSPN TOOL CONFIG MODAL -->
-        <div id="dspnModal" class="modal">
-            <div class="modal-content" style="width: 750px; max-height: 90vh;">
-                <div class="modal-header">
-                    <span class="title">DSPN-Tool Configurator</span>
-                    <button id="closeDspnModal" class="close-btn">✕</button>
+            <!-- Right: Editor -->
+            <div class="modal-main editor-panel" style="display: flex; flex-direction: column; overflow: hidden;">
+                <input type="hidden" id="modalParserId">
+
+                <div class="editor-header-input"
+                    style="display: flex; padding: 10px; background: #252526; border-bottom: 1px solid var(--border-color); gap: 10px; flex-shrink: 0;">
+                    <input type="text" id="modalParserName" placeholder="Parser Name (e.g. My CSV Format)"
+                        style="flex: 1; padding: 6px; background: #1e1e1e; border: 1px solid #444; color: white;">
+                    <input type="text" id="modalParserDesc" placeholder="Description..."
+                        style="flex: 2; padding: 6px; background: #1e1e1e; border: 1px solid #444; color: #ccc;">
                 </div>
-                <div class="modal-body dspn-config-body"
-                    style="padding:0; display: flex; flex-direction: row; overflow: hidden;">
-                    <!-- Sidebar for Categories -->
-                    <div class="modal-sidebar" style="width: 180px; background: #252526;">
-                        <div class="dspn-cat active" data-target="dspn-general">General</div>
-                        <div class="dspn-cat" data-target="dspn-analysis">Analysis Type</div>
-                        <div class="dspn-cat" data-target="dspn-solver">Solver & Precond</div>
-                        <div class="dspn-cat" data-target="dspn-params">Parameters</div>
-                        <div class="dspn-cat" data-target="dspn-exports">Output & Invariants</div>
-                    </div>
-                    <!-- Main Content -->
-                    <div class="modal-main modal-padding" style="flex: 1; overflow-y: auto; background: #1e1e1e;">
-                        <div id="dspn-general" class="dspn-section">
-                            <h4
-                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
-                                General Settings</h4>
-                            <div class="input-row">
-                                <label>Verbosity</label>
-                                <select id="dspn_opt_verbose" style="width: 100%;">
-                                    <option value="-nv">Basic Verbose (-nv)</option>
-                                    <option value="-nnv">Quiet Mode (-nnv)</option>
-                                    <option value="-v">Verbose (-v)</option>
-                                    <option value="-vv">Very Verbose (-vv)</option>
-                                </select>
-                            </div>
-                            <div class="input-row">
-                                <label>Load Type</label>
-                                <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_pt"> <span>Load as P/T
-                                        net (ignore delays) [-pt]</span></label>
-                            </div>
-                        </div>
 
-                        <div id="dspn-analysis" class="dspn-section" style="display:none;">
-                            <h4
-                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
-                                Analysis Type</h4>
-                            <div class="input-col-group"
-                                style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <div>
-                                    <label style="font-size:10px; color:#888;">State Space</label>
-                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_trg"> <span>Build
-                                            TRG
-                                            [-trg]</span></label>
-                                    <small class="hint-text">Tangible Reachability Graph.</small>
-                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_rg"> <span>Build RG
-                                            [-rg]</span></label>
-                                    <small class="hint-text">Reachability Graph with vanishings.</small>
-                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_novpaths"> <span>No
-                                            vanishing paths [-no-vpaths]</span></label>
-                                </div>
-                                <div>
-                                    <label style="font-size:10px; color:#888;">Solution</label>
-                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_s"> <span>Steady
-                                            State [-s]</span></label>
-                                    <small class="hint-text">Compute stationary distribution.</small>
-                                    <div class="input-row" style="margin-top:5px;">
-                                        <label>Transient Time [-t]</label>
-                                        <input type="number" id="dspn_val_t" step="0.1" placeholder="Time (sec)">
-                                        <small class="hint-text">Compute transient solution at time T.</small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="input-row" style="margin-top:10px;">
-                                <label>Method</label>
-                                <select id="dspn_opt_method">
-                                    <option value="">Default (Auto)</option>
-                                    <option value="-i">Implicit MRP Method [-i]</option>
-                                    <option value="-e">Explicit MRP Method [-e]</option>
-                                </select>
-                                <small class="hint-text">Implicit uses Power/GMRES, Explicit builds EMC.</small>
-                            </div>
-                        </div>
+                <div
+                    style="display: flex; flex-direction: column; flex: 1; overflow-y: auto; background: #1a1a1a; padding: 15px; gap: 20px;">
 
-                        <div id="dspn-solver" class="dspn-section" style="display:none;">
-                            <h4
-                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
-                                Solver & Preconditioner</h4>
-                            <div class="input-row">
-                                <label>Iterative Solver</label>
-                                <select id="dspn_opt_solver">
-                                    <option value="">Default (Power method)</option>
-                                    <option value="-gmres">GMRES [-gmres]</option>
-                                    <option value="-bicgstab">BiCG-STAB [-bicgstab]</option>
-                                    <option value="-cgs">CGS [-cgs]</option>
-                                    <option value="-jor">JOR [-jor]</option>
-                                    <option value="-forward-sor">Forward SOR [-forward-sor]</option>
-                                    <option value="-backward-sor">Backward SOR [-backward-sor]</option>
-                                    <option value="-ssor">Symmetric SOR [-ssor]</option>
-                                </select>
-                                <small class="hint-text">Select numerical method for solving the linear system.</small>
-                            </div>
-                            <div class="input-row">
-                                <label>Preconditioner</label>
-                                <select id="dspn_opt_prec">
-                                    <option value="">No Preconditioner [-no-prec]</option>
-                                    <option value="-diag-prec">Diagonal (Jacobi) [-diag-prec]</option>
-                                    <option value="-ilu0-prec">ILU(0) Preconditioner [-ilu0-prec]</option>
-                                </select>
-                                <small class="hint-text">Speeds up convergence for GMRES/BiCG-STAB.</small>
-                            </div>
-                        </div>
-
-                        <div id="dspn-params" class="dspn-section" style="display:none;">
-                            <h4
-                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
-                                Numerical Parameters</h4>
-                            <div class="input-row">
-                                <label>Residual Error (Epsilon) [-epsilon]</label>
-                                <input type="text" id="dspn_val_epsilon" placeholder="1.0e-10">
-                                <small class="hint-text">Target accuracy for convergence.</small>
-                            </div>
-                            <div class="input-row">
-                                <label>Max Iterations [-max-iters]</label>
-                                <input type="number" id="dspn_val_maxiters" placeholder="1000">
-                            </div>
-                            <div class="input-row">
-                                <label>Timeout (seconds) [-timeout]</label>
-                                <input type="number" id="dspn_val_timeout" placeholder="60">
-                            </div>
-                        </div>
-
-                        <div id="dspn-exports" class="dspn-section" style="display:none;">
-                            <h4
-                                style="color: var(--accent); margin-bottom:15px; border-bottom: 1px solid #333; padding-bottom:5px;">
-                                Output & Invariants</h4>
-                            <div class="input-col-group"
-                                style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <div>
-                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_pinv">
-                                        <span>P-Invariants [-pinv]</span>
-                                    </label>
-                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_tinv">
-                                        <span>T-Invariants [-tinv]</span>
-                                    </label>
-                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_traps">
-                                        <span>Traps/Siphons [-traps]</span>
-                                    </label>
-                                    <small class="hint-text">Structural analysis of the net.</small>
-                                </div>
-                                <div>
-                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_dot"> <span>Save as
-                                            Dot [-dot]</span></label>
-                                    <small class="hint-text">Exports graph to GraphViz format.</small>
-                                    <label class="algo-checkbox"><input type="checkbox" id="dspn_opt_allmeas">
-                                        <span>Print
-                                            All Measures [-all-measures]</span></label>
-                                    <small class="hint-text">Prints all basic measures (avg tokens, throughput,
-                                        etc).</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer"
-                    style="flex-direction: column; align-items: stretch; padding: 15px; background: #252526;">
+                    <!-- 1. Sample Input File -->
                     <div
-                        style="font-size: 10px; color: #888; margin-bottom: 5px; text-transform: uppercase; font-weight:bold;">
-                        Live Command Preview:</div>
-                    <div class="cmd-preview"
-                        style="background:#000; padding:10px; border-radius: 4px; font-family: monospace; font-size: 12px; color: var(--accent); border: 1px solid #444; word-break: break-all;">
-                        DSPN-Tool -load {net} <span id="dspnCmdPreviewText" style="color:#fff;"></span>
+                        style="display: flex; flex-direction: column; border: 1px solid #333; border-radius: 4px; overflow: hidden; flex-shrink: 0;">
+                        <div
+                            style="padding: 8px 10px; background: #222; font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #333;">
+                            1. Sample Input File
+                        </div>
+                        <textarea id="modalParserSample"
+                            placeholder="Paste a sample of your raw file here to test extraction rules in real time..."
+                            style="width: 100%; min-height: 150px; background: transparent; color: #ddd; border: none; padding: 10px; font-family: monospace; font-size: 12px; resize: vertical; box-sizing: border-box;"></textarea>
                     </div>
-                    <div style="display:flex; justify-content: flex-end; margin-top:10px;">
-                        <button id="btnSaveDspnConfig" class="btn primary">Apply & Close</button>
+
+                    <!-- 2. Extraction Rules -->
+                    <div
+                        style="display: flex; flex-direction: column; border: 1px solid #333; border-radius: 4px; overflow: hidden; flex-shrink: 0;">
+                        <div
+                            style="padding: 8px 10px; background: #222; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
+                            <span
+                                style="font-size: 11px; color: var(--accent); text-transform: uppercase; font-weight: bold;">2.
+                                Extraction Rules</span>
+                            <button id="btnAddParserRule" class="btn-xs highlight" style="padding: 4px 8px;">+ Add
+                                Rule</button>
+                        </div>
+                        <div style="background: #1e1e1e; padding: 15px;">
+                            <div id="parserRulesContainer" style="display: flex; flex-direction: column; gap: 15px;">
+                                <div class="empty-state"
+                                    style="padding: 20px; text-align: center; color: #666; font-style: italic;">No rules
+                                    defined yet.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Live JSON Preview -->
+                    <div
+                        style="display: flex; flex-direction: column; border: 1px solid #333; border-radius: 4px; overflow: hidden; flex-shrink: 0;">
+                        <div
+                            style="padding: 8px 10px; background: #222; font-size: 11px; color: #88ff88; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
+                            <span>3. Live JSON Preview</span>
+                            <button id="btnParserTest" class="btn-xs" style="padding: 1px 5px;">Refresh</button>
+                        </div>
+                        <pre id="parserLivePreview"
+                            style="background: #0f0f0f; color: #a5d6ff; margin: 0; padding: 10px; font-family: monospace; font-size: 11px; overflow-x: auto; min-height: 150px; white-space: pre-wrap;"></pre>
+                    </div>
+                </div>
+
+                <div class="modal-footer"
+                    style="flex-shrink: 0; display: flex; justify-content: space-between; background: #252526; padding: 10px 15px;">
+                    <div class="status-text" id="parserStatusText" style="color: #888;">Ready</div>
+                    <div class="actions">
+                        <button id="btnSaveParser" class="btn primary">Save Parser</button>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+</div>
