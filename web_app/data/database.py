@@ -154,6 +154,29 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     ''', commit=True)
+
+    execute_query(conn, '''
+        CREATE TABLE IF NOT EXISTS custom_parsers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            rules_json TEXT NOT NULL,
+            sample_input TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''', commit=True)
+
+    execute_query(conn, '''
+        CREATE TABLE IF NOT EXISTS explorer_state (
+            user_id INTEGER PRIMARY KEY,
+            state_json TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''', commit=True)
+
     conn.close()
 
 # --- Users ---
@@ -278,6 +301,30 @@ def save_benchmark_state(user_id, state):
             (user_id, state_str), commit=True)
     conn.close()
 
+# --- Explorer State ---
+ 
+def get_explorer_state(user_id):
+    conn = get_db_connection()
+    row = execute_query(conn, 'SELECT state_json FROM explorer_state WHERE user_id = ?', (user_id,), fetchone=True)
+    conn.close()
+    if row:
+        return json.loads(row['state_json'])
+    return None
+ 
+def save_explorer_state(user_id, state):
+    conn = get_db_connection()
+    state_str = json.dumps(state)
+    if IS_POSTGRES:
+        execute_query(conn,
+            'INSERT INTO explorer_state (user_id, state_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) '
+            'ON CONFLICT (user_id) DO UPDATE SET state_json = EXCLUDED.state_json, updated_at = CURRENT_TIMESTAMP',
+            (user_id, state_str), commit=True)
+    else:
+        execute_query(conn,
+            'INSERT OR REPLACE INTO explorer_state (user_id, state_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+            (user_id, state_str), commit=True)
+    conn.close()
+ 
 # --- Graphs (Standard) ---
 
 def get_all_graphs():
@@ -308,11 +355,12 @@ def delete_graph(graph_id):
 # --- Petri Nets ---
 
 def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created_at', order='DESC', 
-                        min_places=None, min_transitions=None, min_arcs=None, min_tokens=None, filter_model_class=None):
+                        prop_filters=None, filter_model_class=None,
+                        metadata_search=None, metadata_regex=None):
     conn = get_db_connection()
     
     stat_sort = sort_by in ['places', 'transitions', 'arcs', 'tokens']
-    has_advanced_filters = any(v is not None for v in [min_places, min_transitions, min_arcs, min_tokens, filter_model_class])
+    has_advanced_filters = any(v is not None for v in [filter_model_class, metadata_search, metadata_regex]) or (prop_filters and len(prop_filters) > 0)
     use_python_logic = has_advanced_filters or stat_sort
     
     query = 'SELECT id, name, content_json, created_at FROM petri_nets'
@@ -357,11 +405,64 @@ def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created
                 'class': model_class
             }
             
-            if min_places is not None and stats['places'] < min_places: continue
-            if min_transitions is not None and stats['transitions'] < min_transitions: continue
-            if min_arcs is not None and stats['arcs'] < min_arcs: continue
-            if min_tokens is not None and stats['tokens'] < min_tokens: continue
+            # Evaluate dynamic property filters
+            skip_net = False
+            if prop_filters:
+                for cond in prop_filters:
+                    prop = cond.get('prop')
+                    op = cond.get('op')
+                    val = cond.get('val')
+                    
+                    if prop not in stats or val is None:
+                        continue
+                        
+                    stat_val = stats[prop]
+                    if op == '>=' and not (stat_val >= val):
+                        skip_net = True; break
+                    elif op == '<=' and not (stat_val <= val):
+                        skip_net = True; break
+                    elif op == '==' and not (stat_val == val):
+                        skip_net = True; break
+            
+            if skip_net: continue
+
             if filter_model_class and filter_model_class.lower() not in str(stats.get('class', '')).lower(): continue
+            
+            # Metadata filters
+            if metadata_search or metadata_regex:
+                meta_obj = content.get('metadata', {})
+                if isinstance(meta_obj, dict):
+                    # Combine all metadata into one string for robust search (legacy + raw)
+                    meta_raw = meta_obj.get('raw', '')
+                    if not meta_raw:
+                        # Legacy or other format - join all key=value pairs
+                        meta_raw = "\n".join([f"{k}={v}" for k, v in meta_obj.items() if k != 'raw'])
+                    
+                    if metadata_search:
+                        if metadata_search.lower() not in meta_raw.lower():
+                            continue
+                    
+                    if metadata_regex:
+                        import re
+                        try:
+                            if not re.search(metadata_regex, meta_raw, re.IGNORECASE | re.MULTILINE):
+                                continue
+                        except re.error:
+                            pass # Skip filter on invalid regex
+                else:
+                    # If metadata is not a dict (e.g. legacy string), and we are searching
+                    if metadata_search or metadata_regex:
+                        # Simple string check if it's already a string
+                        meta_str = str(meta_obj)
+                        if metadata_search and metadata_search.lower() not in meta_str.lower():
+                            continue
+                        if metadata_regex:
+                            import re
+                            try:
+                                if not re.search(metadata_regex, meta_str, re.IGNORECASE | re.MULTILINE):
+                                    continue
+                            except re.error:
+                                pass
             
             net['stats'] = stats
             net['metadata'] = content.get('metadata', {})
@@ -416,4 +517,52 @@ def update_petri_net(net_id, name, content):
 def delete_petri_net(net_id):
     conn = get_db_connection()
     execute_query(conn, 'DELETE FROM petri_nets WHERE id = ?', (net_id,), commit=True)
+    conn.close()
+
+# --- Custom Parsers ---
+
+def get_all_parsers():
+    conn = get_db_connection()
+    parsers = execute_query(conn, 'SELECT id, name, description, rules_json, sample_input, created_at FROM custom_parsers ORDER BY created_at DESC', fetchall=True)
+    conn.close()
+    result = []
+    for p in parsers:
+        entry = dict(p)
+        try:
+            entry['rules'] = json.loads(entry['rules_json'])
+        except Exception:
+            entry['rules'] = []
+        del entry['rules_json']
+        result.append(entry)
+    return result
+
+def get_parser(parser_id):
+    conn = get_db_connection()
+    p = execute_query(conn, 'SELECT * FROM custom_parsers WHERE id = ?', (parser_id,), fetchone=True)
+    conn.close()
+    if p:
+        entry = dict(p)
+        try:
+            entry['rules'] = json.loads(entry['rules_json'])
+        except Exception:
+            entry['rules'] = []
+        del entry['rules_json']
+        return entry
+    return None
+
+def save_parser(name, description, rules, sample_input=''):
+    conn = get_db_connection()
+    execute_query(conn, 'INSERT INTO custom_parsers (name, description, rules_json, sample_input) VALUES (?, ?, ?, ?)',
+                 (name, description, json.dumps(rules), sample_input), commit=True)
+    conn.close()
+
+def update_parser(parser_id, name, description, rules, sample_input=''):
+    conn = get_db_connection()
+    execute_query(conn, 'UPDATE custom_parsers SET name = ?, description = ?, rules_json = ?, sample_input = ? WHERE id = ?',
+                 (name, description, json.dumps(rules), sample_input, parser_id), commit=True)
+    conn.close()
+
+def delete_parser(parser_id):
+    conn = get_db_connection()
+    execute_query(conn, 'DELETE FROM custom_parsers WHERE id = ?', (parser_id,), commit=True)
     conn.close()

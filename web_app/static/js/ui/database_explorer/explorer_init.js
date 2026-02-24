@@ -4,13 +4,15 @@
 
 import {
     viewDatabaseExplorer, dbGrid, dbSearchInput, dbSortSelect, btnRefreshDb, dbViewSelect,
-    dbMinP, dbMinT, dbMinA, dbMinK, dbModelClass,
+    dbAdvancedFiltersPanel, btnDbFilters, btnApplyDbFilters, btnResetDbFilters, btnAddDbPropFilter, dbPropFiltersContainer,
+    dbFilterModelClass, dbFilterMetaSearch, dbFilterMetaRegex,
+    dbActiveFiltersIndicator, dbActiveFiltersCount, btnDbClearFiltersToolbar,
     importNetInput, importFolderInput, importFormatSelect, dbStats,
     currentPage, itemsPerPage, isLoading, hasMore, observer, sentinel,
     selectedNetIds, allLoadedNets, currentNets,
     PETRI_EXTENSIONS, GRAPH_EXTENSIONS,
     setDomRefs, setSentinel, setObserver, setCurrentPage, setIsLoading,
-    setHasMore, setCurrentNets, setAllLoadedNets
+    setHasMore, setCurrentNets, setAllLoadedNets, getCsrfToken
 } from './explorer_shared.js';
 import { updateBulkDeleteButton, toggleSelectAll, clearSelection, selectDuplicates, deleteSelectedNets, bulkExport } from './explorer_actions.js';
 import { handleImport, handleDrop } from './explorer_import.js';
@@ -26,13 +28,22 @@ export function initDatabaseExplorer() {
         importNetInput: document.getElementById('importNetInput'),
         importFolderInput: document.getElementById('importFolderInput'),
         dbStats: document.getElementById('dbStats'),
-        dbMinP: document.getElementById('dbMinP'),
-        dbMinT: document.getElementById('dbMinT'),
-        dbMinA: document.getElementById('dbMinA'),
-        dbMinK: document.getElementById('dbMinK'),
-        dbModelClass: document.getElementById('dbModelClass'),
         dbViewSelect: document.getElementById('dbViewSelect'),
-        importFormatSelect: document.getElementById('importFormatSelect')
+        importFormatSelect: document.getElementById('importFormatSelect'),
+
+        // Advanced Filters Panel
+        dbAdvancedFiltersPanel: document.getElementById('dbAdvancedFiltersPanel'),
+        btnDbFilters: document.getElementById('btnDbFilters'),
+        btnApplyDbFilters: document.getElementById('btnApplyDbFilters'),
+        btnResetDbFilters: document.getElementById('btnResetDbFilters'),
+        btnAddDbPropFilter: document.getElementById('btnAddDbPropFilter'),
+        dbPropFiltersContainer: document.getElementById('dbPropFiltersContainer'),
+        dbFilterModelClass: document.getElementById('dbFilterModelClass'),
+        dbFilterMetaSearch: document.getElementById('dbFilterMetaSearch'),
+        dbFilterMetaRegex: document.getElementById('dbFilterMetaRegex'),
+        dbActiveFiltersIndicator: document.getElementById('dbActiveFiltersIndicator'),
+        dbActiveFiltersCount: document.getElementById('dbActiveFiltersCount'),
+        btnDbClearFiltersToolbar: document.getElementById('btnDbClearFiltersToolbar')
     };
     setDomRefs(refs);
 
@@ -52,17 +63,34 @@ export function initDatabaseExplorer() {
         let debounceTimer;
         refs.dbSearchInput.addEventListener('input', () => {
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => loadDatabaseItems(true), 400);
+            debounceTimer = setTimeout(() => {
+                saveExplorerState();
+                loadDatabaseItems(true);
+            }, 400);
         });
     }
 
-    if (refs.dbSortSelect) {
-        refs.dbSortSelect.addEventListener('change', () => loadDatabaseItems(true));
+    // Sort listener removed (handled by Filter Modal Apply)
+    // if (refs.dbSortSelect) {
+    //     refs.dbSortSelect.addEventListener('change', () => loadDatabaseItems(true));
+    // }
+
+    const dbViewTabs = document.querySelectorAll('.db-view-tab');
+    if (dbViewTabs.length > 0 && refs.dbViewSelect) {
+        dbViewTabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                dbViewTabs.forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                refs.dbViewSelect.value = e.target.dataset.view;
+                refs.dbViewSelect.dispatchEvent(new Event('change'));
+            });
+        });
     }
 
     if (refs.dbViewSelect) {
         refs.dbViewSelect.addEventListener('change', () => {
             updateImportAcceptFilters(true);
+            saveExplorerState();
             loadDatabaseItems(true);
         });
     }
@@ -71,9 +99,99 @@ export function initDatabaseExplorer() {
         refs.importFormatSelect.addEventListener('change', () => updateImportAcceptFilters(false));
     }
 
-    [refs.dbMinP, refs.dbMinT, refs.dbMinA, refs.dbMinK, refs.dbModelClass].forEach(el => {
-        if (el) el.addEventListener('change', () => loadDatabaseItems(true));
-    });
+    // Filter Panel (Toggle functionality restored)
+    if (refs.btnDbFilters && refs.dbAdvancedFiltersPanel) {
+        refs.btnDbFilters.addEventListener('click', () => {
+            const isVisible = refs.dbAdvancedFiltersPanel.style.display === 'block';
+            const nextVisible = !isVisible;
+            refs.dbAdvancedFiltersPanel.style.display = nextVisible ? 'block' : 'none';
+            refs.btnDbFilters.style.background = nextVisible ? 'var(--accent)' : '';
+            refs.btnDbFilters.style.color = nextVisible ? 'white' : '';
+            saveExplorerState();
+        });
+    }
+
+    if (refs.btnApplyDbFilters) {
+        refs.btnApplyDbFilters.addEventListener('click', () => {
+            updateFilterBadge();
+            saveExplorerState();
+            loadDatabaseItems(true);
+        });
+    }
+
+    if (refs.btnResetDbFilters) {
+        refs.btnResetDbFilters.addEventListener('click', () => {
+            clearDatabaseFilters();
+            saveExplorerState();
+        });
+    }
+
+    if (refs.btnDbClearFiltersToolbar) {
+        refs.btnDbClearFiltersToolbar.addEventListener('click', () => {
+            clearDatabaseFilters();
+            saveExplorerState();
+        });
+    }
+
+    if (refs.dbFilterModelClass) {
+        refs.dbFilterModelClass.addEventListener('input', () => saveExplorerState());
+    }
+    if (refs.dbFilterMetaSearch) {
+        refs.dbFilterMetaSearch.addEventListener('input', () => saveExplorerState());
+    }
+    if (refs.dbFilterMetaRegex) {
+        refs.dbFilterMetaRegex.addEventListener('input', () => saveExplorerState());
+    }
+    if (refs.dbSortSelect) {
+        refs.dbSortSelect.addEventListener('change', () => {
+            saveExplorerState();
+            loadDatabaseItems(true);
+        });
+    }
+
+    if (refs.btnAddDbPropFilter && refs.dbPropFiltersContainer) {
+        refs.btnAddDbPropFilter.addEventListener('click', () => {
+            const emptyMsg = document.getElementById('dbPropFiltersEmpty');
+            if (emptyMsg) emptyMsg.style.display = 'none';
+
+            const row = document.createElement('div');
+            row.className = 'petri-prop-filter-row';
+            row.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 5px;';
+            row.innerHTML = `
+                <select class="prop-sel" style="flex: 2; padding: 6px; background: #000; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px;">
+                    <option value="places">Places (P)</option>
+                    <option value="transitions">Transitions (T)</option>
+                    <option value="arcs">Arcs (A)</option>
+                    <option value="tokens">Tokens (K)</option>
+                </select>
+                <select class="op-sel" style="flex: 1; padding: 6px; background: #000; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px;">
+                    <option value=">=">≥</option>
+                    <option value="<=">≤</option>
+                    <option value="==">=</option>
+                </select>
+                <input type="number" class="val-input" min="0" placeholder="0" style="flex: 2; padding: 6px; background: #000; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px;">
+                <button class="btn-delete-row" style="background: none; border: none; color: #f66; cursor: pointer; padding: 4px; font-size: 16px;">✕</button>
+            `;
+
+            row.querySelector('.btn-delete-row').addEventListener('click', () => {
+                row.remove();
+                if (refs.dbPropFiltersContainer.querySelectorAll('.petri-prop-filter-row').length === 0) {
+                    if (emptyMsg) emptyMsg.style.display = 'block';
+                }
+                saveExplorerState();
+            });
+
+            // Auto-save on row changes
+            row.querySelectorAll('select, input').forEach(el => {
+                el.addEventListener('change', () => saveExplorerState());
+                if (el.tagName === 'INPUT') {
+                    el.addEventListener('input', () => saveExplorerState());
+                }
+            });
+
+            refs.dbPropFiltersContainer.appendChild(row);
+        });
+    }
 
     if (refs.importNetInput) {
         refs.importNetInput.addEventListener('change', handleImport);
@@ -193,13 +311,43 @@ export function initDatabaseExplorer() {
         }
     });
 
+    document.addEventListener('parsersUpdated', updateImportFormatDropdown);
+
     updateImportAcceptFilters(true);
+}
+
+export async function updateImportFormatDropdown() {
+    const formatSelect = document.getElementById('importFormatSelect');
+    if (!formatSelect) return;
+
+    // Keep the core/built-in options
+    Array.from(formatSelect.options).forEach(opt => {
+        if (opt.value.startsWith('custom_')) {
+            opt.remove();
+        }
+    });
+
+    try {
+        const { getParserCache } = await import('./parser_builder.js');
+        const parsers = await getParserCache();
+        parsers.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = `custom_${p.id}`;
+            opt.textContent = `Custom: ${p.name}`;
+            formatSelect.appendChild(opt);
+        });
+    } catch (err) {
+        console.error("Failed to update parsers list for dropdown", err);
+    }
 }
 
 export function openDatabaseExplorer() {
     if (!viewDatabaseExplorer) return;
     viewDatabaseExplorer.style.display = 'flex';
-    loadDatabaseItems(true);
+    updateImportAcceptFilters(true);
+    updateImportFormatDropdown();
+    // loadDatabaseItems is called by restoreExplorerState or manually if needed
+    restoreExplorerState();
 }
 
 export function closeExplorer() {
@@ -215,18 +363,19 @@ export function updateImportAcceptFilters(modeChanged = false) {
 
     if (modeChanged) {
         importFormatSelect.innerHTML = '';
-        importFormatSelect.appendChild(new Option('Wszystkie dozwolone', 'all'));
+        importFormatSelect.appendChild(new Option('All Supported', 'all'));
 
         if (isPetri) {
-            importFormatSelect.appendChild(new Option('Tylko .pnh', '.pnh'));
-            importFormatSelect.appendChild(new Option('Tylko .pnml / .xml', '.pnml'));
-            importFormatSelect.appendChild(new Option('Tylko .json', '.json'));
+            importFormatSelect.appendChild(new Option('Only .pnh (Built-in)', '.pnh'));
+            importFormatSelect.appendChild(new Option('Only .pnml / .xml (Built-in)', '.pnml'));
+            importFormatSelect.appendChild(new Option('Only .json (Built-in)', '.json'));
         } else {
-            importFormatSelect.appendChild(new Option('Tylko .json', '.json'));
-            importFormatSelect.appendChild(new Option('Tylko .gml', '.gml'));
-            importFormatSelect.appendChild(new Option('Tylko .graphml', '.graphml'));
-            importFormatSelect.appendChild(new Option('Tylko .edgelist', '.edgelist'));
+            importFormatSelect.appendChild(new Option('Only .json', '.json'));
+            importFormatSelect.appendChild(new Option('Only .gml', '.gml'));
+            importFormatSelect.appendChild(new Option('Only .graphml', '.graphml'));
+            importFormatSelect.appendChild(new Option('Only .edgelist', '.edgelist'));
         }
+        updateImportFormatDropdown();
     }
 
     const selectedFormat = importFormatSelect.value;
@@ -236,6 +385,8 @@ export function updateImportAcceptFilters(modeChanged = false) {
         acceptStr = isPetri ? PETRI_EXTENSIONS.join(',') : GRAPH_EXTENSIONS.join(',');
     } else if (selectedFormat === '.pnml') {
         acceptStr = '.pnml,.xml';
+    } else if (selectedFormat.startsWith('custom_')) {
+        acceptStr = ''; // Allow any file type for custom parsers
     } else {
         acceptStr = selectedFormat;
     }
@@ -244,6 +395,9 @@ export function updateImportAcceptFilters(modeChanged = false) {
 }
 
 export async function loadDatabaseItems(reset = false) {
+    if (isLoading || (reset ? false : !hasMore)) return;
+    setIsLoading(true);
+
     if (reset) {
         setCurrentPage(1);
         setCurrentNets([]);
@@ -257,9 +411,6 @@ export async function loadDatabaseItems(reset = false) {
         if (dbStats) dbStats.textContent = 'Loading...';
     }
 
-    if (isLoading || !hasMore) return;
-    setIsLoading(true);
-
     const query = dbSearchInput ? dbSearchInput.value : '';
     const sort = dbSortSelect ? dbSortSelect.value : 'date_desc';
     const viewMode = dbViewSelect ? dbViewSelect.value : 'petri';
@@ -267,6 +418,7 @@ export async function loadDatabaseItems(reset = false) {
     try {
         let newNets = [];
         let total = 0;
+        let totalDb = 0;
 
         if (viewMode === 'petri') {
             const params = new URLSearchParams({
@@ -276,11 +428,25 @@ export async function loadDatabaseItems(reset = false) {
                 sort: sort
             });
 
-            if (dbMinP && dbMinP.value) params.append('min_p', dbMinP.value);
-            if (dbMinT && dbMinT.value) params.append('min_t', dbMinT.value);
-            if (dbMinA && dbMinA.value) params.append('min_a', dbMinA.value);
-            if (dbMinK && dbMinK.value) params.append('min_k', dbMinK.value);
-            if (dbModelClass && dbModelClass.value) params.append('class', dbModelClass.value);
+            // Collect dynamic property filters
+            const propFilters = [];
+            const filterRows = document.querySelectorAll('.petri-prop-filter-row');
+            filterRows.forEach(row => {
+                const prop = row.querySelector('.prop-sel').value;
+                const op = row.querySelector('.op-sel').value;
+                const val = row.querySelector('.val-input').value;
+                if (val !== '') {
+                    propFilters.push({ prop, op, val: parseInt(val, 10) });
+                }
+            });
+
+            if (propFilters.length > 0) {
+                params.set('prop_filters', JSON.stringify(propFilters));
+            }
+
+            if (dbFilterModelClass && dbFilterModelClass.value) params.set('class', dbFilterModelClass.value);
+            if (dbFilterMetaSearch && dbFilterMetaSearch.value) params.set('meta_search', dbFilterMetaSearch.value);
+            if (dbFilterMetaRegex && dbFilterMetaRegex.value) params.set('meta_regex', dbFilterMetaRegex.value);
 
             const response = await fetch(`/api/petri/saved?${params.toString()}`);
             if (!response.ok) throw new Error('Failed to fetch nets');
@@ -288,6 +454,7 @@ export async function loadDatabaseItems(reset = false) {
             const data = await response.json();
             newNets = data.nets || [];
             total = data.total || 0;
+            totalDb = data.total_db || total; // Set totalDb for Petri view
 
             document.querySelectorAll('.filter-unit').forEach(el => el.style.opacity = '1');
             document.querySelectorAll('.class-input-group').forEach(el => el.style.display = 'flex');
@@ -299,6 +466,7 @@ export async function loadDatabaseItems(reset = false) {
             if (!response.ok) throw new Error('Failed to fetch graphs');
 
             const data = await response.json();
+            totalDb = data.length; // Set totalDb for Graphs view (total items in DB)
             let filtered = data;
             if (query) {
                 filtered = filtered.filter(g => g.name.toLowerCase().includes(query.toLowerCase()));
@@ -324,7 +492,7 @@ export async function loadDatabaseItems(reset = false) {
         renderNewItems(newNets, viewMode);
 
         if (dbStats) {
-            dbStats.textContent = `${updatedNets.length} / ${total} nets`;
+            dbStats.innerHTML = `${updatedNets.length} / ${total} <span style="font-size: 0.9em; opacity: 0.6; margin-left: 5px;">(${totalDb} total)</span>`;
         }
 
         if (updatedNets.length >= total || newNets.length < itemsPerPage) {
@@ -348,5 +516,171 @@ export async function loadDatabaseItems(reset = false) {
         }
     } finally {
         setIsLoading(false);
+    }
+}
+
+function clearDatabaseFilters() {
+    if (dbPropFiltersContainer) {
+        dbPropFiltersContainer.querySelectorAll('.petri-prop-filter-row').forEach(r => r.remove());
+        const emptyMsg = document.getElementById('dbPropFiltersEmpty');
+        if (emptyMsg) emptyMsg.style.display = 'block';
+    }
+    if (dbFilterModelClass) dbFilterModelClass.value = '';
+    if (dbFilterMetaSearch) dbFilterMetaSearch.value = '';
+    if (dbFilterMetaRegex) dbFilterMetaRegex.value = '';
+
+    updateFilterBadge();
+    loadDatabaseItems(true);
+}
+
+function updateFilterBadge() {
+    if (!dbActiveFiltersIndicator || !dbActiveFiltersCount || !btnDbClearFiltersToolbar) return;
+
+    let count = 0;
+    const filterRows = document.querySelectorAll('.petri-prop-filter-row');
+    filterRows.forEach(row => {
+        if (row.querySelector('.val-input').value !== '') count++;
+    });
+
+    if (dbFilterModelClass && dbFilterModelClass.value) count++;
+    if (dbFilterMetaSearch && dbFilterMetaSearch.value) count++;
+    if (dbFilterMetaRegex && dbFilterMetaRegex.value) count++;
+
+    if (count > 0) {
+        dbActiveFiltersIndicator.style.display = 'block';
+        dbActiveFiltersCount.textContent = count;
+        btnDbClearFiltersToolbar.style.display = 'inline-block';
+    } else {
+        dbActiveFiltersIndicator.style.display = 'none';
+        btnDbClearFiltersToolbar.style.display = 'none';
+    }
+}
+
+function collectExplorerState() {
+    const propFilters = [];
+    document.querySelectorAll('.petri-prop-filter-row').forEach(row => {
+        const prop = row.querySelector('.prop-sel').value;
+        const op = row.querySelector('.op-sel').value;
+        const val = row.querySelector('.val-input').value;
+        if (val !== '') {
+            propFilters.push({ prop, op, val: parseInt(val, 10) });
+        }
+    });
+
+    return {
+        query: dbSearchInput ? dbSearchInput.value : '',
+        sort: dbSortSelect ? dbSortSelect.value : 'date_desc',
+        viewMode: dbViewSelect ? dbViewSelect.value : 'petri',
+        modelClass: dbFilterModelClass ? dbFilterModelClass.value : '',
+        metaSearch: dbFilterMetaSearch ? dbFilterMetaSearch.value : '',
+        metaRegex: dbFilterMetaRegex ? dbFilterMetaRegex.value : '',
+        propFilters: propFilters,
+        filtersVisible: dbAdvancedFiltersPanel ? dbAdvancedFiltersPanel.style.display === 'block' : false
+    };
+}
+
+async function saveExplorerState() {
+    const state = collectExplorerState();
+    try {
+        await fetch('/api/explorer/state', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify(state)
+        });
+    } catch (err) {
+        console.error("[Explorer] Failed to save state:", err);
+    }
+}
+
+async function restoreExplorerState() {
+    try {
+        const response = await fetch('/api/explorer/state');
+        let state = {};
+        if (response.ok) {
+            state = await response.json();
+        }
+
+        if (!state || Object.keys(state).length === 0) {
+            loadDatabaseItems(true);
+            return;
+        }
+
+        // Apply state
+        if (dbSearchInput) dbSearchInput.value = state.query || '';
+        if (dbSortSelect) dbSortSelect.value = state.sort || 'date_desc';
+        if (dbViewSelect && state.viewMode) {
+            dbViewSelect.value = state.viewMode;
+            // Update tabs UI
+            const tabs = document.querySelectorAll('.db-view-tab');
+            tabs.forEach(t => {
+                if (t.dataset.view === state.viewMode) t.classList.add('active');
+                else t.classList.remove('active');
+            });
+        }
+        if (dbFilterModelClass) dbFilterModelClass.value = state.modelClass || '';
+        if (dbFilterMetaSearch) dbFilterMetaSearch.value = state.metaSearch || '';
+        if (dbFilterMetaRegex) dbFilterMetaRegex.value = state.metaRegex || '';
+
+        if (dbAdvancedFiltersPanel && typeof state.filtersVisible === 'boolean') {
+            dbAdvancedFiltersPanel.style.display = state.filtersVisible ? 'block' : 'none';
+            if (btnDbFilters) {
+                btnDbFilters.style.background = state.filtersVisible ? 'var(--accent)' : '';
+                btnDbFilters.style.color = state.filtersVisible ? 'white' : '';
+            }
+        }
+
+        // Rebuild property filters
+        if (dbPropFiltersContainer && state.propFilters) {
+            dbPropFiltersContainer.querySelectorAll('.petri-prop-filter-row').forEach(r => r.remove());
+            const emptyMsg = document.getElementById('dbPropFiltersEmpty');
+            if (emptyMsg) emptyMsg.style.display = state.propFilters.length > 0 ? 'none' : 'block';
+
+            state.propFilters.forEach(f => {
+                const row = document.createElement('div');
+                row.className = 'petri-prop-filter-row';
+                row.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 5px;';
+                row.innerHTML = `
+                    <select class="prop-sel" style="flex: 2; padding: 6px; background: #000; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px;">
+                        <option value="places" ${f.prop === 'places' ? 'selected' : ''}>Places (P)</option>
+                        <option value="transitions" ${f.prop === 'transitions' ? 'selected' : ''}>Transitions (T)</option>
+                        <option value="arcs" ${f.prop === 'arcs' ? 'selected' : ''}>Arcs (A)</option>
+                        <option value="tokens" ${f.prop === 'tokens' ? 'selected' : ''}>Tokens (K)</option>
+                    </select>
+                    <select class="op-sel" style="flex: 1; padding: 6px; background: #000; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px;">
+                        <option value=">=" ${f.op === '>=' ? 'selected' : ''}>≥</option>
+                        <option value="<=" ${f.op === '<=' ? 'selected' : ''}>≤</option>
+                        <option value="==" ${f.op === '==' ? 'selected' : ''}>=</option>
+                    </select>
+                    <input type="number" class="val-input" min="0" value="${f.val}" style="flex: 2; padding: 6px; background: #000; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px;">
+                    <button class="btn-delete-row" style="background: none; border: none; color: #f66; cursor: pointer; padding: 4px; font-size: 16px;">✕</button>
+                `;
+                row.querySelector('.btn-delete-row').addEventListener('click', () => {
+                    row.remove();
+                    if (dbPropFiltersContainer.querySelectorAll('.petri-prop-filter-row').length === 0) {
+                        if (emptyMsg) emptyMsg.style.display = 'block';
+                    }
+                    saveExplorerState();
+                });
+
+                // Auto-save on row changes
+                row.querySelectorAll('select, input').forEach(el => {
+                    el.addEventListener('change', () => saveExplorerState());
+                    if (el.tagName === 'INPUT') {
+                        el.addEventListener('input', () => saveExplorerState());
+                    }
+                });
+
+                dbPropFiltersContainer.appendChild(row);
+            });
+        }
+
+        updateFilterBadge();
+        loadDatabaseItems(true);
+    } catch (err) {
+        console.error("[Explorer] Failed to restore state:", err);
+        loadDatabaseItems(true);
     }
 }

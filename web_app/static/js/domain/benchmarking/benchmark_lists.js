@@ -252,18 +252,30 @@ export async function loadBenchmarkPetriNets() {
     try {
         const params = new URLSearchParams({ per_page: '9999' });
 
-        const minP = document.getElementById('benchPetriMinP')?.value;
-        const minT = document.getElementById('benchPetriMinT')?.value;
-        const minA = document.getElementById('benchPetriMinA')?.value;
-        const minK = document.getElementById('benchPetriMinK')?.value;
         const modelClass = document.getElementById('benchPetriModelClass')?.value;
+        const metaSearch = document.getElementById('benchPetriMetaSearch')?.value;
+        const metaRegex = document.getElementById('benchPetriMetaRegex')?.value;
         const sort = document.getElementById('benchPetriSort')?.value;
 
-        if (minP) params.set('min_p', minP);
-        if (minT) params.set('min_t', minT);
-        if (minA) params.set('min_a', minA);
-        if (minK) params.set('min_k', minK);
+        // Collect dynamic property filters
+        const propFilters = [];
+        const filterRows = document.querySelectorAll('.petri-prop-filter-row');
+        filterRows.forEach(row => {
+            const prop = row.querySelector('.prop-sel').value;
+            const op = row.querySelector('.op-sel').value;
+            const val = row.querySelector('.val-input').value;
+            if (val !== '') {
+                propFilters.push({ prop, op, val: parseInt(val, 10) });
+            }
+        });
+
+        if (propFilters.length > 0) {
+            params.set('prop_filters', JSON.stringify(propFilters));
+        }
+
         if (modelClass) params.set('class', modelClass);
+        if (metaSearch) params.set('meta_search', metaSearch);
+        if (metaRegex) params.set('meta_regex', metaRegex);
         if (sort) params.set('sort', sort);
 
         const resp = await fetch(`/api/petri/saved?${params.toString()}`);
@@ -335,11 +347,60 @@ export function initPetriFilterModal() {
         });
     }
 
+    // Dynamic filters logic
+    const btnAddFilter = document.getElementById('btnAddPetriPropFilter');
+    const filtersContainer = document.getElementById('benchPetriPropFiltersContainer');
+    const emptyMsg = document.getElementById('benchPetriPropFiltersEmpty');
+
+    const updateEmptyMsg = () => {
+        if (!filtersContainer || !emptyMsg) return;
+        const rows = filtersContainer.querySelectorAll('.petri-prop-filter-row');
+        emptyMsg.style.display = rows.length > 0 ? 'none' : 'block';
+    };
+
+    if (btnAddFilter && filtersContainer) {
+        btnAddFilter.addEventListener('click', () => {
+            const row = document.createElement('div');
+            row.className = 'petri-prop-filter-row';
+            row.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+            row.innerHTML = `
+                <select class="prop-sel" style="flex: 2; padding: 4px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                    <option value="places">Places (P)</option>
+                    <option value="transitions">Transitions (T)</option>
+                    <option value="arcs">Arcs (A)</option>
+                    <option value="tokens">Tokens (K)</option>
+                </select>
+                <select class="op-sel" style="flex: 1; padding: 4px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                    <option value=">=">≥</option>
+                    <option value="<=">≤</option>
+                    <option value="==">=</option>
+                </select>
+                <input type="number" class="val-input" min="0" placeholder="0" style="flex: 2; padding: 4px; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-bright); border-radius: 4px;">
+                <button class="btn btn-delete-row" style="background: none; border: none; color: #f66; cursor: pointer; padding: 4px;" title="Remove">✕</button>
+            `;
+
+            row.querySelector('.btn-delete-row').addEventListener('click', () => {
+                row.remove();
+                updateEmptyMsg();
+            });
+
+            filtersContainer.appendChild(row);
+            updateEmptyMsg();
+        });
+    }
+
     const clearFiltersFn = () => {
-        ['benchPetriMinP', 'benchPetriMinT', 'benchPetriMinA', 'benchPetriMinK', 'benchPetriModelClass'].forEach(id => {
+        ['benchPetriModelClass', 'benchPetriMetaSearch', 'benchPetriMetaRegex'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
+
+        if (filtersContainer) {
+            const rows = filtersContainer.querySelectorAll('.petri-prop-filter-row');
+            rows.forEach(r => r.remove());
+            updateEmptyMsg();
+        }
+
         const sortEl = document.getElementById('benchPetriSort');
         if (sortEl) sortEl.value = 'date_desc';
         loadBenchmarkPetriNets();

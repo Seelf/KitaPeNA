@@ -8,7 +8,9 @@ import { savePetriNetDb, loadPetriNetFromDb } from '../../core/storage.js';
 
 // DOM Elements (set during init)
 export let viewDatabaseExplorer, dbGrid, dbSearchInput, dbSortSelect, btnRefreshDb, dbViewSelect;
-export let dbMinP, dbMinT, dbMinA, dbMinK, dbModelClass;
+export let dbAdvancedFiltersPanel, btnDbFilters, btnApplyDbFilters, btnResetDbFilters, btnAddDbPropFilter, dbPropFiltersContainer;
+export let dbFilterModelClass, dbFilterMetaSearch, dbFilterMetaRegex;
+export let dbActiveFiltersIndicator, dbActiveFiltersCount, btnDbClearFiltersToolbar;
 export let importNetInput, importFolderInput, importFormatSelect;
 export let dbStats;
 
@@ -34,11 +36,20 @@ export function setDomRefs(refs) {
     dbSortSelect = refs.dbSortSelect;
     btnRefreshDb = refs.btnRefreshDb;
     dbViewSelect = refs.dbViewSelect;
-    dbMinP = refs.dbMinP;
-    dbMinT = refs.dbMinT;
-    dbMinA = refs.dbMinA;
-    dbMinK = refs.dbMinK;
-    dbModelClass = refs.dbModelClass;
+
+    dbAdvancedFiltersPanel = refs.dbAdvancedFiltersPanel;
+    btnDbFilters = refs.btnDbFilters;
+    btnApplyDbFilters = refs.btnApplyDbFilters;
+    btnResetDbFilters = refs.btnResetDbFilters;
+    btnAddDbPropFilter = refs.btnAddDbPropFilter;
+    dbPropFiltersContainer = refs.dbPropFiltersContainer;
+    dbFilterModelClass = refs.dbFilterModelClass;
+    dbFilterMetaSearch = refs.dbFilterMetaSearch;
+    dbFilterMetaRegex = refs.dbFilterMetaRegex;
+    dbActiveFiltersIndicator = refs.dbActiveFiltersIndicator;
+    dbActiveFiltersCount = refs.dbActiveFiltersCount;
+    btnDbClearFiltersToolbar = refs.btnDbClearFiltersToolbar;
+
     importNetInput = refs.importNetInput;
     importFolderInput = refs.importFolderInput;
     importFormatSelect = refs.importFormatSelect;
