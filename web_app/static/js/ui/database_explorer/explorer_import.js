@@ -2,7 +2,10 @@
  * explorer_import.js — File import and drag-and-drop handling.
  */
 
-import { viewDatabaseExplorer, importNetInput, importFolderInput, dbStats, savePetriNetDb } from './explorer_shared.js';
+import {
+    viewDatabaseExplorer, importNetInput, importFolderInput, dbStats, savePetriNetDb,
+    dbViewSelect, importFormatSelect, PETRI_EXTENSIONS, GRAPH_EXTENSIONS, getCsrfToken
+} from './explorer_shared.js';
 import { parsePnh, parsePnml } from './explorer_converters.js';
 import { loadDatabaseItems } from './explorer_init.js';
 
@@ -66,32 +69,51 @@ async function processFiles(files) {
 
     if (dbStats) dbStats.textContent = `Importing ${files.length} file(s)...`;
 
+    const isPetri = dbViewSelect && dbViewSelect.value === 'petri';
+    const selectedFormat = (importFormatSelect && importFormatSelect.value !== 'all') ? importFormatSelect.value : null;
+
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
-
         const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-        if (!['.json', '.pnh', '.pnml', '.xml'].includes(ext)) {
-            continue;
+
+        // Skip if it doesn't match the explicitly selected format
+        if (selectedFormat) {
+            if (selectedFormat === '.pnml' && !['.pnml', '.xml'].includes(ext)) continue;
+            if (selectedFormat !== '.pnml' && ext !== selectedFormat) continue;
+        } else {
+            // General filtering by mode
+            const allowed = isPetri ? PETRI_EXTENSIONS : GRAPH_EXTENSIONS;
+            if (!allowed.includes(ext)) {
+                console.log(`Skipping file with unallowed extension: ${file.name}`);
+                continue;
+            }
         }
 
         try {
-            const content = await file.text();
-            const name = file.name.split('.')[0];
-            let netContent;
+            if (isPetri) {
+                const content = await file.text();
+                const name = file.name.split('.')[0];
+                let netContent;
 
-            if (ext === '.json') {
-                netContent = JSON.parse(content);
-            } else if (ext === '.pnh') {
-                netContent = parsePnh(content);
-            } else if (ext === '.pnml' || ext === '.xml') {
-                netContent = parsePnml(content);
-            }
+                if (ext === '.json') {
+                    netContent = JSON.parse(content);
+                } else if (ext === '.pnh') {
+                    netContent = parsePnh(content);
+                } else if (ext === '.pnml' || ext === '.xml') {
+                    netContent = parsePnml(content);
+                }
 
-            if (netContent) {
-                await savePetriNetDb(name, netContent);
-                successCount++;
+                if (netContent) {
+                    await savePetriNetDb(name, netContent);
+                    successCount++;
+                } else {
+                    failCount++;
+                }
             } else {
-                failCount++;
+                // Graph format import
+                const result = await processGraphFile(file);
+                if (result) successCount++;
+                else failCount++;
             }
         } catch (err) {
             console.error(`Error importing file ${file.name}:`, err);
@@ -107,9 +129,45 @@ async function processFiles(files) {
 
     loadDatabaseItems(true);
 
-    if (files.length === 1 && failCount === 0) {
+    if (files.length === 1 && failCount === 0 && successCount > 0) {
         alert(`Import successful: ${files[0].name.split('.')[0]}`);
     } else if (files.length > 0) {
         alert(`Bulk Import Complete:\nSuccessfully stored: ${successCount}\nFailed/Ignored: ${failCount}`);
     }
+}
+
+async function processGraphFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/graphs/import', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCsrfToken() },
+        body: formData
+    });
+
+    if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to parse graph file');
+    }
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const saveRes = await fetch('/api/graphs', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({
+            name: data.name || file.name.split('.')[0],
+            nodes: JSON.stringify(data.nodes),
+            edges: JSON.stringify(data.edges),
+            is_directed: data.is_directed
+        })
+    });
+
+    if (!saveRes.ok) throw new Error('Failed to save parsed graph to database');
+    return true;
 }

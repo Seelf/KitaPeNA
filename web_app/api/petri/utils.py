@@ -8,11 +8,22 @@ def parse_pnh(content):
         content = content[1:]
         
     lines = []
+    metadata = {}
+    raw_metadata_lines = []
     for l in content.splitlines():
         clean = l.strip()
-        # Skip empty lines, comments (#, //, ;)
-        if not clean or clean.startswith(('#', '//', ';')):
+        # Skip empty lines, comments (#, //)
+        if not clean or clean.startswith(('#', '//')):
             continue
+        if clean.startswith(';'):
+            raw_metadata_lines.append(clean)
+            meta_content = clean[1:].strip()
+            if meta_content.startswith('Places='):
+                metadata['__places'] = meta_content[7:].split(';')
+            elif meta_content.startswith('Transitions='):
+                metadata['__transitions'] = meta_content[12:].split(';')
+            continue
+            
         lines.append(clean)
         
     if len(lines) < 3:
@@ -34,6 +45,19 @@ def parse_pnh(content):
     
     places = [{'id': i, 'tokens': 0, 'label': f'p{i}'} for i in range(num_places)]
     transitions = [{'id': i, 'label': f't{i}'} for i in range(num_transitions)]
+    
+    if '__places' in metadata:
+        names = metadata['__places']
+        for i, n in enumerate(names):
+            if i < len(places): places[i]['label'] = n
+        del metadata['__places']
+        
+    if '__transitions' in metadata:
+        names = metadata['__transitions']
+        for i, n in enumerate(names):
+            if i < len(transitions): transitions[i]['label'] = n
+        del metadata['__transitions']
+
     arcs = []
     
     # Parse Incidence Matrix
@@ -97,7 +121,8 @@ def parse_pnh(content):
         except Exception as e:
              raise ValueError(f"Line {marking_row_idx+1} (Marking): '{lines[marking_row_idx]}' - {str(e)}")
                 
-    return {'places': places, 'transitions': transitions, 'arcs': arcs}
+    metadata_out = {'raw': '\n'.join(raw_metadata_lines)}
+    return {'places': places, 'transitions': transitions, 'arcs': arcs, 'metadata': metadata_out}
 
 def normalize_arcs(arcs, place_ids, transition_ids):
     """Normalize arcs to ensure sourceId, targetId, type fields exist."""
@@ -178,6 +203,17 @@ def export_pnh(data):
     t_names = [t.get('label', f"t{t['id']}") for t in transitions]
     lines.append(f";Transitions={';'.join(t_names)}")
     
+    metadata = data.get('metadata', {})
+    if 'raw' in metadata and metadata['raw']:
+        for meta_line in metadata['raw'].splitlines():
+            meta_line_clean = meta_line.strip()
+            if not meta_line_clean:
+                continue
+            # Filter out old designations of Places and Transitions to prevent conflicts
+            if meta_line_clean.startswith(';Places=') or meta_line_clean.startswith(';Transitions='):
+                continue
+            lines.append(meta_line_clean)
+            
     return "\n".join(lines)
 
 def export_pnml(data, net_name="petrinet"):

@@ -9,7 +9,7 @@ import { savePetriNetDb, loadPetriNetFromDb } from '../../core/storage.js';
 // DOM Elements (set during init)
 export let viewDatabaseExplorer, dbGrid, dbSearchInput, dbSortSelect, btnRefreshDb, dbViewSelect;
 export let dbMinP, dbMinT, dbMinA, dbMinK, dbModelClass;
-export let importNetInput, importFolderInput;
+export let importNetInput, importFolderInput, importFormatSelect;
 export let dbStats;
 
 // Pagination state
@@ -22,6 +22,10 @@ export let sentinel = null;
 export let selectedNetIds = new Set();
 export let allLoadedNets = [];
 export let currentNets = [];
+
+// Extensions constants
+export const PETRI_EXTENSIONS = ['.pnh', '.pnml', '.xml', '.json'];
+export const GRAPH_EXTENSIONS = ['.json', '.gml', '.graphml', '.edgelist'];
 
 export function setDomRefs(refs) {
     viewDatabaseExplorer = refs.viewDatabaseExplorer;
@@ -37,6 +41,7 @@ export function setDomRefs(refs) {
     dbModelClass = refs.dbModelClass;
     importNetInput = refs.importNetInput;
     importFolderInput = refs.importFolderInput;
+    importFormatSelect = refs.importFormatSelect;
     dbStats = refs.dbStats;
 }
 

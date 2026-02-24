@@ -3,35 +3,45 @@
  */
 
 export function parsePnh(content) {
-    const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0 && !l.trim().startsWith('#'));
-    if (lines.length < 3) throw new Error("Invalid PNH format");
+    const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0 && !l.trim().startsWith('#') && !l.trim().startsWith('//'));
 
-    const numPlaces = parseInt(lines[0].trim());
-    const numRows = parseInt(lines[1].trim());
-    const numTransitions = numRows - 1;
+    const dataLines = [];
+    const pNames = [];
+    const tNames = [];
+    const rawMetadataLines = [];
 
-    const places = [];
-    for (let i = 0; i < numPlaces; i++) places.push({ id: i, label: `p${i}`, tokens: 0 });
-
-    const transitions = [];
-    for (let i = 0; i < numTransitions; i++) transitions.push({ id: i, label: `t${i}` });
-
-    const arcs = [];
-
-    // Parse Metadata
     lines.forEach(l => {
-        if (l.trim().startsWith(';Places=')) {
-            const names = l.trim().substring(8).split(';');
-            names.forEach((n, i) => { if (places[i]) places[i].label = n; });
-        } else if (l.trim().startsWith(';Transitions=')) {
-            const names = l.trim().substring(13).split(';');
-            names.forEach((n, i) => { if (transitions[i]) transitions[i].label = n; });
+        const trimmed = l.trim();
+        if (trimmed.startsWith(';')) {
+            rawMetadataLines.push(trimmed);
+            const metaContent = trimmed.substring(1).trim();
+            if (metaContent.startsWith('Places=')) {
+                metaContent.substring(7).split(';').forEach(n => pNames.push(n));
+            } else if (metaContent.startsWith('Transitions=')) {
+                metaContent.substring(12).split(';').forEach(n => tNames.push(n));
+            }
+        } else {
+            dataLines.push(trimmed);
         }
     });
 
+    if (dataLines.length < 3) throw new Error("Invalid PNH format");
+
+    const numPlaces = parseInt(dataLines[0].trim());
+    const numRows = parseInt(dataLines[1].trim());
+    const numTransitions = numRows - 1;
+
+    const places = [];
+    for (let i = 0; i < numPlaces; i++) places.push({ id: i, label: pNames[i] || `p${i}`, tokens: 0 });
+
+    const transitions = [];
+    for (let i = 0; i < numTransitions; i++) transitions.push({ id: i, label: tNames[i] || `t${i}` });
+
+    const arcs = [];
+
     // Parse Matrix
     for (let t = 0; t < numTransitions; t++) {
-        const line = lines[2 + t].trim();
+        const line = dataLines[2 + t].trim();
         let vals = [];
         if (line.includes(' ')) {
             vals = line.split(/\s+/).map(v => v === 'x' ? -1 : parseInt(v));
@@ -46,7 +56,7 @@ export function parsePnh(content) {
     }
 
     // Marking
-    const markingLine = lines[2 + numTransitions].trim();
+    const markingLine = dataLines[2 + numTransitions].trim();
     let tokens = [];
     if (markingLine.includes(' ')) {
         tokens = markingLine.split(/\s+/).map(Number);
@@ -55,7 +65,11 @@ export function parsePnh(content) {
     }
     tokens.forEach((t, i) => { if (places[i]) places[i].tokens = t; });
 
-    return { places, transitions, arcs };
+    const metadata = {
+        raw: rawMetadataLines.join('\n')
+    };
+
+    return { places, transitions, arcs, metadata };
 }
 
 export function parsePnml(content) {
@@ -184,6 +198,17 @@ export function convertToPnh(json) {
 
     const tNames = transitions.map(t => t.label || t.name || `t${t.id}`).join(';');
     lines.push(`;Transitions=${tNames}`);
+
+    if (json.metadata && json.metadata.raw) {
+        lines.push('');
+        const metaLines = json.metadata.raw.split('\n');
+        metaLines.forEach(l => {
+            const clean = l.trim();
+            if (clean && !clean.startsWith(';Places=') && !clean.startsWith(';Transitions=')) {
+                lines.push(clean);
+            }
+        });
+    }
 
     return lines.join("\n");
 }
