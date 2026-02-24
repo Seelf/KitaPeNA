@@ -2,7 +2,7 @@
  * explorer_cards.js — Card rendering for Petri nets and graphs.
  */
 
-import { getCsrfToken, selectedNetIds } from './explorer_shared.js';
+import { getCsrfToken, selectedNetIds, showCustomModal } from './explorer_shared.js';
 import { updateBulkDeleteButton, handleAction, handleGraphAction, loadNetToEditor, loadGraphToEditor, updateNetClass } from './explorer_actions.js';
 
 export function createNetCard(net) {
@@ -13,13 +13,17 @@ export function createNetCard(net) {
     const dateStr = net.created_at ? new Date(net.created_at).toLocaleDateString() : 'Unknown';
     const isSelected = selectedNetIds.has(net.id);
 
+    const metadata = net.metadata || {};
+    const isPetri = typeof stats.places !== 'undefined';
+    const infoHtml = isPetri ? `<span class="net-info-btn" title="View / Edit Metadata" style="cursor:pointer; color:#888; font-size:14px; margin-left:5px; vertical-align:middle;">ⓘ</span>` : '';
+
     card.innerHTML = `
         <div class="card-checkbox-wrapper">
             <input type="checkbox" class="card-checkbox" data-id="${net.id}" ${isSelected ? 'checked' : ''}>
         </div>
         <div class="net-card-header">
             <div class="net-info-group">
-                <div class="net-title" title="${net.name}">${net.name}</div>
+                <div class="net-title" title="${net.name}">${net.name}${infoHtml}</div>
                 <div class="net-id-badge">#${net.id} • ${dateStr}</div>
             </div>
         </div>
@@ -76,8 +80,83 @@ export function createNetCard(net) {
 
     if (isSelected) card.classList.add('selected');
 
+    if (isPetri) {
+        const infoBtn = card.querySelector('.net-info-btn');
+        if (infoBtn) {
+            infoBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                let textContent = '';
+                if (metadata.raw !== undefined) {
+                    textContent = metadata.raw;
+                } else {
+                    for (const [k, v] of Object.entries(metadata)) {
+                        textContent += `;${k}=${v}\n`;
+                    }
+                }
+
+                let content = `
+                <div style="display: flex; flex-direction: column; height: 100%; text-align: left;">
+                    <div style="margin-bottom: 8px; color: #aaa; font-size: 13px; flex-shrink: 0;">Edit metadata (lines starting with ';' are parsed as metadata):</div>
+                    <textarea id="editMetadataArea_${net.id}" style="
+                        background-color: #1e1e1e; 
+                        color: #d4d4d4; 
+                        font-family: 'Courier New', Courier, monospace; 
+                        padding: 15px; 
+                        border-radius: 6px; 
+                        width: 100%;
+                        flex: 1;
+                        resize: none;
+                        white-space: pre-wrap;
+                        font-size: 13px;
+                        border: 1px solid #333;
+                        box-sizing: border-box;
+                        outline: none;
+                    ">${textContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                </div>`;
+
+                showCustomModal(`Metadata: ${net.name}`, content, true, async () => {
+                    const textarea = document.getElementById(`editMetadataArea_${net.id}`);
+                    if (!textarea) return;
+
+                    const newText = textarea.value;
+
+                    try {
+                        const getRes = await fetch(`/api/petri/saved/${net.id}`);
+                        if (!getRes.ok) throw new Error('Failed to fetch net data');
+                        const netData = await getRes.json();
+
+                        const contentJson = typeof netData.content_json === 'string' ? JSON.parse(netData.content_json) : netData.content_json;
+                        if (!contentJson.metadata) contentJson.metadata = {};
+                        contentJson.metadata.raw = newText;
+
+                        const putRes = await fetch(`/api/petri/saved/${net.id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCsrfToken()
+                            },
+                            body: JSON.stringify({
+                                name: netData.name,
+                                content: contentJson
+                            })
+                        });
+
+                        if (!putRes.ok) throw new Error('Failed to update metadata');
+
+                        import('./explorer_init.js').then(m => m.loadDatabaseItems(true));
+
+                    } catch (err) {
+                        console.error(err);
+                        alert('Failed to save metadata');
+                    }
+                }, null, { large: true });
+            });
+        }
+    }
+
     card.addEventListener('click', (e) => {
-        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) {
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('a') || e.target.closest('.net-info-btn')) {
             return;
         }
         checkbox.checked = !checkbox.checked;

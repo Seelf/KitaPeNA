@@ -364,6 +364,7 @@ def get_all_petri_nets(limit=None, offset=0, search_query=None, sort_by='created
             if filter_model_class and filter_model_class.lower() not in str(stats.get('class', '')).lower(): continue
             
             net['stats'] = stats
+            net['metadata'] = content.get('metadata', {})
             del net['content_json']
             results.append(net)
         except Exception:

@@ -1,123 +1,130 @@
-            <!-- Database Explorer View -->
-            <div id="viewDatabaseExplorer" class="db-explorer-view" style="display: none;">
-                <!-- Toolbar -->
-                <div class="db-toolbar">
-                    <div class="db-search">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" style="margin-right: 8px; color: #666;">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                        <input type="text" id="dbSearchInput" placeholder="Search nets by name...">
-                    </div>
+<!-- Database Explorer View -->
+<div id="viewDatabaseExplorer" class="db-explorer-view" style="display: none;">
+    <!-- Toolbar -->
+    <div class="db-toolbar">
+        <div class="db-search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                style="margin-right: 8px; color: #666;">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="dbSearchInput" placeholder="Search nets by name...">
+        </div>
 
-                    <div class="db-bulk-dropdown" id="dbBulkDropdown">
-                        <button id="btnDbBulkMenu" class="btn secondary btn-xs" title="Bulk Management">
-                            Bulk ▾
-                        </button>
-                        <div id="dbBulkMenu" class="db-bulk-dropdown-menu" style="display: none;">
-                            <div class="db-bulk-item" id="btnDbSelectAll">
-                                Select All
-                            </div>
-                            <div class="db-bulk-item" id="btnDbSelectDuplicates">
-                                Duplicates
-                            </div>
-                            <div class="db-bulk-item" id="btnDbClearSelection" style="display: none;">
-                                Clear Selection
-                            </div>
-                            <div class="db-bulk-divider" id="dbBulkExportDivider" style="display: none;"></div>
-                            <div class="db-bulk-item danger" id="btnDbDeleteSelected" style="display: none;">
-                                Delete Selected (<span id="dbSelectedCount">0</span>)
-                            </div>
-                            <div class="db-bulk-item" id="btnDbExportPnh" style="display: none;">
-                                Export to PNH
-                            </div>
-                            <div class="db-bulk-item" id="btnDbExportPnml" style="display: none;">
-                                Export to PNML
-                            </div>
-                            <div class="db-bulk-item" id="btnDbExportJson" style="display: none;">
-                                Export to JSON
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="db-actions">
-                        <select id="dbViewSelect" class="db-select"
-                            style="margin-right: 15px; background: #333; color: #fff; border: 1px solid #555; padding: 5px; border-radius: 4px;">
-                            <option value="petri" selected>View: Petri Nets</option>
-                            <option value="graphs">View: Standard Graphs</option>
-                        </select>
-                        <span id="dbStats" style="margin-right: 15px; font-size: 12px; color: #888;"></span>
-
-                        <div class="db-filters-advanced"
-                            style="display: flex; gap: 8px; margin-right: 15px; align-items: center;">
-                            <div class="filter-unit" title="Min Places">
-                                <span style="font-size: 10px; color: #666;">P≥</span>
-                                <input type="number" id="dbMinP" class="db-input-small" min="0" style="width: 40px;">
-                            </div>
-                            <div class="filter-unit" title="Min Transitions">
-                                <span style="font-size: 10px; color: #666;">T≥</span>
-                                <input type="number" id="dbMinT" class="db-input-small" min="0" style="width: 40px;">
-                            </div>
-                            <div class="filter-unit" title="Min Arcs">
-                                <span style="font-size: 10px; color: #666;">A≥</span>
-                                <input type="number" id="dbMinA" class="db-input-small" min="0" style="width: 40px;">
-                            </div>
-                            <div class="filter-unit" title="Min Tokens">
-                                <span style="font-size: 10px; color: #666;">K≥</span>
-                                <input type="number" id="dbMinK" class="db-input-small" min="0" style="width: 40px;">
-                            </div>
-                            <div class="filter-unit" title="Graph Class">
-                                <input type="text" id="dbModelClass" class="db-input-small" placeholder="Class"
-                                    style="width: 60px;">
-                            </div>
-                        </div>
-
-                        <select id="dbSortSelect" class="db-select">
-                            <option value="date_desc">Newest First</option>
-                            <option value="date_asc">Oldest First</option>
-                            <option value="name_asc">Name A-Z</option>
-                            <option value="places_desc">Most Places</option>
-                            <option value="places_asc">Least Places</option>
-                            <option value="transitions_desc">Most Transitions</option>
-                            <option value="transitions_asc">Least Transitions</option>
-                            <option value="arcs_desc">Most Arcs</option>
-                            <option value="arcs_asc">Least Arcs</option>
-                            <option value="tokens_desc">Most Tokens</option>
-                            <option value="tokens_asc">Least Tokens</option>
-                        </select>
-
-                        <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
-                            <button id="btnImportDropdown" class="btn primary"
-                                onclick="const m = document.getElementById('importDropdownMenu'); m.style.display = m.style.display === 'none' ? 'block' : 'none';">
-                                Import ▼
-                            </button>
-                            <div id="importDropdownMenu"
-                                style="display: none; position: absolute; top: 100%; left: 0; background-color: #2a2a2a; border: 1px solid #444; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 9999; min-width: 140px; margin-top: 5px;">
-                                <label for="importNetInput"
-                                    style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left; border-bottom: 1px solid #444;"
-                                    onmouseover="this.style.backgroundColor='#444'"
-                                    onmouseout="this.style.backgroundColor='transparent'">Select Files</label>
-                                <label for="importFolderInput"
-                                    style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left;"
-                                    onmouseover="this.style.backgroundColor='#444'"
-                                    onmouseout="this.style.backgroundColor='transparent'">Select Folder</label>
-                            </div>
-                        </div>
-                        <input type="file" id="importNetInput" accept=".pnh,.json,.pnml,.xml" multiple
-                            style="display: none;">
-                        <input type="file" id="importFolderInput" webkitdirectory directory multiple
-                            style="display: none;">
-
-                        <button id="btnRefreshDb" class="btn secondary">
-                            Refresh
-                        </button>
-                    </div>
+        <div class="db-bulk-dropdown" id="dbBulkDropdown">
+            <button id="btnDbBulkMenu" class="btn secondary btn-xs" title="Bulk Management">
+                Bulk ▾
+            </button>
+            <div id="dbBulkMenu" class="db-bulk-dropdown-menu" style="display: none;">
+                <div class="db-bulk-item" id="btnDbSelectAll">
+                    Select All
                 </div>
-
-                <!-- Grid Container -->
-                <div id="dbGrid" class="db-grid">
-                    <!-- Cards will be injected here -->
-                    <div class="empty-state">Loading saved nets...</div>
+                <div class="db-bulk-item" id="btnDbSelectDuplicates">
+                    Duplicates
+                </div>
+                <div class="db-bulk-item" id="btnDbClearSelection" style="display: none;">
+                    Clear Selection
+                </div>
+                <div class="db-bulk-divider" id="dbBulkExportDivider" style="display: none;"></div>
+                <div class="db-bulk-item danger" id="btnDbDeleteSelected" style="display: none;">
+                    Delete Selected (<span id="dbSelectedCount">0</span>)
+                </div>
+                <div class="db-bulk-item" id="btnDbExportPnh" style="display: none;">
+                    Export to PNH
+                </div>
+                <div class="db-bulk-item" id="btnDbExportPnml" style="display: none;">
+                    Export to PNML
+                </div>
+                <div class="db-bulk-item" id="btnDbExportJson" style="display: none;">
+                    Export to JSON
                 </div>
             </div>
+        </div>
+
+        <div class="db-actions">
+            <select id="dbViewSelect" class="db-select"
+                style="margin-right: 15px; background: #333; color: #fff; border: 1px solid #555; padding: 5px; border-radius: 4px;">
+                <option value="petri" selected>View: Petri Nets</option>
+                <option value="graphs">View: Standard Graphs</option>
+            </select>
+            <span id="dbStats" style="margin-right: 15px; font-size: 12px; color: #888;"></span>
+
+            <div class="db-filters-advanced" style="display: flex; gap: 8px; margin-right: 15px; align-items: center;">
+                <div class="filter-unit" title="Min Places">
+                    <span style="font-size: 10px; color: #666;">P≥</span>
+                    <input type="number" id="dbMinP" class="db-input-small" min="0" style="width: 40px;">
+                </div>
+                <div class="filter-unit" title="Min Transitions">
+                    <span style="font-size: 10px; color: #666;">T≥</span>
+                    <input type="number" id="dbMinT" class="db-input-small" min="0" style="width: 40px;">
+                </div>
+                <div class="filter-unit" title="Min Arcs">
+                    <span style="font-size: 10px; color: #666;">A≥</span>
+                    <input type="number" id="dbMinA" class="db-input-small" min="0" style="width: 40px;">
+                </div>
+                <div class="filter-unit" title="Min Tokens">
+                    <span style="font-size: 10px; color: #666;">K≥</span>
+                    <input type="number" id="dbMinK" class="db-input-small" min="0" style="width: 40px;">
+                </div>
+                <div class="filter-unit" title="Graph Class">
+                    <input type="text" id="dbModelClass" class="db-input-small" placeholder="Class"
+                        style="width: 60px;">
+                </div>
+            </div>
+
+            <select id="dbSortSelect" class="db-select">
+                <option value="date_desc">Newest First</option>
+                <option value="date_asc">Oldest First</option>
+                <option value="name_asc">Name A-Z</option>
+                <option value="places_desc">Most Places</option>
+                <option value="places_asc">Least Places</option>
+                <option value="transitions_desc">Most Transitions</option>
+                <option value="transitions_asc">Least Transitions</option>
+                <option value="arcs_desc">Most Arcs</option>
+                <option value="arcs_asc">Least Arcs</option>
+                <option value="tokens_desc">Most Tokens</option>
+                <option value="tokens_asc">Least Tokens</option>
+            </select>
+
+            <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
+                <button id="btnImportDropdown" class="btn primary"
+                    onclick="const m = document.getElementById('importDropdownMenu'); m.style.display = m.style.display === 'none' ? 'block' : 'none';">
+                    Import ▼
+                </button>
+                <div id="importDropdownMenu"
+                    style="display: none; position: absolute; top: 100%; left: 0; background-color: #2a2a2a; border: 1px solid #444; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 9999; min-width: 160px; margin-top: 5px;">
+                    <div style="padding: 10px 15px; border-bottom: 1px solid #444;">
+                        <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 5px;">Format:</label>
+                        <select id="importFormatSelect" class="db-select"
+                            style="width: 100%; background: #222; border: 1px solid #555; color: #ddd; padding: 4px; border-radius: 3px; font-size: 12px;">
+                            <option value="all">Wszystkie dozwolone</option>
+                            <option value=".pnh">Tylko .pnh</option>
+                            <option value=".pnml">Tylko .pnml / .xml</option>
+                            <option value=".json">Tylko .json</option>
+                        </select>
+                    </div>
+                    <label for="importNetInput"
+                        style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left; border-bottom: 1px solid #444;"
+                        onmouseover="this.style.backgroundColor='#444'"
+                        onmouseout="this.style.backgroundColor='transparent'">Select Files</label>
+                    <label for="importFolderInput"
+                        style="display: block; padding: 10px 15px; cursor: pointer; color: #ddd; text-align: left;"
+                        onmouseover="this.style.backgroundColor='#444'"
+                        onmouseout="this.style.backgroundColor='transparent'">Select Folder</label>
+                </div>
+            </div>
+            <input type="file" id="importNetInput" accept=".pnh,.json,.pnml,.xml" multiple style="display: none;">
+            <input type="file" id="importFolderInput" webkitdirectory directory multiple style="display: none;">
+
+            <button id="btnRefreshDb" class="btn secondary">
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Grid Container -->
+    <div id="dbGrid" class="db-grid">
+        <!-- Cards will be injected here -->
+        <div class="empty-state">Loading saved nets...</div>
+    </div>
+</div>

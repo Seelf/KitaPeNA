@@ -357,6 +357,8 @@ const mainEditorContainer = document.getElementById('mainEditorContainer');
 const viewResults = document.getElementById('viewResults');
 
 if (tabEditor && tabDb && tabPerformance) {
+    const statusBar = document.querySelector('.status-bar');
+
     tabEditor.addEventListener('click', () => {
         tabEditor.classList.add('active');
         tabDb.classList.remove('active');
@@ -364,6 +366,8 @@ if (tabEditor && tabDb && tabPerformance) {
         if (mainEditorContainer) mainEditorContainer.style.display = 'flex';
         if (viewPerformance) viewPerformance.style.display = 'none';
         if (viewDatabaseExplorer) viewDatabaseExplorer.style.display = 'none';
+
+        if (statusBar) statusBar.style.display = (state.appContext === 'CONCURRENCY') ? 'flex' : 'none';
 
         if (viewResults) {
             viewResults.style.display = (['MIS', 'PETRI', 'CONCURRENCY'].includes(state.appContext)) ? 'flex' : 'none';
@@ -383,6 +387,7 @@ if (tabEditor && tabDb && tabPerformance) {
         }
         if (mainEditorContainer) mainEditorContainer.style.display = 'none';
         if (viewPerformance) viewPerformance.style.display = 'none';
+        if (statusBar) statusBar.style.display = 'none';
         state.activeActivityTab = 'tabDb';
         saveToLocalStorage();
     });
@@ -394,6 +399,7 @@ if (tabEditor && tabDb && tabPerformance) {
         if (viewPerformance) viewPerformance.style.display = 'flex';
         if (mainEditorContainer) mainEditorContainer.style.display = 'none';
         if (viewDatabaseExplorer) viewDatabaseExplorer.style.display = 'none';
+        if (statusBar) statusBar.style.display = 'none';
         state.activeActivityTab = 'tabPerformance';
         saveToLocalStorage();
     });

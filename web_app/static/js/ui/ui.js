@@ -447,12 +447,54 @@ export function initViewSettings() {
     }
 }
 
-export function showCustomModal(title, message, isConfirm = false, onConfirm = null, onCancel = null) {
+export function showCustomModal(title, message, isConfirm = false, onConfirm = null, onCancel = null, options = {}) {
     const modal = document.getElementById('universalModal');
     if (!modal) return;
 
     document.getElementById('universalModalTitle').textContent = title;
-    document.getElementById('universalModalMessage').innerHTML = message;
+
+    const messageContainer = document.getElementById('universalModalMessage');
+    messageContainer.innerHTML = message;
+
+    const contentBox = modal.querySelector('.modal-content');
+    const bodyBox = modal.querySelector('.modal-body');
+
+    if (contentBox) {
+        if (options.large) {
+            contentBox.style.maxWidth = '80vw';
+            contentBox.style.width = '80vw';
+            contentBox.style.height = '80vh';
+            contentBox.style.display = 'flex';
+            contentBox.style.flexDirection = 'column';
+
+            if (bodyBox) {
+                bodyBox.style.flex = '1';
+                bodyBox.style.display = 'flex';
+                bodyBox.style.flexDirection = 'column';
+                bodyBox.style.overflow = 'hidden';
+            }
+            if (messageContainer) {
+                messageContainer.style.flex = '1';
+                messageContainer.style.display = 'flex';
+                messageContainer.style.flexDirection = 'column';
+            }
+        } else {
+            contentBox.style.maxWidth = '400px';
+            contentBox.style.width = 'auto';
+            contentBox.style.height = 'auto';
+            contentBox.style.display = 'block';
+
+            if (bodyBox) {
+                bodyBox.style.flex = 'none';
+                bodyBox.style.display = 'block';
+                bodyBox.style.overflow = 'visible';
+            }
+            if (messageContainer) {
+                messageContainer.style.flex = 'none';
+                messageContainer.style.display = 'block';
+            }
+        }
+    }
 
     const btnConfirm = document.getElementById('btnUniversalConfirm');
     const btnCancel = document.getElementById('btnUniversalCancel');

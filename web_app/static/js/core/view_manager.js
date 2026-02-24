@@ -111,6 +111,15 @@ function updateToolbars(ctx) {
     const display = (ctx === 'CONCURRENCY') ? 'block' : 'none';
     if (btnCheckTransitive) btnCheckTransitive.style.display = display;
     if (concurrencySeparator) concurrencySeparator.style.display = display;
+
+    // Status / Simulation bar visibility inside the Editor
+    const statusBar = document.querySelector('.status-bar');
+    if (statusBar) {
+        statusBar.style.display = (ctx === 'CONCURRENCY') ? 'flex' : 'none';
+
+        // Ensure flex layout reflows properly by firing a lightweight resize request
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
+    }
 }
 
 function prepareMisView() {

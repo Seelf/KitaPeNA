@@ -5,9 +5,10 @@
 import {
     viewDatabaseExplorer, dbGrid, dbSearchInput, dbSortSelect, btnRefreshDb, dbViewSelect,
     dbMinP, dbMinT, dbMinA, dbMinK, dbModelClass,
-    importNetInput, importFolderInput, dbStats,
+    importNetInput, importFolderInput, importFormatSelect, dbStats,
     currentPage, itemsPerPage, isLoading, hasMore, observer, sentinel,
     selectedNetIds, allLoadedNets, currentNets,
+    PETRI_EXTENSIONS, GRAPH_EXTENSIONS,
     setDomRefs, setSentinel, setObserver, setCurrentPage, setIsLoading,
     setHasMore, setCurrentNets, setAllLoadedNets
 } from './explorer_shared.js';
@@ -30,7 +31,8 @@ export function initDatabaseExplorer() {
         dbMinA: document.getElementById('dbMinA'),
         dbMinK: document.getElementById('dbMinK'),
         dbModelClass: document.getElementById('dbModelClass'),
-        dbViewSelect: document.getElementById('dbViewSelect')
+        dbViewSelect: document.getElementById('dbViewSelect'),
+        importFormatSelect: document.getElementById('importFormatSelect')
     };
     setDomRefs(refs);
 
@@ -59,7 +61,14 @@ export function initDatabaseExplorer() {
     }
 
     if (refs.dbViewSelect) {
-        refs.dbViewSelect.addEventListener('change', () => loadDatabaseItems(true));
+        refs.dbViewSelect.addEventListener('change', () => {
+            updateImportAcceptFilters(true);
+            loadDatabaseItems(true);
+        });
+    }
+
+    if (refs.importFormatSelect) {
+        refs.importFormatSelect.addEventListener('change', () => updateImportAcceptFilters(false));
     }
 
     [refs.dbMinP, refs.dbMinT, refs.dbMinA, refs.dbMinK, refs.dbModelClass].forEach(el => {
@@ -183,6 +192,8 @@ export function initDatabaseExplorer() {
             menuBulk.style.display = 'none';
         }
     });
+
+    updateImportAcceptFilters(true);
 }
 
 export function openDatabaseExplorer() {
@@ -196,6 +207,40 @@ export function closeExplorer() {
     viewDatabaseExplorer.style.display = 'none';
     const tabEditor = document.getElementById('tabEditor');
     if (tabEditor) tabEditor.click();
+}
+
+export function updateImportAcceptFilters(modeChanged = false) {
+    if (!importNetInput || !dbViewSelect || !importFormatSelect) return;
+    const isPetri = dbViewSelect.value === 'petri';
+
+    if (modeChanged) {
+        importFormatSelect.innerHTML = '';
+        importFormatSelect.appendChild(new Option('Wszystkie dozwolone', 'all'));
+
+        if (isPetri) {
+            importFormatSelect.appendChild(new Option('Tylko .pnh', '.pnh'));
+            importFormatSelect.appendChild(new Option('Tylko .pnml / .xml', '.pnml'));
+            importFormatSelect.appendChild(new Option('Tylko .json', '.json'));
+        } else {
+            importFormatSelect.appendChild(new Option('Tylko .json', '.json'));
+            importFormatSelect.appendChild(new Option('Tylko .gml', '.gml'));
+            importFormatSelect.appendChild(new Option('Tylko .graphml', '.graphml'));
+            importFormatSelect.appendChild(new Option('Tylko .edgelist', '.edgelist'));
+        }
+    }
+
+    const selectedFormat = importFormatSelect.value;
+    let acceptStr = '';
+
+    if (selectedFormat === 'all') {
+        acceptStr = isPetri ? PETRI_EXTENSIONS.join(',') : GRAPH_EXTENSIONS.join(',');
+    } else if (selectedFormat === '.pnml') {
+        acceptStr = '.pnml,.xml';
+    } else {
+        acceptStr = selectedFormat;
+    }
+
+    importNetInput.accept = acceptStr;
 }
 
 export async function loadDatabaseItems(reset = false) {
